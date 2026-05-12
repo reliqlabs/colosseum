@@ -1,0 +1,5 @@
+- [User Hardware](user_hardware.md) — Maxed M5 Max MBP, 107GB unified memory
+- [Local Inference Context](user_local_inference.md) — Runs local LLMs at model-max context; KV cache dominates memory math
+- [Local Model Speed Preference](feedback_local_model_speed.md) — Prefers fast MoE over slow dense; dense models get under-used in practice
+- [Reliq / Colosseum / verified-cosmwasm](project_reliq_colosseum.md) — Layered FV methodology project; substrate verification (cosmwasm) → Colosseum methodology → eventual Quartz ranked-choice re-implementation
+- [Colosseum v0.1 gaps from Quartz dogfooding](project_colosseum_gaps.md) — Composition, multi-model honesty, reverse-intent, pyramid axis split, two missing categories, tracer discard criteria, untested MCPs

@@ -1,0 +1,67 @@
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# --- IDE state ---
+.idea/
+.vscode/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# --- Python (MCP wrappers run via `uv run --script` with inline deps;
+#     no venv lives in the tree by default, but guard against accidents) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Rust (none currently in this repo, but reserved for future tracer-bullet
+#     prototypes that might live here) ---
+target/
+Cargo.lock.bak
+
+# --- Editor / OS scratch ---
+*.swp
+*.swo
+*~
+.directory
+nul
+
+# --- Local secrets / private overrides ---
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+secrets.toml
+
+# --- Build outputs from extraction pipelines that produce artifacts
+#     adjacent to source (Aeneas extraction, Lean lake build, etc.) ---
+extracted-lean/
+.lake/
+lake-packages/
+build/
+*.olean
+
+# --- Runtime / cache directories ---
+.crucible/
+.colosseum/
+
+# NOTE: the historical archive/ directory is INTENTIONALLY tracked.
+# It contains a one-time snapshot of the Claude Code transcripts and
+# auto-memory files captured at the crucible→colosseum rename. The live
+# copies live under ~/.claude/projects/-Users-mvid/ and continue to evolve;
+# the archive in this repo is read-only project history.
+#
+# If this repo ever goes public: review archive/transcripts/*.jsonl for any
+# sensitive content (API endpoints, internal paths, conversational drafts)
+# before publishing. The transcripts capture full Claude Code sessions
+# verbatim and may contain artifacts not intended for public release.
