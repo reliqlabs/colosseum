@@ -101,6 +101,24 @@ Now edit the Rust code. Bring the implementation in line with the revised specs.
 
 Resist the temptation to edit code in parallel with specs — the discipline of upstream-first means the code edit becomes the *consequence* of the spec edit, not its driver. If during code editing you discover the spec is impossible to satisfy with reasonable code, return to Step 4 and revise the spec rather than weakening it silently in code.
 
+### Companion-module pattern (for heavy-classpath verification scaffolding)
+
+When a spec revision adds a verification library with a heavy transitive closure — VCV-io, ArkLib, mathlib subsets, large Verus prelude expansions — the naive integration imports the library directly into the affected spec file. This silently widens every downstream file's classpath and can blow `synthInstance.maxHeartbeats` (Lean) or push Verus past its solver budget on unrelated proofs.
+
+The **companion-module pattern** is the disciplined alternative:
+
+1. Keep the existing spec file's imports unchanged. Downstream files that synthesise instances against this module pay no cost.
+2. Add a sibling file `<Module>Lift.lean` (or `<Module>VCVio.lean`, `<Module>Verified.lean` — choose a suffix that names *what the heavy import buys you*).
+3. The companion module imports the heavy library and re-exposes the spec content in the heavier framework's idiom (OracleComp, AsymmEncAlg, refined Verus annotations, etc.).
+4. Composition theorems that need the heavy framework import the companion, not the core spec.
+
+Two health signals confirm the pattern is working:
+
+- **Build cost is flat after the one-time classpath hit.** Adding the second companion module is +1 build job, not +N.
+- **Downstream type-class synthesis paths are unaffected.** Re-run `colosseum-verify`; if downstream proofs that were green before the change are now stuck on instance synthesis, the pattern is being violated somewhere.
+
+Use this pattern whenever the spec revision is *additive in expressive power but contagious in build cost*. It's the structural fix for the failure mode where adding a sound foundation breaks every unrelated proof in the project. (Recorded as a Quartz/VCVio finding — emerged across all five collection-phase steps of the Quartz refactor.)
+
 ## Step 6: Re-verify the pyramid
 
 Run `colosseum-verify`. Expect two kinds of failure:

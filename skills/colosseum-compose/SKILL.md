@@ -68,9 +68,15 @@ Depends on:
   - <Kani harness name> at <file>:<line>  [verified / not yet run]
   - <Quint invariant name> at <file>:<line>  [model-checked / not yet checked]
 Trust boundary: <which dependencies are axiomatic — i.e., not proven from below>
+Bundle cardinality: <N — number of distinct trust-boundary axioms the proof rides on>
+Bundle cardinality (prior ledger): <N' — what this number was last time, if there is a prior ledger>
 ```
 
 The Trust boundary line is load-bearing: it makes explicit which assumptions the composition theorem rides on. A composition theorem with twelve axioms beneath it is a different claim than one with two — both are real verification, but the ledger must show the difference.
+
+The Bundle cardinality line is the *quantitative* readout of trust boundary. Track it across ledger emissions: a theorem that was dual-bundle in ledger N and triple-bundle in ledger N+1 has had its trust surface widened by an intermediate refactor. This drift is often invisible mid-refactor — collection-phase bundling of axioms in upstream modules silently promotes downstream theorems "up the bundle-cardinality ladder". The drift line catches this.
+
+If `bundle cardinality` increased without a deliberate change record explaining it, flag in `## Outstanding work`. If it decreased, that is verification progress and should appear in the coverage delta as a win.
 
 ## Step 4: Trust-boundary axiom inventory
 
@@ -80,11 +86,37 @@ Separately from the composition theorems, produce a flat list of every axiomatic
 Axiom: <fully-qualified name>
 Located at: <file>:<line>
 Kind: <Lean axiom | Verus uninterp spec fn | Verus external_body | sorry-marker | quint assume>
+Bucket: <(a) demotable-to-def-or-dead | (b) demotable-to-derived-theorem | (c) honest-computational-assumption | (d) impossibility-or-over-strength>
+Sub-tag: <see sub-taxonomy below>
 Justification: <one-line — extracted from comments adjacent to the axiom, or "no justification provided">
 Used by: <list of composition theorems that depend on this axiom>
+Discharge path: <what external work would remove the axiom — e.g. "ArkLib Groth16-KS reduction", "concrete bytes hash specification", or "none — axiom is structural">
 ```
 
-Every axiom is a trust claim. The team has earned the right to take it on faith *only if* the justification stands up to review. The ledger makes the set inspectable.
+### 4-bucket sub-taxonomy
+
+When you assign a bucket, also assign a sub-tag. The sub-taxonomy makes (d) inspectable — without it, (d) collapses into "we shrugged" and reviewers cannot tell whether an axiom is provably impossible vs cryptographically standard vs over-strong.
+
+- **(a)** sub-tags: `pure-def` (axiom is a constant or derived computation) · `dead-axiom` (zero downstream dependents; see Step 4.5) · `blocked-by-abstract-carrier` (would be a `def` if the carrier were concrete)
+- **(b)** sub-tags: `derived-from-bundle-axiom` (the axiom is a corollary of a single record/embedding bundle) · `derived-from-spec-model` (the axiom follows from a deterministic spec model the project added)
+- **(c)** sub-tags: `carrier` (opaque type for an externally-supplied representation) · `unforgeability` · `collision-resistance` · `knowledge-soundness` · `circuit-equivalence` · `decisional-hardness` · `named-constant`
+- **(d)** sub-tags: `pigeonhole-impossible` (the axiom's statement is provably false in the spec category — e.g. asserting a collision on a `Function.Embedding`) · `classically-over-strong-single-negligibility` (a single hardness assumption stated as a `Prop` when honesty requires a negligible-advantage hypothesis) · `classically-over-strong-doubled-negligibility` (two distinct hardness assumptions collapsed into one `Prop`) · `classically-over-strong-preconditional` (the axiom is honest only under a stronger precondition than its `Prop` statement admits) · `vacuous-impossible-as-hypothesis` (the axiom appears in a hypothesis position where the impossibility makes the consuming theorem vacuous; lifting the theorem to its probabilistic form forces an honest restatement) · `disjunction-vs-decomposition` (a disjunctive hardness assumption that collapsed at intermediate composition levels but must decompose at the load-bearing terminal lift)
+
+Every axiom is a trust claim. The team has earned the right to take it on faith *only if* the justification stands up to review *and* the bucket-plus-sub-tag stands up to review. The ledger makes both inspectable.
+
+## Step 4.5: Dead-axiom scan
+
+After the inventory is built but before the ledger is emitted, run a dependent-count pass over every axiom. For each axiom:
+
+- Grep the project for references to the axiom's fully-qualified name across spec, proof, and code surface.
+- If the count is zero outside the axiom's own declaration site, the axiom is **dead**: it was added at some point but no theorem or definition currently uses it.
+
+Dead axioms should be:
+
+1. **Flagged in the inventory** with bucket `(a)` and sub-tag `dead-axiom`.
+2. **Listed in their own ledger section** (`## Dead axioms`) with file:line and a one-line recommendation: either delete, or document why the axiom is intentionally kept as a forward-compatibility hook.
+
+This scan is cheap and catches axiom accretion — the failure mode where a refactor removes an axiom's last consumer without removing the axiom. The first time you run this scan on a mature project, expect at least one hit. The first time you run it and find zero, *explicitly say so* — "Dead-axiom scan: 0 hits" is a meaningful ledger entry, not an omission.
 
 ## Step 5: Emit the ledger
 
@@ -121,6 +153,18 @@ Write the ledger to `<project>/.colosseum/ledger.md`. Format:
 | Kani | <count> harnesses | <count passing> | <count> |
 | proptest | <count> properties | <count passing> | <count> |
 
+## Trust density
+
+| Bucket | Sub-tag distribution | Count | Delta vs prior |
+|--------|----------------------|-------|----------------|
+| (a) demotable-to-def-or-dead | <e.g. 3 blocked-by-abstract-carrier> | <count> | <±N> |
+| (b) demotable-to-derived-theorem | <distribution> | <count> | <±N> |
+| (c) honest-computational-assumption | <e.g. 7 carrier, 5 unforgeability, 4 collision-resistance, 3 knowledge-soundness> | <count> | <±N> |
+| (d) impossibility-or-over-strength | <e.g. 2 pigeonhole-impossible, 1 doubled-negligibility, 1 preconditional> | <count> | <±N> |
+| **Total** | | <sum> | <±N> |
+
+Trust density is the readout that says, in one table, *what kind* of trust the project asks reviewers to take. The right shape after a mature refactor is `(b) = 0` (everything bundle-derivable has been derived), `(c)` carrying the bulk (honest cryptographic assumptions), `(d)` minimised and each instance separately accounted for, `(a)` reduced to genuinely-structural items. A project with high `(b)` is verification debt; a project with growing `(d)` without sub-tag justification is silent surface widening.
+
 ## Coverage delta vs. prior ledger
 
 <diff: theorems added, theorems removed, axioms added, axioms removed, coverage shifts>
@@ -145,7 +189,7 @@ Before merging the current branch:
 
 After persisting, report:
 
-- One-line summary: `Composition theorems: N (M with no unproven dependencies). Axioms: K (J justified, K-J unjustified).`
+- One-line summary: `Composition theorems: N (M with no unproven dependencies). Axioms: K (J justified, K-J unjustified). Trust density: (a)=X (b)=Y (c)=Z (d)=W. Bundle-cardinality drift: <largest increase, name + Δ>. Dead-axiom scan: <count> hits.`
 - Absolute path to the ledger
 - Top three outstanding items by criticality
 - A concrete suggested next step:

@@ -6,6 +6,12 @@ A methodology for building dependable software in a world of fast, unreliable LL
 
 This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The first concrete output will be a small Rust program built end-to-end through this process to validate the approach on real code.
 
+## Installing
+
+See **[INSTALL.md](./INSTALL.md)** for full step-by-step instructions. Colosseum composes existing verification tools (Kani, Verus, Aeneas+charon, Quint+Apalache, optionally LM Studio + cloud LLM APIs) through MCP wrappers. Setup is incremental — each tool is optional, and each MCP's health check reports gracefully if its underlying tool is missing.
+
+Tested on **macOS 14+ Apple Silicon**. Linux should mostly work; Windows is untested.
+
 ## Why
 
 LLMs are fast, broad, and characteristically unreliable. Even frontier models at high effort make silly, recoverable mistakes: hallucinated APIs, subtle reasoning errors, plan drift, confident-wrong answers. Traditional correctness mechanisms — code review, human-written tests, manual audit — are human-bottlenecked and scale linearly with reviewer attention. LLM output scales 10–100× faster. That mismatch is the trust gap.
@@ -101,14 +107,24 @@ Initial target stack (Rust ecosystem):
 | Fuzzing | `cargo-fuzz` | Panic/crash discovery |
 | Bounded MC | Kani | Property checking with bounded loops |
 | SMT verification | Verus | Annotation-driven Rust verification |
-| Code → proof | Aeneas | Rust → Lean translation |
+| Code → proof | Aeneas (primary) / hax (alternative) | Rust → Lean (Aeneas) or Rust → F\* (hax) translation |
 | Theorem proving | Lean 4 + mathlib | Deep correctness proofs |
+| Cryptographic foundations | [VCV-io](https://github.com/Verified-zkEVM/VCV-io) | Foundational Lean 4 crypto library — `OracleComp`, `ProbComp`, relational program logic, NIST PQC primitives |
+| SNARK / IOR foundations | [ArkLib](https://github.com/Verified-zkEVM/ArkLib) | Formalized SNARKs over IORs (sum-check, Spartan, FRI, STIR, WHIR, Binius); track for projects using these schemes |
 | Protocol spec | Quint | State-machine and temporal properties |
 | Proof specialist | Goedel Prover V2 | Lean tactic proposal (local) |
 | Lean integration | `lean-lsp-mcp` | Proof state, mathlib search, diagnostics |
 | Orchestration | Claude Code / OpenCode | Planning, error recovery, failure routing |
 
 Model selection follows the same principle as tool selection: cheapest model that can handle the job, with adversarial pairing on critical outputs.
+
+## Related work
+
+This methodology builds on existing work and stays current with adjacent published efforts.
+
+- **VCVio: Verified Cryptography in Lean via Oracle Effects and Handlers** (Tuma, Dao, Waters, Hicks, Hopper; [eprint 2026/899](https://eprint.iacr.org/2026/899)). Foundational Lean 4 framework for cryptographic proofs using algebraic effects + handlers. Closest published peer to Colosseum's methodology stance — explicitly reports on LLM-assisted theorem proving as a data point, including workflows and failure modes. Adopt VCV-io as the Lean substrate for any crypto-touching Colosseum project; it replaces axiomatic stubs (the kind cataloged in a project's integration ledger) with mechanically discharged oracle models.
+- **ArkLib** (Verified-zkEVM, 2025–). Modular SNARK / IOR formalization on top of VCV-io. Active targets: sum-check, Spartan, Merkle trees, FRI, STIR, WHIR, Binius. Not yet covering Groth16 / PLONK / STARKs. Track for projects using FRI-style proof systems.
+- **Aeneas (Charon + Aeneas)** vs **[hax](https://github.com/hacspec/hax)** as Rust-extraction paths. Aeneas targets Lean 4 / Coq / F\* / HOL4; hax targets F\* primarily, with experimental Coq/Lean. Colosseum defaults to Aeneas → Lean for the theorem-proving layer; hax + F\* is a legitimate alternative for users whose toolchain is already F\*-anchored (e.g. HACL\*, miTLS). Tradeoff: Aeneas's Lean targeting composes naturally with mathlib and VCV-io; hax has stronger production-scale adoption in HACL\* and Bertie. ArkLib's roadmap mentions hax as its Rust-extraction path of choice.
 
 ## First project
 
