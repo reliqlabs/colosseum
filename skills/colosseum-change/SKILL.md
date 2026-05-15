@@ -148,6 +148,7 @@ Write a change record to `<project>/.colosseum/changes/<ISO-timestamp>-<short-na
 - Date: <ISO timestamp>
 - Classification: implementation-only | intent-touching
 - Intent revision: <none | new version <N>>
+- Cycle-outcome intent: <one of the four enum values below — REQUIRED for any cycle that produces a `_negl` lift, optional otherwise>
 
 ## Description
 
@@ -171,6 +172,21 @@ Write a change record to `<project>/.colosseum/changes/<ISO-timestamp>-<short-na
 - <any new axioms needing justification>
 - <any deferred work>
 ```
+
+### Cycle-outcome intent enum
+
+The `Cycle-outcome intent` field (v0.2 Ask 7, surfaced from Quartz cycle-6.7 and cycle-6.8 implementations) captures the intent behind a security-lift cycle's outcome. When the cycle's lifted advantage proves identically zero (`failAdv 𝒜 n = 0`), the cycle is *valid but underwhelming* — the conclusion follows unconditionally from the hypotheses, with no probabilistic-failure event. Without explicit declaration, auditors cannot distinguish intentional non-modelling from genuine vacuity.
+
+The four enum values:
+
+1. **`probabilistic-failure-modelled`** (default — the lift bounds a real probabilistic event with non-zero failure advantage). Most cycles fall here.
+2. **`degenerate-by-design — scope excludes the failure event`** (the spec is intentionally not modelling the relevant probabilistic phenomenon under the current carrier abstraction; e.g., Quartz's `session_confidentiality_negl` models deterministic correctness, not CPA security — IND-CPA is out of the current scope by design). A scope-bounded lift is honest within its scope.
+3. **`degenerate-by-accident — abstraction collapsed the failure event`** (the lift is structurally trivial because the carrier model elided the event; a refactor is needed to restore it). This is a methodology obligation — the lift should not ship as a "security lemma" without the refactor.
+4. **`follow-up to add it`** (the lift ships now as `degenerate-by-design` or `degenerate-by-accident`, with a tracked follow-up cycle queued to add the probabilistic claim later).
+
+**Why this is enumerated, not free-form prose**: auditors can grep change records for `Cycle-outcome intent: degenerate-by-accident` and surface all instances at once. Free-form prose buries the audit signal. The discreteness IS the audit affordance.
+
+Quartz cycles 6.7 and 6.8 are `degenerate-by-design — scope excludes the failure event` (ECIES IND-CPA is out of the current spec abstraction's scope). Cycles 6.4-6.6 and 6.9-6.11 are `probabilistic-failure-modelled`.
 
 The change record is the project's history of how its trust claims evolved. Treat it as load-bearing.
 

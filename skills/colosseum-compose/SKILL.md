@@ -67,10 +67,22 @@ Depends on:
   - <axiom or lemma name> at <file>:<line>  [...]
   - <Kani harness name> at <file>:<line>  [verified / not yet run]
   - <Quint invariant name> at <file>:<line>  [model-checked / not yet checked]
+Per-conjunct failure-mode table:
+  | Conjunct | Status | Source |
+  |----------|--------|--------|
+  | P_i      | probabilistic-failure mode (needs negligibility hypothesis) | <underlying primitive> |
+  | P_j      | unconditional theorem | <derived theorem name> |
+  | P_k      | derived from Accepted / hypotheses | <projection name> |
 Trust boundary: <which dependencies are axiomatic — i.e., not proven from below>
-Bundle cardinality: <N — number of distinct trust-boundary axioms the proof rides on>
-Bundle cardinality (prior ledger): <N' — what this number was last time, if there is a prior ledger>
+Bundle cardinality: <K — count of `probabilistic-failure mode` rows in the per-conjunct table>
+Bundle cardinality (prior ledger): <K' — what this number was last time, if there is a prior ledger>
 ```
+
+**Per-conjunct failure-mode table is load-bearing** (v0.2 Ask 6, surfaced from Quartz cycle-6.4-through-6.11 implementation; cross-validated against verified-rcv Round 3a). The bundle cardinality must be **derivable from the per-conjunct table** — specifically the count of `probabilistic-failure mode` rows — NOT a free number pulled from axiom-closure size. The prior Step 6.0–6.3 work in Quartz over-bundled 7 of 8 lifts because it derived cardinality from "how many axioms are in the classical-proof closure" rather than "how many conjuncts of the conclusion have an actual probabilistic-failure event". The terminal lift `cross_component_session_bind_negl` was the most extreme case: 5-summand → single after the table-driven recount.
+
+A conjunct is `probabilistic-failure mode` only if it has an actual probabilistic-failure event under the current spec abstraction. Conjuncts that are unconditional theorems (derived rewrites, equalities, projections from `Accepted`) do not contribute to bundle cardinality.
+
+Verified-rcv's B9 negligibility decomposition went from 5 → 4 summands during Round 3a's revision pass, driven by ad-hoc attack analysis (KMS-leakage = confidentiality, image-registration = operational-fault). The per-conjunct table would have surfaced both at setup time, not as a corrective revision.
 
 The Trust boundary line is load-bearing: it makes explicit which assumptions the composition theorem rides on. A composition theorem with twelve axioms beneath it is a different claim than one with two — both are real verification, but the ledger must show the difference.
 

@@ -26,7 +26,7 @@ Colosseum composes five complementary trust mechanisms. None alone is sufficient
 
 **1. Formal verification.** Mechanistic, composable, produces real guarantees rather than statistical confidence. Limit: can only verify what's specifiable; intent still requires human anchoring.
 
-**2. Multi-model adversarial generation.** One model produces, another attacks. Different model families have different blind spots; combining them gives additive coverage. Crucially, *adversarial beats consensus* — multiple models agreeing can converge on shared wrongness, but an adversary's job is to find faults. This is the sharper version of "multi-model." **Current implementation status:** v0.2 of `colosseum-adversarial` dispatches attacks in parallel across Claude (native), local models via `lm-studio-mcp` (free, always-on adversarial floor), and cloud frontier via `external-model-mcp` (OpenAI + Gemini, opt-in). The orchestrator persists every model's report verbatim and emits a separate synthesis covering shared findings, unique findings, and verdict comparison. The methodology now operates at family-diverse strength; routine spec milestones default to Claude + local (free), high-stakes milestones add cloud.
+**2. Multi-model adversarial generation.** One model produces, another attacks. Different model families have different blind spots; combining them gives additive coverage. Crucially, *adversarial beats consensus* — multiple models agreeing can converge on shared wrongness, but an adversary's job is to find faults. This is the sharper version of "multi-model." **Current implementation status:** `colosseum-adversarial` (v0.3 evidence base) dispatches attacks across four channels: Claude (Agent subagent with file access), local LM Studio models via `lm-studio-mcp`, cloud-provider BYOK via `external-model-mcp` (OpenAI + Gemini), and an operator-curated **gateway** route via the same MCP supporting non-Western frontier voices (Moonshot kimi-k2-6, Zhipu glm-4-7-flash, OpenAI-OSS gpt-oss-120b). The harness-agnostic dispatch manifest at `scripts/colosseum_run.py` lets Claude Code and OpenCode coordinate on the same adversarial run through a shared `run.json` — necessary now that Anthropic-gateway routes are unviable for long-output passes and the Claude voice runs natively while non-Claude voices live in OpenCode. The orchestrator persists every voice's verbatim report and emits a structured synthesis (overlap matrix + verdict tally + false-positives identified) covering shared findings, unique findings, and depth-of-attack divergences. Routine milestones default to Claude + local + 1–2 gateway voices; system-scale milestones require frontier-tier voices across multiple families.
 
 **3. Mechanistic constraints in the substrate.** Pre-LLM-era tools — types, ownership, linters, sanitizers — are underrated when paired with LLM output. Rust's type system rejects whole classes of bugs silently. Cheap, deterministic, no model required.
 
@@ -126,46 +126,49 @@ This methodology builds on existing work and stays current with adjacent publish
 - **ArkLib** (Verified-zkEVM, 2025–). Modular SNARK / IOR formalization on top of VCV-io. Active targets: sum-check, Spartan, Merkle trees, FRI, STIR, WHIR, Binius. Not yet covering Groth16 / PLONK / STARKs. Track for projects using FRI-style proof systems.
 - **Aeneas (Charon + Aeneas)** vs **[hax](https://github.com/hacspec/hax)** as Rust-extraction paths. Aeneas targets Lean 4 / Coq / F\* / HOL4; hax targets F\* primarily, with experimental Coq/Lean. Colosseum defaults to Aeneas → Lean for the theorem-proving layer; hax + F\* is a legitimate alternative for users whose toolchain is already F\*-anchored (e.g. HACL\*, miTLS). Tradeoff: Aeneas's Lean targeting composes naturally with mathlib and VCV-io; hax has stronger production-scale adoption in HACL\* and Bertie. ArkLib's roadmap mentions hax as its Rust-extraction path of choice.
 
-## First project
+## Dogfood projects
 
-A small, sealed Rust program built end-to-end through Colosseum. Goals:
+Methodology validation runs against real projects ("dogfood"), recorded as Rounds. Each round produces concrete evidence — adversarial reports, ledger entries, methodology asks — that drives the next methodology version.
 
-- Validate that the workflow runs cleanly on real (non-toy) code
-- Identify where the pipeline breaks, where it produces friction, and where it adds real value
-- Produce a public artifact others can inspect and re-verify
-- Surface what's missing — tools, prompts, agent definitions, dashboards
+| Round | Project | Scope | Status |
+|---|---|---|---|
+| 1 | Quartz (TDX + zkdcap attestation primitives) | Lean trust-boundary refactor; 8 `_negl` protocol lifts | Steps 1-7 complete; cycle-6.4-through-6.11 def-tying refactor landed 2026-05-14 |
+| 2 | Quartz Round A adversarial review | Multi-model attack on the 8 lifts | Returned BREAKS; surfaced v0.2 Asks 5, 6, 7 |
+| 3a | `verified-rcv` (instant-runoff voting CosmWasm contract + TDX enclave tabulation) | Greenfield methodology validation: intent → first adversarial → revision → sanity-pass → 7-voice re-adversarial → synthesis → revision | Mid-dogfood as of 2026-05-15; intent revised v0.3.0; next: re-attack survival → Quint → Lean → verify pyramid → compose ledger → Quartz comparator |
+| 3b+ | Bidboard (sponsorship-auction contract with anti-sniping, multi-component) | Planned first multi-component dogfood; first test of system-of-intents shape | Pending |
 
-Scope constraints for the first run:
-- ~200 lines of Rust, pure logic, minimal IO
-- Single module, narrow interface
-- An intent document that fits on two pages
-- Five to ten functions, twenty to thirty Lean theorems maximum
+Each round's evidence base lives under the dogfood project's `.colosseum/attacks/`, `.colosseum/changes/`, and `.colosseum/ledger.md`. The methodology asks they surface flow into the relevant SKILLs / docs once stable; tentative candidates awaiting dogfood validation are tracked in `methodology-v0.{N}-candidates.md` files in this repo.
 
-Target completion criterion: a verified module where every public function has either a proven Lean theorem or a `proptest` property with non-trivial coverage, and where the unverified surface is explicitly catalogued.
+Round 3a's combined evidence shipped as v0.3: 8 stable asks back-ported into SKILLs / docs (gateway provider, per-route timeout caveats, theorem-prover exclusion, LM Studio contention discipline, manifest-protocol dispatch, voice-failure-mode catalog, overlap-matrix synthesis, voice diversity metadata) + 6 tentative candidates tracked in `methodology-v0.4-candidates.md` awaiting Round 3b validation. The external sources Round 3a's pattern survey rests on are catalogued in `references.md`.
 
 ## Status
 
-Methodology in development. First verification project pending (target: ranked-choice tabulation algorithm in pure Rust, decomposed from the broader Quartz example).
+Methodology in development. **Round 3a dogfood (`verified-rcv`) is mid-pass** as of 2026-05-15: greenfield methodology validation on an IRV CosmWasm contract + TDX enclave tabulation. Round 3a's evidence motivates the v0.3 ask set; intent doc has survived two adversarial passes + revisions and now awaits a third (gated on power-availability for local model dispatch).
 
-v1 agentic backbone — incremental build in parallel with the first project:
+**Methodology versioning** (this repo): v0.2 set surfaced from Quartz Round A is partially shipped (documented form; enforced form gated on the executable-layer decision); v0.3 set surfaced from Round 3a is split into stable (back-ported into SKILLs / docs) and tentative (tracked in `methodology-v0.4-candidates.md` awaiting Round 3b validation). External pattern-survey sources are catalogued in `references.md`.
+
+v1 agentic backbone:
 
 | Component | Type | Status | Path |
 |-----------|------|--------|------|
-| goedel-mcp | MCP server | v0.1 (✓ stdio-validated, Goedel V2 32B reachable via LM Studio) | `mcp/goedel-mcp/` |
+| goedel-mcp | MCP server | v0.1 (✓ stdio-validated, Goedel V2 32B reachable via LM Studio). **Methodology note**: goedel-class models excluded from adversarial spec review per v0.3 Ask C — verify-pyramid use only. | `mcp/goedel-mcp/` |
 | kani-mcp | MCP server | v0.1 (✓ stdio-validated, cargo-kani 0.67.0; 41/41 Quartz harnesses discovered) | `mcp/kani-mcp/` |
 | verus-mcp | MCP server | v0.1.1 (✓ stdio-validated, Verus 0.2026.05.05; comment-FP bug fixed) | `mcp/verus-mcp/` |
 | aeneas-mcp | MCP server | v0.1.2 (✓ end-to-end: Rust→LLBC→Lean pipeline; `--preset=aeneas`, `-backend` flags fixed, `rocq` backend added, `.lake/` exclusion) | `mcp/aeneas-mcp/` |
 | quint-mcp | MCP server | v0.1 (✓ end-to-end: quint 0.32.0 + Quartz handshake.qnt run completed 3704 traces/sec, 22/22 invariants discovered) | `mcp/quint-mcp/` |
-| external-model-mcp | MCP server | v0.1 (✓ stdio-validated; OpenAI + Gemini single-shot + fan-out; needs API keys to query) | `mcp/external-model-mcp/` |
-| lm-studio-mcp | MCP server | v0.1 (✓ stdio-validated; 6 local models loaded; fan-out exercises concurrency at LM Studio's scheduler) | `mcp/lm-studio-mcp/` |
+| external-model-mcp | MCP server | **v0.2** (✓ Round 3a-validated; OpenAI + Gemini single-shot + fan-out + **gateway channel** for operator-curated multi-model routes; `.env`-loaded credentials, no URLs/tokens in code). See `gateway-bugs-2026-05-14.md` for known route failure modes. | `mcp/external-model-mcp/` |
+| lm-studio-mcp | MCP server | v0.1 (✓ stdio-validated; cross-session contention discipline documented in v0.3 Ask D — use `lms load` before dispatch + retry-on-unload) | `mcp/lm-studio-mcp/` |
 | colosseum-spec-adversary | Subagent | v0.1.1 (+ `temporal_state_mismatch` category) | `agents/colosseum-spec-adversary.md` |
 | colosseum-failure-classifier | Subagent | v0.1.1 (+ `state_space_blowup` category) | `agents/colosseum-failure-classifier.md` |
-| `colosseum-intent` | Skill | v0.2 (elicitation mode; structured behavior blocks + state/temporal invariant tagging) | `skills/colosseum-intent/` |
+| `colosseum-intent` | Skill | v0.2 (elicitation mode; structured behavior blocks + state/temporal invariant tagging). v0.4 candidate extension for system-of-intents shape (Ask I in `methodology-v0.4-candidates.md`). | `skills/colosseum-intent/` |
 | `colosseum-reverse-intent` | Skill | v0.2 (distillation mode; same structural discipline applied retroactively) | `skills/colosseum-reverse-intent/` |
-| `colosseum-adversarial` | Skill | v0.2 (multi-model dispatch + synthesis; Claude + local + cloud) | `skills/colosseum-adversarial/` |
-| `colosseum-verify` | Skill | v0.1 (untested end-to-end) | `skills/colosseum-verify/` |
-| `colosseum-compose` | Skill | v0.1 (cross-component theorems + integration ledger + axiom inventory) | `skills/colosseum-compose/` |
-| `colosseum-change` | Skill | v0.1 (change-loop: triage → intent diff → impact → upstream-first revisions → re-verify → composition re-check) | `skills/colosseum-change/` |
+| `colosseum-adversarial` | Skill | **v0.3** (Round 3a-validated: gateway channel + per-route timeout caveats + theorem-prover specialist exclusion + ops notes on cross-session contention + harness-agnostic manifest forward-pointer) | `skills/colosseum-adversarial/` |
+| `colosseum-verify` | Skill | v0.1 (untested end-to-end; gated on Round 3a Quint/Lean phases) | `skills/colosseum-verify/` |
+| `colosseum-compose` | Skill | v0.1 (cross-component theorems + integration ledger + axiom inventory). v0.4 candidate extension for spec-version tracking (Ask N in `methodology-v0.4-candidates.md`). | `skills/colosseum-compose/` |
+| `colosseum-change` | Skill | v0.1 (change-loop: triage → intent diff → impact → upstream-first revisions → re-verify → composition re-check). v0.2 candidate extension for cycle-outcome-intent enum per v0.2 Ask 7. | `skills/colosseum-change/` |
+| `colosseum_run.py` | **Manifest tool (new in v0.3)** | ✓ prototype; harness-agnostic dispatch coordinator; exercised on retrofitted Round 3a run dir | `scripts/colosseum_run.py` |
+| `references.md` | **Source register (new in v0.3)** | ✓ comprehensive; 9 sections covering decomposition / compositional verification / long-context LLMs / spec versioning / tooling / domain / internal artifacts | `references.md` |
+| `methodology-v0.4-candidates.md` | **Tentative-asks register (new in v0.3)** | ✓ 6 v0.4 candidates (system-of-intents shape, per-section dispatch, file-access subagent dispatch, frontier-tier requirement, assume-guarantee inter-component invariants, SemVer + compose-ledger versioning); v0.3 stable asks back-ported into SKILLs / docs and indexed in this file's lookup table | `methodology-v0.4-candidates.md` |
 | coverage dashboard CLI | Deterministic tool | deferred to v1.1 | `tools/` |
 
-This README is the working specification of the process itself — it will evolve as the first verification project and the v1 backbone surface what works and what does not.
+This README is the working specification of the process itself — it will evolve as Round 3a closes and the v0.3 ask set lands.

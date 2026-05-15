@@ -242,7 +242,9 @@ The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration n
 
 ## 7. Optional: cloud model layer
 
-For genuine family diversity across providers (Claude + GPT + Gemini), register `external-model-mcp` with API keys:
+`external-model-mcp` v0.2 exposes three provider channels — `query_openai` (OpenAI BYOK), `query_google` (Google BYOK), and `query_gateway` (operator-curated multi-model gateway). The MCP loads credentials from `.env` files (gitignored) following this search order: `$COLOSSEUM_DOTENV` override → `$CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Setting env vars on the MCP launch line still works as before; the `.env` path is operationally cleaner.
+
+For BYOK across Claude + GPT + Gemini:
 
 ```bash
 claude mcp remove -s user external-model
@@ -253,7 +255,22 @@ claude mcp add -s user external-model \
   -- $COLOSSEUM/mcp/external-model-mcp/external_model_mcp.py
 ```
 
-Either key works alone. Both give full coverage.
+For the **gateway** channel (one credential, multiple models including non-Western frontier voices like kimi-k2-6, glm-4-7-flash, gpt-oss-120b):
+
+```bash
+# Drop credentials into <colosseum-repo-root>/.env (gitignored). Example:
+cat >> $COLOSSEUM/.env <<EOF
+COLOSSEUM_GATEWAY_BASE_URL=https://your-gateway-host/v1
+COLOSSEUM_GATEWAY_API_KEY=xxx
+COLOSSEUM_GATEWAY_DEFAULT_MODEL=claude-opus-4-7
+EOF
+
+# Restart the MCP / Claude Code session so the env is picked up.
+```
+
+The gateway is operator-curated; the model list drifts. Pin model IDs in adversarial-pass artifacts (see `skills/colosseum-adversarial/SKILL.md` Step 4 + `gateway-bugs-2026-05-14.md` for known per-route failure modes / timeouts).
+
+Any single credential channel works alone; using all three gives maximum coverage.
 
 ---
 
