@@ -70,40 +70,85 @@ The system-prompt portion is read from `agents/colosseum-spec-adversary.md` (str
 
 Dispatch happens in parallel — every requested provider attacks concurrently.
 
-**Two dispatch shapes are supported**:
+**Three dispatch modes, ordered by preference.** The verified-rcv Round 3a calibration (2026-05-14 → 2026-05-16) demonstrated that Mode 1 produces strictly better output than Mode 3 for non-trivial specs: more attacks per voice, less hedging, no first-attempt-truncation pattern, and sidesteps the gateway 240s cap structurally. Use Mode 1 as the default; fall back to Mode 3 only when the listed conditions apply.
 
-- **In-process** (this section) — the running Claude Code session dispatches each voice as a child Agent / MCP call, blocks until all return, then synthesizes. Works when every voice can be invoked from one harness.
+| Mode | When to use | Key property |
+|---|---|---|
+| **1. OpenCode + spec-adversary agent (ReAct)** | Default for non-trivial specs (≥ 5K tokens). Required for gateway-prone voices (kimi-k2-6, gpt-oss-120b). Recommended for any voice that supports tool use. | Multi-turn ReAct loop breaks one model invocation into N HTTP requests, each under the gateway's 240s cap. |
+| **2. Claude Code Agent subagent** | The Claude voice slot in a multi-model ensemble. | Direct Anthropic API; no gateway hop; no Bug 3 / Bug 4 exposure. |
+| **3. Inline single-HTTP-request** | Fallback. Use when (a) spec is small (< 5K tokens) and the ReAct overhead isn't worth paying, (b) the voice is local + tool-use-unfriendly (some older non-tool-trained LM Studio models), or (c) the harness doesn't have OpenCode/ReAct available. | Simpler. Single HTTP request, single response. Exposed to gateway timeout caps. |
 
-- **Harness-agnostic manifest** (`scripts/colosseum_run.py` — v0.3+) — for cases where voices live in different harnesses (e.g., Claude voice runs in Claude Code with the Agent subagent, non-Claude voices run in OpenCode with native multi-provider subagents + file access + step budgets that work around per-voice timeouts). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage. Recommend this shape when (a) the Anthropic-via-gateway route is unviable for the non-Claude voices (Bug 4) and Claude must run in-process, or (b) voices need file-access tools that the MCP-call channels can't provide.
+**Two orchestration shapes** layered on top of the modes above:
 
-- **claude** — invoke the `colosseum-spec-adversary` subagent via the Agent tool. Claude operates with full tool access (Read, Grep, Glob, Bash); the inlined prompt body is supplemental, not the only input. This subagent can re-read files, check related code, run diagnostics.
+- **In-process** — the running Claude Code session dispatches each voice as a child Agent / MCP call, blocks until all return, then synthesizes. Works when every voice can be invoked from one harness (Mode 2 + Mode 3 inlined MCPs).
+- **Harness-agnostic manifest** (`scripts/colosseum_run.py` — v0.3+) — voices live in different harnesses (Claude voice in Claude Code via Mode 2, non-Claude voices in OpenCode via Mode 1). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage. Required when Mode 1 is in the panel and Claude must remain in-process.
 
-- **local** — call `lm-studio-mcp`'s `fan_out_local` with `models=` set to the user's preferred local pair (default: all loaded). The inlined prompt is the only input — local models have no file access. Quality is lower than Claude / cloud frontier but lineage is genuinely different.
+### Mode 1: OpenCode + spec-adversary agent (ReAct) — recommended default
 
+Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adversary.md` (canonical source) → installed via `colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/` into the project's `.opencode/agent/` directory. The agent reads the target spec on demand via OpenCode's Read tool (`permission.read: allow`); the invocation message names a `TARGET_SPEC` path plus an optional `TARGET_SLICE` for per-section dispatch.
+
+**Invocation shape**:
+
+```bash
+opencode run --agent spec-adversary --model burnt/kimi-k2-6 \
+  --format default --dangerously-skip-permissions \
+  "TARGET_SPEC: /path/to/intent.md\n\nTARGET_SLICE: temporal-invariants — ..."
+```
+
+Orchestrate (voice × slice) pairs from a Python script that captures stdout per call and writes per-section files. Reference implementation: `verified-rcv/.colosseum/scripts/opencode_dispatch.py`.
+
+**Per-voice voice IDs to pass to `--model`** (gateway-routed via OpenCode's `burnt` provider configured in `~/.config/opencode/opencode.jsonc`):
+
+- `burnt/claude-opus-4-7`, `burnt/claude-sonnet-4-6` — Anthropic via gateway (Bug 4 status open under ReAct — single-call response stays under 127s)
+- `burnt/kimi-k2-6` — Moonshot
+- `burnt/glm-4-7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per Round 3a 2026-05-16 calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class, glm-4-7-flash is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use the full glm-4-7 (non-flash) or pull a comparable model into LM Studio
+- `burnt/gpt-oss-120b` — OpenAI-OSS
+- `burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b` — NVIDIA Nemotron 3 120B-A12B MoE via Cloudflare; reasoning-on; added to gateway 2026-05-16
+- `burnt/gemini-2-5-flash`, `burnt/gemini-3-1-flash-lite` — Google
+- `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`)
+
+**Required configuration in `opencode.jsonc`**: set `limit.output ≥ 65536` (recommend `131072`) per gateway model so Turn 2's analysis response budget never hits a cap mid-report. With the default 16K cap, thorough reasoning models truncate mid-sentence and the orchestrator's retry loop fires; raising to 64K+ makes that pattern disappear.
+
+**Empirical results (2026-05-16 verified-rcv calibration on intent v0.3.0, single-voice sequential, output cap 131072)**:
+
+| Voice | Per-slice wall time | Per-slice output | Retry rate |
+|---|---|---|---|
+| `kimi-k2-6` (ReAct, single sequential) | 143-371s | 6.8-15.0K chars | ~10% |
+| `kimi-k2-6` (inlined, 8K max_tokens) | 125s | 35K chars, truncated at length | n/a (truncated) |
+
+ReAct mode caught **5 attacks on state-invariants** (S5/S6/S9/S10 + Block 6 set-relations); inlined kimi found 1 hedged S5 mention. Committed where inlined hedged.
+
+**Failure mode to expect** (under-budgeted): "first attempt fails, retry succeeds" pattern when output cap is at 16K. The model writes its complete report up to the cap and gets cut off; the orchestrator's retry hits a more concise sampling path. Raising the cap eliminates the retries.
+
+### Mode 2: Claude Code Agent subagent — the Claude voice
+
+Invoke the `colosseum-spec-adversary` subagent (at `colosseum/agents/colosseum-spec-adversary.md`) via the Agent tool. The same canonical body powers it; the Claude Code frontmatter (`tools: Read, Grep, Glob, Bash`) gives it full file-access.
+
+Claude operates with native tool access; the inlined prompt body is supplemental, not the only input. This subagent can re-read files, check related code, run diagnostics. No gateway hop, no Bug 3 / Bug 4 exposure.
+
+This is the canonical Claude voice for multi-model ensembles. Run it via the Agent tool in parallel with the OpenCode voices; results are captured as the Agent tool's returned text.
+
+### Mode 3: Inline single-HTTP-request (fallback)
+
+When Mode 1 isn't viable (small spec, tool-use-unfriendly voice, OpenCode not available):
+
+- **gateway** — call `external-model-mcp`'s `query_gateway(prompt=..., model="<gateway-model-id>")`. The gateway is an operator-curated OpenAI-format multi-model endpoint; available `model` ids drift with operator curation (current set: `claude-opus-4-7`, `claude-sonnet-4-6`, `gemini-2-5-flash`, `gemini-3-1-flash-lite`, `glm-4-7-flash`, `gpt-oss-120b`, `kimi-k2-6`).
+- **local** — call `lm-studio-mcp`'s `fan_out_local` with `models=` set to the user's preferred local pair (default: all loaded). The inlined prompt is the only input — local models have no file access in this mode.
 - **openai** — call `external-model-mcp`'s `query_openai(prompt=...)`. The inlined prompt is the only input.
+- **google** — call `external-model-mcp`'s `query_google(prompt=...)`.
 
-- **google** — call `external-model-mcp`'s `query_google(prompt=...)`. The inlined prompt is the only input.
+**Gateway configuration**: the MCP loads `COLOSSEUM_GATEWAY_BASE_URL` + `COLOSSEUM_GATEWAY_API_KEY` + `COLOSSEUM_GATEWAY_DEFAULT_MODEL` from `.env` (gitignored). Search order: `$COLOSSEUM_DOTENV` env override → `CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. After editing `.env` the MCP process must restart.
 
-- **gateway** — call `external-model-mcp`'s `query_gateway(prompt=..., model="<gateway-model-id>")`. The gateway is an operator-curated OpenAI-format multi-model endpoint; available `model` ids drift with operator curation (current set: `claude-opus-4-7`, `claude-sonnet-4-6`, `gemini-2-5-flash`, `gemini-3-1-flash-lite`, `glm-4-7-flash`, `gpt-oss-120b`, `kimi-k2-6`). Picking the gateway gives the cleanest path to family-diverse non-Western reasoning voices (Moonshot `kimi-k2-6`, Zhipu `glm-4-7-flash`) without provisioning per-provider BYOK keys.
+**Inline-mode timeout caveats** (do NOT apply to Mode 1, which sidesteps them via ReAct):
 
-  Configuration: the MCP loads `COLOSSEUM_GATEWAY_BASE_URL` + `COLOSSEUM_GATEWAY_API_KEY` + `COLOSSEUM_GATEWAY_DEFAULT_MODEL` from `.env` (gitignored). Search order: `$COLOSSEUM_DOTENV` env override → `CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Each project's working directory is the natural place to drop a project-local `.env` so the MCP picks it up when launched with that CWD. After editing `.env` the MCP process must restart (env vars are read at MCP start, not per-call) — easiest is to restart the Claude Code session.
+- **Gateway-wide ~240s ceiling** (Bug 3). Calibrate `max_tokens` per upstream model's generation speed to fit under it. Empirical values at a ~22K-token prompt: `kimi-k2-6` ≤ 8K (133s); `glm-4-7-flash` ≤ 16K (152s); `gpt-oss-120b` 16K in 47s. Above these, HTTP 408. Truncation at the cap loses the verdict line and most of the latter half of the report.
+- **Anthropic-route ~127s ceiling** (Bug 4, Cloudflare 524). `claude-opus-4-7` and `claude-sonnet-4-6` hit it on long+high-budget inlined dispatches. Anthropic-via-gateway is unviable for long-output single-request adversarial passes. For the Claude voice, **prefer Mode 2** (Agent subagent).
 
-  **Timeout caveats** (observed 2026-05-14; see `<project>/.colosseum/gateway-bugs-2026-05-14.md` Bugs 3+4): there are *two* timeout layers in front of the gateway:
-  
-  - **Gateway-wide ~240s ceiling** (Bug 3, likely Cloudflare inbound proxy). Affects every route. Calibrate `max_tokens` per upstream model's generation speed to fit under it. Empirical 2026-05-14 values at a ~22K-token prompt:
-    - `kimi-k2-6`: ≤ 8192 (133s); 16K blows cap (238s, HTTP 408)
-    - `glm-4-7-flash`: ≤ 16384 (152s); 24K blows cap (238s, HTTP 408)
-    - `gpt-oss-120b`: 16K finished in 47s, much higher should be safe
-    - Prompt length is a free variable; pin observed elapsed + max_tokens in your meta.md
-  - **Anthropic-route ~127s ceiling** (Bug 4, Cloudflare 524). Both `claude-opus-4-7` and `claude-sonnet-4-6` hit it on long+high-budget dispatches. Anthropic-via-gateway is currently unviable for long-output adversarial passes. **For the "Claude voice" slot in a multi-model ensemble, run Claude via the Agent subagent** (file-access, no gateway dependency) — that path was the dispatch-plan recommendation anyway.
-  
-  **Parameter quirk**: `claude-opus-4-7` rejects the `temperature` request parameter (HTTP 400 "`temperature` is deprecated for this model"). Omit `temperature` when calling that model id. The MCP's `query_gateway` accepts `temperature=None` to opt out.
-  
-  Pin the exact model id + max_tokens + observed elapsed in your dispatch ledger so the timeout shape is reproducible across runs.
+**Parameter quirk**: `claude-opus-4-7` rejects the `temperature` request parameter (HTTP 400). Omit `temperature` when calling that model id. The MCP's `query_gateway` accepts `temperature=None` to opt out.
 
-  **Reproducibility discipline**: gateway model ids are operator-curated and change between sessions; record the exact `model` parameter you invoked in your meta.md so future re-runs are honest.
+**Reproducibility discipline**: pin the exact model id + max_tokens + observed elapsed in your dispatch ledger so the timeout shape is reproducible across runs.
 
-(For "openai" and "google" together, you may use `external-model-mcp`'s `fan_out_query(prompt, providers=["openai", "google"])` for one round-trip. The gateway is per-model — there is no fan-out across gateway models in one MCP call; dispatch them as separate `query_gateway` calls in parallel, or use a project-local Python wrapper that reads the same `.env` and posts to the gateway directly. Verified-rcv's `.colosseum/scripts/fan_out_dispatch.py` is one such pattern.)
+(For "openai" and "google" together, you may use `external-model-mcp`'s `fan_out_query(prompt, providers=["openai", "google"])` for one round-trip. The gateway is per-model — there is no fan-out across gateway models in one MCP call.)
 
 ### Excluded model classes — theorem-prover specialists
 

@@ -146,6 +146,94 @@ For N-ary interactions (3+ components participating in a single invariant), esca
 
 ---
 
+## Round 3a continuation candidates (validated 2026-05-19)
+
+A second wave of Round 3a fan-out cycles (v10 fresh-state, v11 intent-tightened, cross-critique, defense, re-cross-critique) produced direct evidence for the next six asks. Unlike Asks I–N (pattern-survey-only), these have dogfood backing — but have not yet been back-ported into SKILLs. They are tentative in that sense only.
+
+Evidence trail: `verified-rcv/.colosseum/specs/{synthesis-2026-05-19, cross-critique-2026-05-19, critique-and-defense-2026-05-19, critique-revised-canonical-2026-05-19}/`.
+
+### Ask O — Cross-critique as standard post-fan-out step
+
+**Evidence**: 2026-05-19 cross-critique round caught two defects that v11 synthesis alone missed — kimi flagged gpt-5.5's tautological S9 shadow (`val s9_shadow = true`); gpt-5.5 flagged kimi's B8 tautology. Both critics also independently identified the canonical's S8/S9 trivial encoding in a separate canonical-critique round. Synthesis aggregation across voices did NOT detect tautological-shadow defects because each voice fell into the same trap. Cross-voice review broke the symmetry.
+
+**Symptom this addresses**: Tautological-shadow defects (`val foo_shadow = true`, vacuous bounds in place of real predicates) typecheck cleanly, satisfy all_invariants vacuously, and survive intent-tightened fan-out + synthesis. They surface only when a voice is asked to read another voice's spec with explicit failure-mode prompts.
+
+**Proposed shape**: After fan-out + synthesis, dispatch a cross-critique round. Each voice reviews ANOTHER voice's spec (not their own) against a Q1/Q2/Q3 structured prompt:
+- Q1: Does each named predicate encode the intent's claim, or is it tautological/vacuous?
+- Q2: Are there state-space gaps where the spec is unreachable in regions the intent requires reachable?
+- Q3: Single most material remaining concern?
+
+The Q1/Q2/Q3 shape forces structured findings instead of free-form review, which suppresses sycophancy and produces non-trivial findings even when the spec is broadly sound.
+
+**Recommended dogfood**: any v0.4 multi-voice project where synthesis produces a candidate canonical.
+
+**Codified form (v0.4 target)**: extend `skills/colosseum-adversarial/SKILL.md` with a new Step 6.5 (cross-critique) between Step 6 (synthesis) and acceptance. `scripts/colosseum_run.py` manifest gains a `cross_critique` phase with each entry naming reviewer voice + target voice + structured prompt.
+
+### Ask P — Defense round for canonical-defect adjudication
+
+**Evidence**: 2026-05-19 critique-and-defense round on the verified-rcv canonical. After two reviewers (kimi, gpt-5.5) independently flagged the S8/S9 omission, two defense voices were dispatched at `--variant high` with the explicit defend/concede/third-option protocol. Both defenses CONCEDED with reasoning ("the predicates as stated are bounds, not the intent's claim"). No anchoring observed. The protocol produced actionable consensus, not a stalemate.
+
+**Symptom this addresses**: A naive synthesis step may anchor on a flawed canonical that nobody questions in a free-form review. Defense round forces structured choice — defend (with reasoning), concede (with reasoning), or third-option (with new proposal) — making the protocol's failure mode explicit and surfacing genuine disputes when they exist.
+
+**Proposed shape**: When cross-critique surfaces a non-trivial defect claim, dispatch a defense round before applying fixes. Voices: ideally the canonical's author voice + one of the original critics + a third independent voice. Each voice must explicitly defend / concede / propose-third-option with reasoning. Near-unanimous concede mandates the fix.
+
+**Recommended dogfood**: any v0.4 project where cross-critique flags a load-bearing defect in the canonical.
+
+**Codified form (v0.4 target)**: extend `skills/colosseum-adversarial/SKILL.md` Step 6.5 / 6.6 with the defense protocol. Reference dispatch: `verified-rcv/.colosseum/scripts/critique_and_defense_dispatch.py`.
+
+### Ask Q — Intent-tightening on encoding-discipline as the convergence lever
+
+**Evidence**: 2026-05-19 v10 (fresh-state regeneration on intent v0.3.1) did NOT converge voices on the same encoding axes that diverged in v9 — confirming fresh-state alone is not a convergence lever. v11 with intent v0.3.2 added two encoding-discipline notes — A2 (enclave-layer state requirement for B10 chain-side projection) and A3 (B2 snapshot-invariant requirement, not pure action-guard) — and DID move voice convergence on those exact axes. Intent-tightening on encoding-discipline is the convergence lever; re-rolling the dice on the same intent is not.
+
+**Symptom this addresses**: When fan-out voices diverge on the same encoding choice across regenerations, the divergence is not stochastic — it reflects under-specification in the intent. Re-running the fan-out without changing the intent reproduces the divergence. The intent doc must be revised to constrain the encoding choice.
+
+**Proposed shape**: Intent doc carries an "encoding-discipline notes" section (A1, A2, A3, ...) for each axis where fan-out has surfaced divergence-as-under-specification. Each note specifies WHAT MUST be in the spec (e.g., A2: "the protocol model MUST include enclave-side state variables for B10 chain-side projection to be checkable"). The next fan-out converges on that axis.
+
+**Recommended dogfood**: any v0.4 project where two fan-out runs show divergence on the same encoding choice.
+
+**Codified form (v0.4 target)**: `skills/colosseum-intent/SKILL.md` adds an "encoding-discipline notes" subsection pattern (Section 9 of the intent template, or appendix). `colosseum-adversarial/SKILL.md` Step 6 synthesis explicitly searches for divergence-as-symptom-of-under-specification and proposes encoding-discipline-note candidates back to the intent.
+
+### Ask R — Re-cross-critique after canonical revision (mandatory if revision touches load-bearing predicates)
+
+**Evidence**: 2026-05-19 re-cross-critique caught two defects introduced by the canonical revision itself — kimi flagged the `bt_tallied = oneOf(Set(0,1,2,3,5))` coverage hole (missing 4 for 5-candidate case, making resolution unreachable from any 4-voter trace); gpt-5.5 flagged `is_tally_spec_output`'s name overstating its scope (chain-observable subset only, not full IRV correctness). Both findings actionable; both fixes applied same session. Without the re-cross-critique step, both regressions would have shipped silently.
+
+**Symptom this addresses**: Fixes to verified specs introduce new defects, especially when the fix shape is novel (bounded nondet, scope-rename, new ghost variable). The canonical author's local context is insufficient to catch all regressions. External eyes, re-applying the same Q1/Q2/Q3 protocol, are cheap (~5 min wall-clock per voice) and reliably catch revision-induced defects.
+
+**Proposed shape**: After applying fixes from cross-critique + defense, run a re-cross-critique round before accepting the revision. Same harness as the original cross-critique; same Q1/Q2/Q3 prompt structure with "is the fix structurally sound?" prepended. Q2 narrowed to "did the revision introduce new defects?"
+
+**Recommended dogfood**: any v0.4 project where canonical is revised in response to cross-critique findings touching load-bearing predicates.
+
+**Codified form (v0.4 target)**: extend `skills/colosseum-adversarial/SKILL.md` Step 6.7 with mandatory re-cross-critique whenever a revision touches a load-bearing predicate or invariant. Reference dispatch: `verified-rcv/.colosseum/scripts/revised_canonical_critique.py`.
+
+### Ask S — Ghost-variable encoding for action-guard-only invariants
+
+**Evidence**: kimi's 2026-05-19 re-cross-critique flagged B1 (tally_result monotone-once-set) as encoded only as `publish_result`'s action-guard `not(contract_tally_result.present)`. No state-side invariant catches an action-set drift that bypasses the guard. By contrast B2 in v0.3.2 was correctly encoded as a snapshot ghost variable (`ghost_ballots_at_end_at`) plus a state invariant (`inv_b2_ballots_at_end_at_frozen`). The pattern generalizes to B5/B6/B7 (all currently action-guard-only in verified-rcv's canonical).
+
+**Symptom this addresses**: When a behavioral invariant is encoded only as an action-guard, the model checker has nothing to flag if a future action is added or modified that bypasses the guard. Action-set drift becomes a silent correctness regression. The model checker's job is to check invariants; encoding the property as a guard alone takes the model checker out of the verification loop for that property.
+
+**Proposed shape**: When a behavioral invariant could be encoded as either action-guard OR ghost-variable+state-predicate, prefer the latter. Pattern:
+- Ghost variable captures the load-bearing state at the moment of the protected transition (e.g., `ghost_published_tally` snapshots `contract_tally_result` at publication).
+- State invariant checks the relation against the ghost (e.g., `if (contract_tally_result.present) then contract_tally_result == ghost_published_tally`).
+- Action-guard remains for liveness/well-definedness but is no longer load-bearing for safety.
+
+**Recommended dogfood**: any v0.4 protocol spec with monotone-set / freeze-at-time / write-once invariants. Verified-rcv's B1/B5/B6/B7 are direct back-port targets.
+
+**Codified form (v0.4 target)**: extend or create `skills/colosseum-spec-encoding/SKILL.md` (or section in `colosseum-adversarial/SKILL.md` Step 5) naming ghost-variable+state-invariant as the preferred encoding pattern for the freeze-at-time invariant class. Document the action-set-drift failure mode the pattern defends against.
+
+### Ask T — `--variant high` (or equivalent reasoning-effort flag) as default for spec-class adversarial work
+
+**Evidence**: 2026-05-19 cross-critique, defense, and re-cross-critique rounds all dispatched at `--variant high`. Findings produced were non-trivial (tautological-shadow detection, scope-name overstating, state-space coverage hole) and the defense rounds produced honest concessions rather than sycophantic agreement. The CLI flag is accepted by both gateway-routed and native-provider channels in opencode; the `opencode.jsonc` `variants.high.reasoningEffort` config supports it across the reasoning-tier models (claude-opus-4-7, gemini-2.5-flash, nemotron, gpt-5.5, kimi-k2-6).
+
+**Symptom this addresses**: Reasoning models at default reasoning-effort produce shallower critiques. Tautological-shadow detection in particular benefits from the additional reasoning budget — the failure mode is "predicate typechecks and reads as substantive but does no work," which requires the reviewer to actually evaluate what the predicate says, not just that it parses.
+
+**Proposed shape**: Spec-class adversarial dispatch (intent review, spec review, cross-critique, defense, re-cross-critique) defaults to `--variant high` (or provider-specific equivalent) for any model with `reasoningEffort` configuration. Cost: more tokens per call. Benefit: adversarial quality, which is the load-bearing axis for adversarial passes.
+
+**Recommended dogfood**: any v0.4 project. Already exercised in verified-rcv Round 3a continuation; cost was acceptable and findings improved.
+
+**Codified form (v0.4 target)**: extend `skills/colosseum-adversarial/SKILL.md` Step 4 dispatch table with `--variant high` annotation per voice (or provider-equivalent reasoning-effort flag). `scripts/colosseum_run.py` manifest schema gains a `variant` field per-voice with default `high` for spec-class phases. Document provider-specific equivalents (e.g., Anthropic `thinking.budget_tokens`, OpenAI `reasoning.effort`, Google `thinking.thinking_budget`, NVIDIA `extra_body.reasoning_effort`).
+
+---
+
 ## Carry-forward from v0.2
 
 The v0.2 ask file at `quartz/.colosseum/methodology-v0.2-asks.md` is partially shipped; the remaining open items are inherited here:
@@ -168,5 +256,14 @@ Each tentative candidate promotes from this file into a SKILL.md when its named 
 - **Ask L** (frontier-tier requirement): a v0.4 system-level run is dispatched with a documented frontier-tier panel. Promotion criterion: a system-level adversarial pass demonstrates a finding that only frontier voices surfaced.
 - **Ask M** (assume-guarantee): bidboard's component intents carry assume/guarantee clauses and boundary docs record implication-links. Promotion criterion: a system-level conjunction theorem is recorded in the compose-ledger.
 - **Ask N** (versioning): a v0.4 boundary doc is published with a SemVer pin against its component intents, and a re-verify pass correctly identifies drift (or its absence) using the version fields. Promotion criterion: a compose-ledger entry's `upstream_version_prior` is non-trivially used in change-record reasoning.
+
+For Asks O–T, the evidence already exists (Round 3a continuation 2026-05-19); the promotion criterion is SKILL codification, not further dogfood:
+
+- **Ask O** (cross-critique): codification lands in `colosseum-adversarial/SKILL.md` Step 6.5 with reference Q1/Q2/Q3 prompt template. Promotion criterion: a v0.4 project uses the codified step end-to-end.
+- **Ask P** (defense round): codification lands in `colosseum-adversarial/SKILL.md` Step 6.6 with defend/concede/third-option protocol. Promotion criterion: a v0.4 defense round produces a structured concession via the codified protocol.
+- **Ask Q** (encoding-discipline notes): codification lands in `colosseum-intent/SKILL.md` template Section 9 (or appendix). Promotion criterion: a v0.4 intent doc publishes encoding-discipline notes ahead of fan-out divergence (proactively), not just reactively.
+- **Ask R** (re-cross-critique): codification lands in `colosseum-adversarial/SKILL.md` Step 6.7 with mandatory-after-load-bearing-revision trigger. Promotion criterion: a v0.4 project's re-cross-critique catches a revision-induced regression.
+- **Ask S** (ghost-variable encoding): codification lands in spec-encoding section of `colosseum-adversarial/SKILL.md` Step 5 (or new `colosseum-spec-encoding` SKILL). Promotion criterion: a v0.4 spec uses ghost+invariant encoding for at least one freeze-at-time property, and a follow-up adversarial pass cites the pattern.
+- **Ask T** (high reasoning default): codification lands in `colosseum-adversarial/SKILL.md` Step 4 dispatch table + `colosseum_run.py` manifest. Promotion criterion: a v0.4 manifest records per-voice `variant` field and the dispatch honors it across providers.
 
 Until a candidate is promoted, dogfood projects MAY adopt the pattern locally; the methodology does not yet require it.
