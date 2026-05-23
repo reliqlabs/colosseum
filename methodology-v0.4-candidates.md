@@ -232,6 +232,58 @@ The Q1/Q2/Q3 shape forces structured findings instead of free-form review, which
 
 **Codified form (v0.4 target)**: extend `skills/colosseum-adversarial/SKILL.md` Step 4 dispatch table with `--variant high` annotation per voice (or provider-equivalent reasoning-effort flag). `scripts/colosseum_run.py` manifest schema gains a `variant` field per-voice with default `high` for spec-class phases. Document provider-specific equivalents (e.g., Anthropic `thinking.budget_tokens`, OpenAI `reasoning.effort`, Google `thinking.thinking_budget`, NVIDIA `extra_body.reasoning_effort`).
 
+### Ask U — Lean spec layer defaults to a Lake project + Mathlib (and VCV-io for crypto-touching projects)
+
+**Evidence**: 2026-05-23 Round 3a discharge continuation. The Lean math spec at `verified-rcv/specs/RcvSpec.lean` was initially set up as a single standalone file (no Lake project), stdlib-only. This was inconsistent with the methodology's own tooling stack (the README §Related work and §Tooling stack both name VCV-io + ArkLib + Mathlib as foundations for crypto-touching projects). The cost of stdlib-only was real: Leanstral and other Lean-trained models default to Mathlib idioms (`linarith`, `induction'`, `Disjoint`), so per-attempt friction compounded across the 3-way comparison and discharge work. Converting `specs/` to a Lake project with Mathlib + VCV-io took ~5 min one-time (mostly `lake update` git clone + `lake exe cache get` olean download); subsequent builds are cached and fast.
+
+**Symptom this addresses**: stdlib-only spec files force Lean voices to translate Mathlib idioms to stdlib equivalents on every output, which both adds friction and produces less idiomatic Lean code. The methodology already commits to Mathlib + VCV-io + ArkLib via the tooling stack, so the spec layer should follow.
+
+**Proposed shape**:
+
+- **`skills/colosseum-intent/SKILL.md`** (when the project is crypto-touching or otherwise likely to benefit from Mathlib): add a step recommending the Lean math spec live in a Lake project with `lakefile.lean` + `lean-toolchain` (pinned), Mathlib4 as a base dep, VCV-io for crypto reasoning, ArkLib for SNARK / IOR reasoning.
+- **`skills/colosseum-compose/SKILL.md`**: document the Lake-project shape in the integration-ledger template; the ledger's per-tool-coverage row for Lean should reference the Lake project root, not a single file.
+- **Reference setup**: the `verified-rcv/specs/lakefile.lean` is a working minimal example pinned to Lean 4.29.0 + Mathlib4 v4.29.0 + VCV-io v4.29.0.
+
+**Recommended dogfood**: bidboard or any other v0.4 crypto-touching project. Validate by attempting Lean proof discharge against the Lake-project spec layer.
+
+**Codified form (v0.4 target)**: `colosseum-intent` SKILL gains a "Lean spec layer setup" sub-step. `colosseum-compose` SKILL's ledger template references the Lake project root. The `methodology-v0.4-candidates.md` validation criteria gain a row for Ask U.
+
+### Ask V — `lean-lsp_lean_run_code` MCP call hangs on `import Mathlib` snippets outside Lake project context
+
+**Evidence**: 2026-05-23 attempt at 3-way Lean discharge comparison. Dispatching gpt-5.5 via opencode + the project-local `lean-spec-generator` agent, the agent invoked `lean-lsp_lean_run_code` on a Lean snippet starting with `import Mathlib`. The MCP server hung indefinitely (80+ minutes wall-clock, ~17s CPU time at the opencode wrapper). Likely cause: the lean-lsp MCP runs Lean in a scratch context that doesn't inherit the parent Lake project's pre-built Mathlib oleans, so it tries to compile Mathlib from scratch (~30 min uncached) and then deadlocks at some point (memory exhaustion, LSP heartbeat lost, etc.). The opencode agent's MCP client has no timeout configured and waits forever.
+
+**Symptom this addresses**: Lean-spec-class adversarial work via opencode + `lean-lsp_lean_run_code` is unreliable when Mathlib is needed (which is the recommended setup per Ask U). Multi-voice fan-out can stall indefinitely, blocking dispatch progress.
+
+**Proposed shape** (two-part fix):
+
+1. **lean-lsp MCP server** should accept a `--lake-project-root` arg (or auto-detect via `lakefile.lean` walk-up) and route `lean_run_code` invocations through that project's environment. If no Lake project is found and the snippet contains `import Mathlib`, fail-fast with a clear error rather than attempting a from-scratch Mathlib compile.
+2. **Dispatch scripts** should not use `lean-lsp_lean_run_code` in agentic loops for spec-class Lean discharge work until #1 lands. Instead, write the snippet to a file inside the parent Lake project and run `lake env lean <file>` directly (single-shot, no MCP round-trip).
+
+**Recommended dogfood**: any v0.4 Lean dispatch project. Validate that the lean-lsp MCP fix unblocks `opencode run --agent lean-spec-generator --model openai/gpt-5.5 --variant high` from hanging on Mathlib-bearing snippets.
+
+**Codified form (v0.4 target)**: file an issue on the lean-lsp MCP server repo with the reproducer (snippet + observed hang). Document the workaround (use `lake env lean` directly) in `skills/colosseum-adversarial/SKILL.md` Step 4 troubleshooting block alongside the gateway-bugs notes.
+
+### Ask W — Voice ranking for Lean proof discharge (Claude > Leanstral > opencode-gpt-5.5 in current state)
+
+**Evidence**: 2026-05-23 3-way comparison on `verified-rcv/specs/RcvSpec.lean`'s `s7_voter_partition`. All three voices were given the same prompt (diagnose missing axiom + propose fix + write proof).
+
+- **Claude (Agent tool, general-purpose subagent)**: consistently cleanest output. Minimal axiom with `cs.Nodup` premise. Clean 3-line proof. Identified `h_nodup` as required by the axiom but not the proof body (subtle correctness point). Polished alternative `List.Perm`-based version offered.
+- **Leanstral (local LM Studio, `leanstral-2603-mlx`)**: structurally-right ideas but multiple Lean compile bugs (missing `pk` argument on the proposed axiom, used unknown `List.map_length` (vs stdlib `List.length_map`), tried to unfold opaque `IRV_spec` via simp). Self-correction with explicit error feedback regressed rather than improved — fixed the wrong function in the second attempt.
+- **gpt-5.5 (opencode + lean-lsp-iterated)**: structurally equivalent to Claude's. Eventually produced a clean solution. But the opencode + lean-lsp agent loop hung for 80+ min on the `import Mathlib` snippet (see Ask V). The salvaged solution (extracted from the LSP run code mid-hang) compiled cleanly.
+
+Single-shot gpt-5.5 via direct API (not opencode + lean-lsp) was not exercised due to MCP credential setup; expected to work and would likely match Claude's quality.
+
+**Symptom this addresses**: Lean-specialist models (Leanstral) are not currently reliable for multi-axiom spec problems even with library context (Mathlib + VCV-io available). Frontier general-purpose models (Claude, gpt-5.5) are more reliable in this regime. Workflow defaults need to reflect this.
+
+**Proposed shape**:
+
+- **`skills/colosseum-compose/SKILL.md`**: Lean discharge sub-step defaults to Claude (Agent tool) as primary voice. Leanstral (or other Lean-specialist models) is a secondary / second-opinion voice — useful for ideas, not load-bearing for correctness.
+- **Single-shot frontier models** (gpt-5.5 direct API, Gemini, Kimi) are acceptable third voices when Claude is unavailable; opencode + lean-lsp agent-loop dispatch is unreliable until Ask V is addressed.
+
+**Recommended dogfood**: bidboard or any v0.4 Lean discharge project. Validate that the workflow defaults produce clean Lean proofs without the per-attempt friction observed with Leanstral on multi-axiom spec problems.
+
+**Codified form (v0.4 target)**: `colosseum-compose` SKILL gains a "Voice selection for Lean discharge" sub-step naming the recommended order. v0.3 Ask C's "theorem-prover specialist exclusion from spec adversarial" is partly subsumed here: Lean-specialist models are excluded from BOTH adversarial review (Ask C) AND multi-axiom proof discharge (Ask W); they remain useful for single-tactic-step verification work (the original `goedel-mcp` `propose_lean_tactic` use case).
+
 ---
 
 ## Carry-forward from v0.2
@@ -265,5 +317,8 @@ For Asks O–T, the evidence already exists (Round 3a continuation 2026-05-19); 
 - **Ask R** (re-cross-critique): codification lands in `colosseum-adversarial/SKILL.md` Step 6.7 with mandatory-after-load-bearing-revision trigger. Promotion criterion: a v0.4 project's re-cross-critique catches a revision-induced regression.
 - **Ask S** (ghost-variable encoding): codification lands in spec-encoding section of `colosseum-adversarial/SKILL.md` Step 5 (or new `colosseum-spec-encoding` SKILL). Promotion criterion: a v0.4 spec uses ghost+invariant encoding for at least one freeze-at-time property, and a follow-up adversarial pass cites the pattern.
 - **Ask T** (high reasoning default): codification lands in `colosseum-adversarial/SKILL.md` Step 4 dispatch table + `colosseum_run.py` manifest. Promotion criterion: a v0.4 manifest records per-voice `variant` field and the dispatch honors it across providers.
+- **Ask U** (Lake project + Mathlib default): codification lands in `colosseum-intent/SKILL.md` (Lean spec layer setup step) and `colosseum-compose/SKILL.md` (ledger references Lake project root). Promotion criterion: a v0.4 crypto-touching project's Lean spec layer is set up as a Lake project with Mathlib + VCV-io from the start, and the ledger entry references the Lake root.
+- **Ask V** (lean-lsp Mathlib hang): codification lands in `colosseum-adversarial/SKILL.md` Step 4 troubleshooting block + an upstream issue filed against the lean-lsp MCP server. Promotion criterion: a v0.4 Lean dispatch project uses `lake env lean <file>` (or a fixed lean-lsp MCP) without the agent loop hanging on Mathlib snippets.
+- **Ask W** (Lean discharge voice ranking): codification lands in `colosseum-compose/SKILL.md` "Voice selection for Lean discharge" sub-step. Promotion criterion: a v0.4 project's Lean discharge run uses the documented voice ranking (Claude primary, Leanstral secondary, single-shot frontier API as third) and produces clean proofs without the per-attempt friction observed in Round 3a continuation.
 
 Until a candidate is promoted, dogfood projects MAY adopt the pattern locally; the methodology does not yet require it.
