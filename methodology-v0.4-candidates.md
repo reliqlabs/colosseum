@@ -286,6 +286,113 @@ Single-shot gpt-5.5 via direct API (not opencode + lean-lsp) was not exercised d
 
 ---
 
+### Ask AB — code-adversarial as a first-class stage with six named lenses
+
+**Evidence**: verified-rcv 4-round audit retrospective (2026-05-26, `verified-rcv/.colosseum/methodology-retrospective-2026-05-26.md`). Across 4 audit rounds (intent v0.3.7 to v0.3.12), 13 high-severity findings closed. Of those 13, 8 would have been caught by an internal code-adversarial stage with six named lenses applied to the implementation against the intent. The audit rounds themselves were the de-facto code-adversarial; this ask internalizes that stage so the catch happens before external audit. Without this stage, multi-round cascades occurred: C2 took R1+R2; C3 took R1+R2+R4.
+
+**Symptom this addresses**: Colosseum v0.2 had intent-elicitation, intent-adversarial, Quint-spec, Lean-spec, Aeneas-extraction, code-implementation, Kani-harness stages, but no stage that reads the implementation against the intent's clauses. The result: bugs of the shape "intent says X must hold; code does not enforce X" went uncaught.
+
+**Proposed shape**: After code-implementation produces a commit and before audit, an internal red-team agent (distinct from the code-implementation author) applies the six lenses below to the implementation, referencing intent and ledger:
+
+- **AB.1 commitment-coverage**: For every hash, signature payload, ReportData, or serialized commitment in contract or runtime, enumerate the attacker-controllable degrees of freedom (DoFs). Confirm each DoF is bound in the commitment's coverage set. Deliverable table: `(commitment, attacker DoFs, bound by, gap)`. Catches the replay-narrow-binding cluster (verified-rcv M2 election_id, N4 chain_id, N22 registration, B6 ballots_hash, minor m7 ECIES chain context).
+- **AB.2 clause-to-line discharge**: For every named intent clause (B-clauses in intent §3.2, ledger links in §8.7, trust assumptions in §6.x), point at a code-line citation (file:line) that discharges it. Deliverable: `(clause, expected discharge, actual code line, status in {discharged, partial, gap})`. Catches the trust-assumption-decomposition cluster (verified-rcv C2 envelope-only, C3 enclave_pubkey provenance, N1 gnark verification deferred).
+- **AB.3 deferred-is-panic**: For every branch labeled deferred/stub/mock/TODO in the production build (default features), confirm the branch panics. Catches stub-as-Ok pattern (verified-rcv C1 Mock variant accepted, N11 real-zkdcap returns Err stub).
+- **AB.4 who-controls**: For every field of stored state, name the supplier and the validation. Deliverable: `(field, supplier, validation, gap)`. Catches admin-input cluster (verified-rcv N2 admin picks pubkey, M1 partial, M3 partial).
+- **AB.5 API field-name fidelity**: For every JSON, proto, or borsh field in a public API surface, confirm the value placed at the field carries the semantic the field name implies. Catches API-presentation-drift (verified-rcv M5 mrtd_hex slot held compose_hash).
+- **AB.6 deferral-justification audit**: For every deferred finding from a prior audit round, decompose the deferral justification into refutable claims and audit each. Catches wrong-deferral events (verified-rcv N13 to N22, where R3's "N2 timelock makes this acceptable" was wrong since N2 prevents registry rotation not registration-quote replay).
+
+Deliverable file: `.colosseum/code-adversarial/<date>.md` with the six tables and the list of findings.
+
+**Recommended dogfood**: any v0.4 project after the implementation layer lands and before external audit. The stage operator MUST be a different agent than the code-implementation author (otherwise drift toward author-self-review).
+
+**Codified form (v0.4 target)**: new SKILL `colosseum-code-adversarial/SKILL.md` (or section in existing `colosseum-adversarial/SKILL.md` distinguishing intent-adversarial vs code-adversarial). Step-by-step protocol for each of the six lenses, with the deliverable table format and the agent-isolation discipline.
+
+### Ask AC — Top-down Kani harness catalog derived from §8.7 trust-chain ledger
+
+**Evidence**: verified-rcv methodology retrospective showed Kani had 10 harnesses, all targeting IRV result structure (B1, S4, S6, S7, S8, S9, S10, already-voted, already-resolved, derive_phase). Zero harnesses targeted attestation verification, registry shape, gnark public_inputs construction, canonical_serialization byte layout, or ECIES decoder rejection paths. The catalog was built bottom-up from theorem inventory; the trust-boundary surfaces (where 6 of 13 high-severity findings lived) were uncovered.
+
+**Symptom this addresses**: Kani-harness-catalog construction without an explicit derivation source produces a catalog that mirrors the prover's mental model rather than the trust-boundary surface. M4 (declaration-order discipline) would have been caught by Kani in seconds, but no harness was written.
+
+**Proposed shape**: Every link in intent §8.7 (the trust-chain ledger) must have either (a) a Kani harness named `<link_id>_<assertion>` that exercises the link's claim, or (b) an explicit annotation `kani: skipped because <reason>` with a closed-list reason (e.g., "off-chain", "covered by cross-layer-ledger byte-equality test", "Verus-only", "axiom"). CI verification feature runs all harnesses; a missing harness without skipped-annotation fails CI.
+
+**Recommended dogfood**: any v0.4 project that has both a §8.7-style trust-chain ledger and a Kani-eligible substrate (Rust contract, executable runtime code).
+
+**Codified form (v0.4 target)**: `colosseum-compose/SKILL.md` Kani sub-step gains a "derive harness catalog from ledger" protocol. `colosseum-intent/SKILL.md` ledger template carries a `kani` annotation column per link.
+
+### Ask AD — Ledger-as-gate (code-line citations on every trust-chain link)
+
+**Evidence**: verified-rcv intent §8.7 had 9 trust-chain links carefully named pre-audit. Audit finding N1 surfaced: §8.7 link 5 said "chain verifies proof," but the contract code only checked envelope shape. The ledger was a map of obligations, not a gate.
+
+**Symptom this addresses**: ledger entries can name the right structure and still drift from code because nothing forces reconciliation between ledger claims and executable code.
+
+**Proposed shape**: every link in §8.7 carries a `code: file:line` annotation pointing at the line that discharges the claim. For off-chain claims, the citation points to a testing harness, an external verifier, or an explicit `axiom: <reason>` annotation. CI runs a check: every §8.7 link has a citation, and every citation resolves to a non-empty line in the live codebase.
+
+**Recommended dogfood**: any v0.4 project that has a multi-layer trust chain (contract + enclave + chain or contract + zk-verifier or similar).
+
+**Codified form (v0.4 target)**: `colosseum-compose/SKILL.md` ledger template adds the `code:` column. `colosseum-change/SKILL.md` change-record schema requires updating the citation when the discharging code moves. CI gate documented as a sub-step in `colosseum-compose`.
+
+### Ask AE — Lifecycle-adversary stage for multi-tx admin features
+
+**Evidence**: verified-rcv N17 (Major) was a brand-new attack class introduced by v0.3.10's registry-rotation timelock feature. The Quint model was not extended when ProposeRegistryUpdate, FinalizeRegistryUpdate, and CancelRegistryUpdate landed. No methodology stage red-teamed multi-block admin sequences combining the new transitions with existing election-lifecycle transitions. The auditor found a sequence `[CreateElection, ProposeRegistryUpdate, ..., FinalizeRegistryUpdate]` reaching a DoS state.
+
+**Symptom this addresses**: when a contract gains a feature with multiple admin transitions (a Propose/Finalize/Cancel pattern, a timelock, a multi-step state archival), the Quint protocol model and the adversarial review can fail to keep pace. The result: an attack class entirely outside the modeled state space.
+
+**Proposed shape**: any contract revision that adds (a) a new admin transition, (b) a timelock, (c) a multi-tx Propose/Finalize/Cancel feature, or (d) a state archival triggers a lifecycle-adversary stage. The stage operator extends the Quint model to encode the new transitions, then Quint-adversarial generates counterexample traces against active-phase invariants over all multi-block sequences combining the new transitions with existing ones. Deliverable: `.colosseum/lifecycle-adversary/<feature>.md`.
+
+**Recommended dogfood**: any v0.4 project that ships a contract feature beyond a single admin transition. Verified-rcv would have caught N17 by extending the Quint model and red-teaming the registry-rotation feature.
+
+**Codified form (v0.4 target)**: new sub-step in `colosseum-change/SKILL.md` triggered by the change-record fields matching the trigger conditions. The Quint extension protocol references the per-link ledger schema (Ask AC + AD).
+
+### Ask AF — CI-self-test pre-merge gate
+
+**Evidence**: verified-rcv v0.3.10 added 4 CI gates. Three of them (N18 cargo-audit RUSTSEC ignore, N19 mock_attestation regex false-positive on user-facing "verification" strings, N20 cosmwasm-check rejects raw cargo build) failed on the commit that added them. The auditor caught each one in subsequent rounds.
+
+**Symptom this addresses**: CI gates added without local verification can ship broken because the gates only run after merge.
+
+**Proposed shape**: any PR that adds a CI step must demonstrate the step passing at the commit that adds it. The simplest enforcement is a pre-merge check that runs the CI from the PR branch (which is the CI's job anyway, so this is enforcing the CI's own purpose rather than adding new tooling).
+
+**Recommended dogfood**: any v0.4 project that ships CI infrastructure. Mostly a discipline ask, not a methodology ask, but worth documenting.
+
+**Codified form (v0.4 target)**: `colosseum-compose/SKILL.md` CI sub-step gains an "added-CI-must-be-green-at-add-commit" rule.
+
+### Ask AG — Commit-message vs code reconciliation pre-merge check
+
+**Evidence**: verified-rcv N7 (R3 audit, Informational): the commit message claimed N4 was deferred while the code changed N4. Mechanical drift between intent stated in commit-message and the actual diff.
+
+**Symptom this addresses**: commit-messages can claim things the diff does not deliver (and vice versa).
+
+**Proposed shape**: lightweight pre-merge check. For every commit, parse the message for claims (e.g., "deferred", "implemented", "fixed N#"), grep the diff for the named entities, and flag mismatches. Most can be heuristic and human-reviewed; the goal is to surface the drift, not to gate strictly.
+
+**Recommended dogfood**: any v0.4 project. Lightweight; mostly a discipline ask.
+
+**Codified form (v0.4 target)**: `colosseum-change/SKILL.md` change-record schema documents the commit-message-vs-code field; a `scripts/check_commit_message.py` reference implementation provides the heuristic.
+
+### Ask AH — Quint-adversarial as a separately-run stage with adversarial trace generation
+
+**Evidence**: verified-rcv M1 (CreateElection clobbers in-flight election). Quint modeled the B1 write-once invariant correctly. Code drift was the CreateElection handler did not check the current phase. A Quint-adversarial pass generating counterexample traces against admin transitions would have produced trace `[CreateElection, SubmitBallot, CreateElection]` and asserted the second CreateElection is rejected. The Quint model had the predicate; nothing forced the trace generation.
+
+**Symptom this addresses**: Quint-spec produces invariants but does not by itself produce attack traces. The adversarial pass against the Quint model is a separate methodology step from the spec construction.
+
+**Proposed shape**: every Quint property gets an adversarial-trace generation pass. Output: a list of admissible trace prefixes that would violate the property if uncaught; cross-reference each trace against the contract code's enforcement.
+
+**Recommended dogfood**: any v0.4 project that uses Quint for protocol-level invariants. Verified-rcv would have caught M1 here.
+
+**Codified form (v0.4 target)**: extend `colosseum-adversarial/SKILL.md` Step 5 (or new Step) with Quint-adversarial protocol: trace generation, property witness, code cross-reference.
+
+### Ask AI — Field-spec discipline at intent-elicitation (wire-length pins on binary-data fields)
+
+**Evidence**: verified-rcv M3 (EnclaveImageRegistry shape validation missing). Intent §6.1 named mrtd and rtmr as TDX measurements without pinning the wire length. The auditor surfaced that the registry stored mrtd as a hex string with no length constraint.
+
+**Symptom this addresses**: intent prose can name a binary-data field by its semantic (TDX measurement, public key, hash) without committing to a wire format. Downstream code can then accept malformed wire values.
+
+**Proposed shape**: intent-elicitation produces a field-spec table for every binary-data field with columns `(field, semantic, wire format, length, validation site)`. Every field with a non-bounded length is flagged for explicit decision.
+
+**Recommended dogfood**: any v0.4 project. Verified-rcv would have caught M3 (and several minor findings in the same shape) here.
+
+**Codified form (v0.4 target)**: `colosseum-intent/SKILL.md` template adds a "Field specifications" section with the table format.
+
+---
+
 ## Carry-forward from v0.2
 
 The v0.2 ask file at `quartz/.colosseum/methodology-v0.2-asks.md` is partially shipped; the remaining open items are inherited here:
