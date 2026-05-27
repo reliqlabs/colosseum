@@ -1,6 +1,6 @@
 ---
 name: colosseum-adversarial
-description: Run the Colosseum spec adversary against a specification — single-model or multi-model. Reads the spec and the intent document, dispatches the colosseum-spec-adversary subagent (Claude) and optionally fans the same attack out to local (lm-studio-mcp) and/or cloud (external-model-mcp) providers, captures each structured report verbatim, persists them under .colosseum/attacks/, and summarizes overlap and divergence. Use when a draft spec needs scrutiny before commitment, or to re-attack a revised spec after a prior round's findings were addressed.
+description: Run the Colosseum spec adversary against a specification — single-model or multi-model. Reads the spec and the intent document, dispatches the colosseum-spec-adversary subagent (Claude) and optionally fans the same attack out to local (lm-studio-mcp) and/or cloud (external-model-mcp) providers, captures each structured report verbatim, persists them under .colosseum/attacks/, and summarizes overlap and divergence. Includes a separately-run Quint-adversarial sub-step (Step 4.5) that generates counterexample traces against named Quint invariants distinct from intent-adversarial prose critique. Use when a draft spec needs scrutiny before commitment, to re-attack a revised spec after a prior round's findings were addressed, or to mechanically check Quint invariants at milestones.
 ---
 
 You are orchestrating an adversarial review of a specification. The methodology rests on the claim that *the unit of trust is surviving adversarial scrutiny*, not consensus. Your job is the orchestration: locate the artifacts, dispatch one or more adversaries, capture their output verbatim, persist it, and report overlap + divergence.
@@ -165,6 +165,70 @@ Three discipline items:
 3. **Coordinate cross-session dispatch** when two agents work in parallel: one fan-out at a time across sessions, or accept best-effort with retries. The `colosseum_run.py` manifest protocol gives a natural coordination point — both sessions read + update the same `run.json`.
 
 Wait for all parallel dispatches to complete. Capture each response.
+
+## Step 4.5: Quint-adversarial — separately-run trace generation
+
+The intent-adversarial dispatch above operates on the *intent doc* (and optionally on a Lean / Verus / Quint spec read as prose). It produces voice critiques. It does NOT, by itself, drive a model checker against the Quint spec to produce adversarial traces against named properties.
+
+That is a separate step. It uses the Quint spec as an executable artifact, not as a target for prose critique. Run it whenever a Quint spec is the project's protocol model AND any of the following are true:
+
+- A new admin transition has been added to the spec (use `colosseum-lifecycle-adversary` instead — it subsumes this step for multi-tx admin features)
+- A new invariant has been added to the spec and has not yet been counterexample-checked
+- A code revision has touched a path the Quint spec is supposed to mirror
+- The project is at a milestone (release, audit, external review) and Quint coverage was last exercised more than a small number of commits ago
+
+### Procedure
+
+For each Quint invariant named in the spec or in intent §3.2:
+
+1. Run `quint run --invariant <inv_name> --max-steps <N> specs/<file>.qnt` (default `N=10`, escalate to 20 or 30 for invariants whose suspected violation requires longer interleavings).
+2. Record the result:
+   - **Counterexample found**: capture the trace as a sequence of `(action, args)`. Note the step at which the invariant was first violated.
+   - **No counterexample within bound**: record the bound. This is informative — an invariant that holds under bound-10 has been mechanically checked under that bound, but a higher-bound run may produce a counterexample.
+   - **Tool error / spec error**: surface the error verbatim. Do not silently move on.
+3. For each counterexample, cross-reference to code:
+   - **Code enforces the invariant via a check the Quint spec did NOT model.** Spec is under-specified relative to code. Fix the spec (add the precondition the code actually checks); re-run. This is the common case when the code is correct but the spec is loose.
+   - **Code does NOT enforce the invariant.** This is a bug — feed it as a target to `colosseum-code-adversarial` or to the standard fix loop.
+   - **Code enforces via a downstream layer the Quint model does not see.** Document the cross-layer dependence in the integration ledger.
+
+### Deliverable
+
+Write to `<project>/.colosseum/attacks/quint-adversarial-<ISO-date>.md`:
+
+```markdown
+# Quint-adversarial trace generation: <project>  —  <ISO-date>
+
+- Quint spec: <path>
+- Spec version: <git rev or frontmatter version>
+- Invariants targeted: <N>
+- Counterexamples found: <K>
+
+## Per-invariant table
+
+| Invariant | Bound | Result | Trace summary | Code enforcement | Verdict |
+|---|---|---|---|---|---|
+| `inv_b1_tally_write_once` | 10 | counterexample | `[CreateElection, SubmitBallot, CreateElection]` violates at step 3 | `CreateElection` handler at `crates/contract/src/handle.rs:118` does NOT check current phase | bug |
+| `inv_s4_voter_partition` | 10 | held under bound | — | n/a | survived |
+
+## Findings
+
+| ID | Severity | Invariant | Trace | Fix recommendation |
+|---|---|---|---|---|
+| QA-01 | Major | `inv_b1_tally_write_once` | `[CreateElection, SubmitBallot, CreateElection]` | reject second `CreateElection` while any election is active |
+```
+
+### Worked example: verified-rcv M1
+
+Verified-rcv intent v0.3.7 stated `B1` (tally write-once per election) and the Quint model encoded `inv_b1_tally_write_once`. The contract code's `CreateElection` handler at `crates/contract/src/handle.rs` did NOT check the current phase — a second `CreateElection` would clobber the in-flight election's state including its tally. A `colosseum-adversarial` intent-adversarial pass against intent v0.3.7 did NOT surface this bug; the intent stated B1 correctly, and adversarial critiques focused on intent-level concerns. A Quint-adversarial pass on `specs/rcv.qnt` running `quint run --invariant inv_b1_tally_write_once` would have produced the trace `[CreateElection { id: 0 }, SubmitBallot { id: 0, ... }, CreateElection { id: 0 }]` violating the invariant at step 3. Cross-reference to code at `handle.rs` would have identified the missing phase check.
+
+The skill caught nothing of this kind before audit. The audit R1 surfaced `M1` (CreateElection clobbers in-flight election). A separately-run Quint-adversarial step at v0.3.7 landing would have surfaced it mechanically.
+
+### Distinction from `colosseum-lifecycle-adversary`
+
+- **`colosseum-lifecycle-adversary`** is triggered by *new admin transitions* (Propose/Finalize/Cancel, timelocks, state archival). It extends the Quint model FIRST, then runs the trace generation. Use it when the spec is being extended.
+- **`colosseum-adversarial` Step 4.5** (this step) runs trace generation against an EXISTING Quint model with EXISTING invariants. Use it as a regular maintenance pass and at milestones.
+
+Both produce trace deliverables in the same format. Use whichever skill matches your trigger; do not run both.
 
 ## Step 5: Persist verbatim
 

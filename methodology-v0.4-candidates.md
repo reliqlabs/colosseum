@@ -305,7 +305,7 @@ Deliverable file: `.colosseum/code-adversarial/<date>.md` with the six tables an
 
 **Recommended dogfood**: any v0.4 project after the implementation layer lands and before external audit. The stage operator MUST be a different agent than the code-implementation author (otherwise drift toward author-self-review).
 
-**Codified form (v0.4 target)**: new SKILL `colosseum-code-adversarial/SKILL.md` (or section in existing `colosseum-adversarial/SKILL.md` distinguishing intent-adversarial vs code-adversarial). Step-by-step protocol for each of the six lenses, with the deliverable table format and the agent-isolation discipline.
+**Codified form (v0.4 target)**: **SHIPPED**: see `skills/colosseum-code-adversarial/SKILL.md`.
 
 ### Ask AC — Top-down Kani harness catalog derived from §8.7 trust-chain ledger
 
@@ -317,7 +317,7 @@ Deliverable file: `.colosseum/code-adversarial/<date>.md` with the six tables an
 
 **Recommended dogfood**: any v0.4 project that has both a §8.7-style trust-chain ledger and a Kani-eligible substrate (Rust contract, executable runtime code).
 
-**Codified form (v0.4 target)**: `colosseum-compose/SKILL.md` Kani sub-step gains a "derive harness catalog from ledger" protocol. `colosseum-intent/SKILL.md` ledger template carries a `kani` annotation column per link.
+**Codified form (v0.4 target)**: **SHIPPED**: see `skills/colosseum-compose/SKILL.md` Step 4.4 (Kani harness catalog — derive top-down from the trust-chain ledger).
 
 ### Ask AD — Ledger-as-gate (code-line citations on every trust-chain link)
 
@@ -329,7 +329,7 @@ Deliverable file: `.colosseum/code-adversarial/<date>.md` with the six tables an
 
 **Recommended dogfood**: any v0.4 project that has a multi-layer trust chain (contract + enclave + chain or contract + zk-verifier or similar).
 
-**Codified form (v0.4 target)**: `colosseum-compose/SKILL.md` ledger template adds the `code:` column. `colosseum-change/SKILL.md` change-record schema requires updating the citation when the discharging code moves. CI gate documented as a sub-step in `colosseum-compose`.
+**Codified form (v0.4 target)**: **SHIPPED**: see `skills/colosseum-compose/SKILL.md` Step 3 dependency-entry template (adds `code:` annotation) + Step 5.5 (CI gate — ledger-as-gate enforcement).
 
 ### Ask AE — Lifecycle-adversary stage for multi-tx admin features
 
@@ -341,7 +341,7 @@ Deliverable file: `.colosseum/code-adversarial/<date>.md` with the six tables an
 
 **Recommended dogfood**: any v0.4 project that ships a contract feature beyond a single admin transition. Verified-rcv would have caught N17 by extending the Quint model and red-teaming the registry-rotation feature.
 
-**Codified form (v0.4 target)**: new sub-step in `colosseum-change/SKILL.md` triggered by the change-record fields matching the trigger conditions. The Quint extension protocol references the per-link ledger schema (Ask AC + AD).
+**Codified form (v0.4 target)**: **SHIPPED**: see `skills/colosseum-lifecycle-adversary/SKILL.md`.
 
 ### Ask AF — CI-self-test pre-merge gate
 
@@ -377,7 +377,7 @@ Deliverable file: `.colosseum/code-adversarial/<date>.md` with the six tables an
 
 **Recommended dogfood**: any v0.4 project that uses Quint for protocol-level invariants. Verified-rcv would have caught M1 here.
 
-**Codified form (v0.4 target)**: extend `colosseum-adversarial/SKILL.md` Step 5 (or new Step) with Quint-adversarial protocol: trace generation, property witness, code cross-reference.
+**Codified form (v0.4 target)**: **SHIPPED**: see `skills/colosseum-adversarial/SKILL.md` Step 4.5 (Quint-adversarial — separately-run trace generation).
 
 ### Ask AI — Field-spec discipline at intent-elicitation (wire-length pins on binary-data fields)
 
