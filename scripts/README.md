@@ -120,10 +120,10 @@ colosseum_run.py reset <run-dir> --voice=X  # flip a voice back to pending (e.g.
 
 A manifest is **inspectable** (`cat run.json`), **crash-resumable** (a half-finished run picks up from `status: pending`), and **harness-agnostic** (any program that can read+write JSON can participate). A daemon would be more responsive at the cost of becoming a fourth piece of infrastructure to operate.
 
-The manifest is also the natural place to record *failure shape* — `error_detail` captures the HTTP 408 / 524 / unloaded-model / cloudflare-page distinctions the verified-rcv Round 3a dogfood pass surfaced. Synthesis can reason about *why* a voice failed, not just *that* it did.
+The manifest is also the natural place to record *failure shape* — `error_detail` captures the HTTP 408 / 524 / unloaded-model / cloudflare-page distinctions surfaced by the verified-rcv dogfood pass. Synthesis can reason about *why* a voice failed, not just *that* it did.
 
-### Methodology back-port status (v0.3 ask)
+### Methodology back-port status
 
-This tool is the prototype for the harness-agnostic-dispatch v0.3 ask. The `colosseum-adversarial` SKILL.md currently describes harness-specific recipes (Claude Code Agent + lm-studio-mcp + external-model-mcp). The v0.3 shape should describe the manifest protocol once, then ship per-harness appendices (Claude Code recipe, OpenCode recipe, shell recipe) all pointing at the same manifest format.
+This tool is the prototype for harness-agnostic dispatch. The `colosseum-adversarial` SKILL.md currently describes harness-specific recipes (Claude Code Agent + lm-studio-mcp + external-model-mcp). The intended shape: describe the manifest protocol once, then ship per-harness appendices (Claude Code recipe, OpenCode recipe, shell recipe) all pointing at the same manifest format.
 
-Round 3a (verified-rcv) is the first project to dogfood it end-to-end.
+Verified-rcv was the first project to dogfood it end-to-end.

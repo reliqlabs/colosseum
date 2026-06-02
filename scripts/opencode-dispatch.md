@@ -1,18 +1,18 @@
 # Per-section adversarial dispatch — design
 
-**Status**: design draft (2026-05-16). Targets v0.4 candidate Asks J + K validation on the verified-rcv 4th adversarial pass (after the v0.3.0 → v0.3.1 revision following the current 3rd-pass synthesis).
+**Status**: design draft. Validates the per-section dispatch + file-access subagent dispatch improvements proposed in [methodology-improvements.md](../methodology-improvements.md).
 
 **Problem this solves**:
 
-1. **Gateway wall-time cap (Bug 3)**: any single OpenAI-format request takes ≤240s upstream. `kimi-k2-6` hits the cap at `max_tokens ≥ 16K`; the timeout floor is wall-time, not token-count. *Per-section dispatch* keeps each single request to ~30-60s by emitting 1-3K output tokens at a time across N section-scoped calls.
-2. **Inlined-everything context size**: each voice currently ingests the entire ~25-30K-token intent.md per call. For verified-rcv this is wasteful but tractable; for multi-component v0.4 projects (bidboard) it would exceed reliable-attention budgets across all but frontier-tier voices.
+1. **Gateway wall-time cap**: any single OpenAI-format request takes ≤240s upstream. `kimi-k2-6` hits the cap at `max_tokens ≥ 16K`; the timeout floor is wall-time, not token-count. *Per-section dispatch* keeps each single request to ~30-60s by emitting 1-3K output tokens at a time across N section-scoped calls.
+2. **Inlined-everything context size**: each voice currently ingests the entire ~25-30K-token intent.md per call. For single-component dogfood it is wasteful but tractable; for multi-component projects it would exceed reliable-attention budgets across all but frontier-tier voices.
 
 The two failure modes are addressed by two related but distinct patterns:
 
 - **Static per-section slicing** (inline dispatch): orchestrator slices `intent.md` by section header at dispatch time; each call gets only its section + a small cross-section context appendix. No file-access primitive needed at the voice side.
 - **Dynamic file-access subagent** (subagent dispatch): voice receives a file handle + brief; the voice's agent loop decides which sections to read. OpenCode-native.
 
-Inline dispatch is the cheap immediate win. Subagent dispatch is the architecturally clean shape for system-of-intents work. Validate inline dispatch on the 4th attack; graduate to subagent dispatch when v0.4 work begins.
+Inline dispatch is the cheap immediate win. Subagent dispatch is the architecturally clean shape for system-of-intents work. Validate inline dispatch first; graduate to subagent dispatch when system-of-intents work begins.
 
 ---
 
@@ -20,7 +20,7 @@ Inline dispatch is the cheap immediate win. Subagent dispatch is the architectur
 
 Orchestrator slices `intent.md` at top-level `##` headers (with a manual override for `## 2. Behaviors` → split at `### 2.5 Structured behavior blocks` because §2.5 is the type-definition section that's its own attack target).
 
-### Slice plan for verified-rcv intent v0.3.x
+### Slice plan for verified-rcv intent
 
 | Slice | Sections | Approx tokens | Attack emphasis |
 |---|---|---|---|
@@ -152,7 +152,7 @@ Inline dispatch is enough to validate the timeout fix. Subagent dispatch graduat
 
 ### Why graduate
 
-Inline dispatch's static slicing is correct for verified-rcv (intent layout known, sections well-bounded, attack targets enumerable). For v0.4 system-of-intents projects with N components × ~10 sections each, static slicing produces a quadratic explosion of calls. Dynamic file-access lets each voice's attack hypothesis drive its own read pattern — typically O(few) reads per attack hypothesis, regardless of system size.
+Inline dispatch's static slicing is correct for verified-rcv (intent layout known, sections well-bounded, attack targets enumerable). For system-of-intents projects with N components × ~10 sections each, static slicing produces a quadratic explosion of calls. Dynamic file-access lets each voice's attack hypothesis drive its own read pattern — typically O(few) reads per attack hypothesis, regardless of system size.
 
 ### OpenCode agent definition
 
@@ -222,7 +222,7 @@ for voice in voices:
 - **Subagent-decided reads**: the voice's ReAct loop reads what it needs; no orchestrator slicing decisions baked into Python.
 - **Single agent definition reused across voices**: model selection is per-invocation, not per-script.
 - **Tool permission scopes are auditable**: `permission.read: allow` is more declarative than orchestrator-side context injection.
-- **Direct hand-off to v0.4 system-of-intents**: when the target becomes "this component intent + linked boundary docs", the agent's read tool handles cross-doc reads natively.
+- **Direct hand-off to system-of-intents work**: when the target becomes "this component intent + linked boundary docs", the agent's read tool handles cross-doc reads natively.
 
 ### What it costs
 
@@ -240,7 +240,7 @@ Different API keys for each. Worth probing whether the `/openai/v1` route has th
 
 ### Discovery: LM Studio model list drift
 
-OpenCode `opencode.jsonc` references `qwen/qwen3.6-27b`, `qwen/qwen3-coder-next`, `nvidia/nemotron-3-nano`, `google/gemma-4-26b-a4b`, `leanstral-2603`. Local `lms ls` shows `qwen3.6-27b-mlx` (different id), `mistral-small-4-119b-2603` (not in OpenCode config), `goedel-prover-v2-32b` (excluded per v0.3 Ask C). Reconcile before dispatch — either pin OpenCode to the actual loaded ids, or accept that some voices are gateway-only via OpenCode and run local voices through the existing Python dispatch.
+OpenCode `opencode.jsonc` references `qwen/qwen3.6-27b`, `qwen/qwen3-coder-next`, `nvidia/nemotron-3-nano`, `google/gemma-4-26b-a4b`, `leanstral-2603`. Local `lms ls` shows `qwen3.6-27b-mlx` (different id), `mistral-small-4-119b-2603` (not in OpenCode config), `goedel-prover-v2-32b` (excluded from adversarial spec review per theorem-prover specialist exclusion). Reconcile before dispatch — either pin OpenCode to the actual loaded ids, or accept that some voices are gateway-only via OpenCode and run local voices through the existing Python dispatch.
 
 ### Risk catalog (subagent dispatch)
 
@@ -260,9 +260,9 @@ The original sequence (inline dispatch first, subagent dispatch later) was justi
 
 3. **Concurrent benefit experiment**: probe whether the OpenCode `/u/c5nksc/openai/v1` gateway route has different timeout behavior than the colosseum `/u/c5nksc/colosseum/v1` route. If it does, methodology gains a workable Anthropic-via-gateway path; if it doesn't, the per-section pattern still wins via per-call wall-time bound.
 
-4. **inline dispatch remains worth keeping as a fallback**: if OpenCode dispatch surfaces an unforeseen problem (model ID mismatch, ReAct loop diverging, MCP plumbing issue), the pure-Python inline dispatch is the no-OpenCode escape hatch. Implementation is small enough (~50 lines on top of current `fan_out_dispatch.py`) that the option-value justifies keeping it on the candidate list, but it doesn't have to ship in v0.4 if subagent dispatch works.
+4. **inline dispatch remains worth keeping as a fallback**: if OpenCode dispatch surfaces an unforeseen problem (model ID mismatch, ReAct loop diverging, MCP plumbing issue), the pure-Python inline dispatch is the no-OpenCode escape hatch. Implementation is small enough (~50 lines on top of current `fan_out_dispatch.py`) that the option-value justifies keeping it on the candidate list, but it doesn't have to ship if subagent dispatch works.
 
-5. **Eventual back-port to methodology**: subagent dispatch alone validates v0.4 candidate Asks J + K simultaneously (static slicing + dynamic file-access). The colosseum-adversarial SKILL Step 4 gets a "Dispatch modes" subsection naming two modes — inlined (current default) and OpenCode subagent (recommended for ≥25K-token intents).
+5. **Eventual back-port to methodology**: subagent dispatch alone validates the per-section dispatch + file-access subagent dispatch improvements simultaneously (static slicing + dynamic file-access). The colosseum-adversarial SKILL Step 4 gets a "Dispatch modes" subsection naming two modes — inlined (current default) and OpenCode subagent (recommended for ≥25K-token intents).
 
 ## Open questions to resolve at implementation time
 

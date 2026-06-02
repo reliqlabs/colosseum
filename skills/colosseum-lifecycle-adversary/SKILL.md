@@ -17,11 +17,11 @@ This skill is mandatory whenever a contract revision adds:
 - **A state archival** (any path that moves "live" state into an "archived" map; the archival itself is an admin transition)
 - **A registry-rotation feature** (the canonical case — a new pubkey/image/parameter overlays the old one through a multi-step process)
 
-The trigger is structural, not severity-based. Even a "small" timelock that touches one field qualifies. The cost of running the skill is small; the cost of skipping it on a real feature can be a Major attack class (see verified-rcv `N17`).
+The trigger is structural, not severity-based. Even a "small" timelock that touches one field qualifies. The cost of running the skill is small; the cost of skipping it on a real feature can be a Major attack class.
 
 ## Why this exists
 
-In verified-rcv Round 3a, intent v0.3.10 added a registry-rotation timelock (`ProposeRegistryUpdate`, `FinalizeRegistryUpdate`, `CancelRegistryUpdate`). The Quint protocol model was NOT extended when the three new transitions landed. No methodology stage red-teamed multi-block admin sequences combining the new transitions with the existing election-lifecycle transitions (`CreateElection`, `SubmitBallot`, `Resolve`). The R4 auditor found the trace `[CreateElection, ..., ProposeRegistryUpdate, ..., FinalizeRegistryUpdate]` reaching a DoS state — an in-flight election's encryption pubkey gets rotated out from under it. Major finding `N17`.
+A real example: verified-rcv added a registry-rotation timelock (`ProposeRegistryUpdate`, `FinalizeRegistryUpdate`, `CancelRegistryUpdate`). The Quint protocol model was NOT extended when the three new transitions landed. No methodology stage red-teamed multi-block admin sequences combining the new transitions with the existing election-lifecycle transitions (`CreateElection`, `SubmitBallot`, `Resolve`). The external auditor found the trace `[CreateElection, ..., ProposeRegistryUpdate, ..., FinalizeRegistryUpdate]` reaching a DoS state — an in-flight election's encryption pubkey gets rotated out from under it. Major finding.
 
 A lifecycle-adversary pass extending Quint at the same time as the feature landed would have produced this trace mechanically. The Quint model would have stated B1's active-phase invariant ("an in-flight election's encryption parameters are stable"), and the trace generator would have produced the counterexample. The bug surfaces in Quint counterexample format, not in audit-finding format, before any external audit.
 
@@ -206,18 +206,18 @@ After persisting, report:
 - The most severe finding's trace, in one line, as a sample
 - Recommended next step: triage findings into the standard fix loop (`colosseum-change` from Step 5)
 
-## Worked example: verified-rcv N17
+## Worked example: registry-rotation timelock
 
-Verified-rcv v0.3.10 added the registry-rotation timelock feature. A lifecycle-adversary pass run at that landing would have:
+A real Quartz-family project added a registry-rotation timelock feature with three new admin transitions. A lifecycle-adversary pass run at that landing would have:
 
 1. (Step 2) Enumerated `ProposeRegistryUpdate`, `FinalizeRegistryUpdate`, `CancelRegistryUpdate`.
 2. (Step 3) Extended Quint's `specs/rcv.qnt` with the three new actions.
 3. (Step 4) Identified `inv_active_election_params_stable` as a target invariant — the active-election encryption pubkey lives in `REGISTRY` and `FinalizeRegistryUpdate` rotates `REGISTRY`.
 4. (Step 5) `quint run --invariant inv_active_election_params_stable` would have produced the trace `[CreateElection { id: 0 }, ProposeRegistryUpdate { new_registry: r' }, AdvanceTime(TIMELOCK), FinalizeRegistryUpdate {}]` violating the invariant at step 4.
 5. (Step 6) The contract code at `crates/contract/src/handle.rs:412` (`FinalizeRegistryUpdate` handler) had no in-flight-election check. Verdict: bug.
-6. (Step 7) Deliverable would have surfaced N17 in lifecycle-adversary format before R4 auditor surfaced it as `N17 Major`.
+6. (Step 7) Deliverable surfaces the bug in lifecycle-adversary format before an external auditor finds it.
 
-The cost of the skill at v0.3.10 landing: ~30 min wall-clock (Quint extension + 3-invariant counterexample run). The cost without it: one Major finding cascading into R4.
+The cost of the skill at feature landing: ~30 min wall-clock (Quint extension + 3-invariant counterexample run). The cost without it: one Major finding cascading into an external audit round.
 
 ## When to invoke
 

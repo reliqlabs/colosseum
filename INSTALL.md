@@ -242,7 +242,7 @@ The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration n
 
 ## 7. Optional: cloud model layer
 
-`external-model-mcp` v0.2 exposes three provider channels — `query_openai` (OpenAI BYOK), `query_google` (Google BYOK), and `query_gateway` (operator-curated multi-model gateway). The MCP loads credentials from `.env` files (gitignored) following this search order: `$COLOSSEUM_DOTENV` override → `$CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Setting env vars on the MCP launch line still works as before; the `.env` path is operationally cleaner.
+`external-model-mcp` exposes three provider channels — `query_openai` (OpenAI BYOK), `query_google` (Google BYOK), and `query_gateway` (operator-curated multi-model gateway). The MCP loads credentials from `.env` files (gitignored) following this search order: `$COLOSSEUM_DOTENV` override → `$CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Setting env vars on the MCP launch line still works as before; the `.env` path is operationally cleaner.
 
 For BYOK across Claude + GPT + Gemini:
 
@@ -268,7 +268,7 @@ EOF
 # Restart the MCP / Claude Code session so the env is picked up.
 ```
 
-The gateway is operator-curated; the model list drifts. Pin model IDs in adversarial-pass artifacts (see `skills/colosseum-adversarial/SKILL.md` Step 4 + `gateway-bugs-2026-05-14.md` for known per-route failure modes / timeouts).
+The gateway is operator-curated; the model list drifts. Pin model IDs in adversarial-pass artifacts (see `skills/colosseum-adversarial/SKILL.md` dispatch section for the gateway-route caveats and per-route failure-mode notes).
 
 Any single credential channel works alone; using all three gives maximum coverage.
 

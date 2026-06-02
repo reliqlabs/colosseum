@@ -119,7 +119,7 @@ In a Colosseum adversarial session targeting family diversity:
 3. Claude calls `fan_out_query(prompt, providers=["openai", "google", "gateway"])` to get parallel attacks across families
 4. (Optional) Claude also runs `colosseum-spec-adversary` natively (Claude's own attack from inside the harness)
 5. The `colosseum-adversarial` skill persists each response verbatim under `.colosseum/attacks/<spec>-<timestamp>/<voice-id>.md`
-6. Claude surfaces the overlap/divergence per the v0.3 three-section synthesis format (overlap matrix / false positives / methodology disagreement)
+6. Claude surfaces the overlap/divergence per the three-section synthesis format (overlap matrix / false positives / methodology disagreement)
 
 When the adversarial roster includes models that this MCP cannot reach (e.g., local LM Studio voices, or kimi-k2 / glm-4 / gpt-oss routed through the same gateway via voice-specific OpenAI clients with finer-grained timeout control), use `colosseum_run.py` to coordinate a multi-harness run via the shared `run.json` manifest. See `colosseum/scripts/README.md`.
 
@@ -131,9 +131,9 @@ OpenAI gpt-4o-mini and Gemini 2.0 Flash are cheap enough for routine adversarial
 
 ## Status
 
-**v0.2** — Single-shot completions to OpenAI, Google, and a configurable OpenAI-format gateway. Parallel fan-out across all three surfaces. No streaming, no tool-use, no retries on transient errors (transient errors surface as the response and the orchestrating skill decides whether to retry).
+Single-shot completions to OpenAI, Google, and a configurable OpenAI-format gateway. Parallel fan-out across all three surfaces. No streaming, no tool-use, no retries on transient errors (transient errors surface as the response and the orchestrating skill decides whether to retry).
 
-New in v0.2:
+Features:
 
 - Gateway provider as a first-class fan-out target (any OpenAI-format multi-model gateway, e.g., routing Claude / Kimi / GLM / GPT-OSS under one endpoint)
 - `.env` load order documented across four locations; `COLOSSEUM_DOTENV` override

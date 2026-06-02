@@ -1,8 +1,8 @@
 # Colosseum methodology — references
 
-Source register for the Colosseum methodology. External sources cited or surfaced during methodology development; internal artifacts produced by Round 3a (verified-rcv dogfood) and prior rounds; tooling references the methodology depends on.
+Source register for the Colosseum methodology. External sources cited or surfaced during methodology development; internal artifacts produced by dogfood projects (Quartz, verified-rcv); tooling references the methodology depends on.
 
-Maintained to support: (a) honest provenance for methodology claims, (b) external review / academic discussion, (c) reproducibility of methodology evidence, (d) v0.3+ back-port traceability.
+Maintained to support: (a) honest provenance for methodology claims, (b) external review / academic discussion, (c) reproducibility of methodology evidence, (d) traceability for back-ports from dogfood projects into SKILLs.
 
 **Discipline:** every external claim in a SKILL.md, agent prompt, or skill-emitted artifact should be traceable to an entry here. Internal artifacts (per-project dogfood evidence) are cited inline; this file collects the *external* substrate the methodology rests on.
 
@@ -10,7 +10,7 @@ Maintained to support: (a) honest provenance for methodology claims, (b) externa
 
 ## A. Multi-component / system-of-intents decomposition
 
-The pattern Colosseum's system-of-intents shape (v0.3+) inherits from.
+The pattern Colosseum's system-of-intents shape inherits from.
 
 | Topic | Source | Why it matters to Colosseum |
 |---|---|---|
@@ -51,7 +51,7 @@ Empirical limits and behaviors of long-context LLMs — relevant to adversarial-
 
 ## D. Specification versioning & evolution
 
-For the v0.3+ versioning pattern (intent docs, boundary docs, formal specs).
+For the spec versioning pattern (intent docs, boundary docs, formal specs).
 
 | Topic | Source | Why it matters to Colosseum |
 |---|---|---|
@@ -68,46 +68,46 @@ Tools the methodology depends on or surfaces failure modes against.
 
 | Tool | Source | Notes |
 |---|---|---|
-| OpenCode | [opencode.ai docs](https://opencode.ai/docs/agents/), [Providers](https://opencode.ai/docs/providers/), [DeepWiki agent system](https://deepwiki.com/sst/opencode/3.2-agent-system), [Built-in tools](https://deepwiki.com/sst/opencode/5.3-built-in-tools-reference), [Building Agent Teams in OpenCode — DEV community](https://dev.to/uenyioha/porting-claude-codes-agent-teams-to-opencode-4hol), [Local provider setup repo](https://github.com/groxaxo/opencode-local-setup) | Multi-provider terminal agent. Subagents support non-Anthropic models with file-access; Task tool spawns child sessions. v0.3 dispatch shape relies on this for non-Claude voices. |
-| LM Studio | [LM Studio OpenAI Compatibility Endpoints docs](https://lmstudio.ai/docs/developer/openai-compat) | Local OpenAI-format inference server. Round 3a found JIT-load auto-evict contention when used cross-session. |
+| OpenCode | [opencode.ai docs](https://opencode.ai/docs/agents/), [Providers](https://opencode.ai/docs/providers/), [DeepWiki agent system](https://deepwiki.com/sst/opencode/3.2-agent-system), [Built-in tools](https://deepwiki.com/sst/opencode/5.3-built-in-tools-reference), [Building Agent Teams in OpenCode — DEV community](https://dev.to/uenyioha/porting-claude-codes-agent-teams-to-opencode-4hol), [Local provider setup repo](https://github.com/groxaxo/opencode-local-setup) | Multi-provider terminal agent. Subagents support non-Anthropic models with file-access; Task tool spawns child sessions. The primary dispatch shape relies on this for non-Claude voices. |
+| LM Studio | [LM Studio OpenAI Compatibility Endpoints docs](https://lmstudio.ai/docs/developer/openai-compat) | Local OpenAI-format inference server. Verified-rcv dogfood found JIT-load auto-evict contention when used cross-session. |
 | Claude Code | [claude.com/claude-code](https://claude.com/claude-code) | Anthropic CLI for the Claude voice (Agent subagent). |
 | Custom OpenAI-compatible providers | [OpenCode Custom Provider Setup — haimaker.ai](https://haimaker.ai/blog/opencode-custom-provider-setup/), [Local LLM with OpenCode — tobrun](https://tobrun.github.io/blog/add-openai-compatible-endpoint-to-opencode/) | How to wire LM Studio / vLLM / gateway endpoints into OpenCode. The methodology depends on this pattern for the gateway voice channel. |
 
-## F. Domain references (verified-rcv Round 3a substrate)
+## F. Domain references (verified-rcv substrate)
 
 Domain references the verified-rcv intent doc rests on. Not methodology-level, but cited so methodology-level reviewers can independently verify domain claims.
 
 | Topic | Source | Notes |
 |---|---|---|
 | Instant-Runoff Voting (IRV) | Wikipedia: Instant-runoff voting; Australian federal parliament uses full-preferential batch-elimination | Algorithm semantics for verified-rcv Section 2.5. Spec inherits the Australian federal parliament variant (batch-eliminate lowest tied set, multi-winner fallback). |
-| dstack TDX | Phala Network dstack docs (current at time of Round 3a) | TDX confidential VM substrate. verified-rcv inherits dstack key-manager + attestor primitives from Quartz. |
-| zkdcap (Groth16 over TDX quote validity) | Automata Network zkdcap (current at time of Round 3a) | ZK proof compression for TDX attestation. verified-rcv inherits zkdcap verifier from Quartz. |
-| CosmWasm | docs.cosmwasm.com (current at time of Round 3a) | Smart contract platform. verified-rcv contract uses CosmWasm v2.0 + Borsh serialization. |
-| Xion | docs.burnt.com (current at time of Round 3a) | CosmWasm chain with native ZK module. verified-rcv targets Xion testnet. |
+| dstack TDX | Phala Network dstack docs | TDX confidential VM substrate. verified-rcv inherits dstack key-manager + attestor primitives from Quartz. |
+| zkdcap (Groth16 over TDX quote validity) | Automata Network zkdcap | ZK proof compression for TDX attestation. verified-rcv inherits zkdcap verifier from Quartz. |
+| CosmWasm | docs.cosmwasm.com | Smart contract platform. verified-rcv contract uses CosmWasm v2.0 + Borsh serialization. |
+| Xion | docs.burnt.com | CosmWasm chain with native ZK module. verified-rcv targets Xion testnet. |
 | Quartz | `/Users/mvid/Development/reliq/quartz/` (peer repo) | Cross-project composition target. verified-rcv consumes Quartz's attestation primitives via the boundary documented in Section 6.2. |
 
-## G. Internal artifacts — Round 3a evidence base
+## G. Internal artifacts — dogfood evidence base
 
-Produced during Round 3a (verified-rcv dogfood). Cited by methodology back-port work.
+Produced during the verified-rcv and Quartz dogfood projects. Cited by methodology back-port work.
 
 | Artifact | Path | Role |
 |---|---|---|
-| Methodology-asks v0.2 (Quartz-side) | `/Users/mvid/Development/reliq/quartz/.colosseum/methodology-v0.2-asks.md` | Quartz-agent-relayed asks 1-7 (4 original + asks 5/6/7 added during cycle-6.4-through-6.11 implementation). |
-| Quartz integration ledger | `/Users/mvid/Development/reliq/quartz/.colosseum/ledger.md` | 26-axiom 4-bucket classification, 8-theorem lift index, cross-bundle composition map. Round 3a B8/B9 inheritance depends on this. |
-| Verified-rcv intent doc | `/Users/mvid/Development/reliq/verified-rcv/.colosseum/intent.md` | The Round 3a dogfood target. ~728 lines after revision pass against the 7-voice re-adversarial. |
-| First-pass adversarial report | `verified-rcv/.colosseum/attacks/intent-first-draft-2026-05-14.md` | 42 findings (13 critical + 24 serious + 5 cosmetic). Revision-1 was driven by this. |
-| Sanity check (interim) | `verified-rcv/.colosseum/attacks/intent-revised-sanity-{claude,local-*,gateway-*}-2026-05-14.md` | Two-voice interim sanity check between revision-1 and the full re-adversarial. |
-| Re-adversarial run dir | `verified-rcv/.colosseum/attacks/intent-revised-2026-05-14T200029Z/` | 8 voices dispatched; 7 returned structured reports; goedel errored. `run.json` (manifest), `synthesis.md` (orchestrator output), `synthesis-input.md` (verbatim concat), per-voice files. |
-| Gateway bugs report | `verified-rcv/.colosseum/gateway-bugs-2026-05-14.md` | 4 documented gateway bugs: (1) Gemini route via OpenAI BYOK (resolved); (2) ReadableStream disturbed (resolved); (3) gateway-wide ~240s cap; (4) Anthropic-route Cloudflare 524 at ~127s. |
-| Round 3a re-adversarial dispatch plan | `verified-rcv/.colosseum/attacks/re-adversarial-dispatch-plan.md` | Lineup design + blindness restrictions for the 6-voice fan-out. |
-| Manifest tool (v0.3 prototype) | `colosseum/scripts/colosseum_run.py` + `colosseum/scripts/README.md` | Harness-agnostic dispatch coordinator. Round 3a is its first dogfood. |
-| External-model MCP (v0.2) | `colosseum/mcp/external-model-mcp/` | OpenAI/Google/gateway provider MCP. Round 3a extended this with the gateway channel. |
+| Quartz methodology-asks log | `/Users/mvid/Development/reliq/quartz/.colosseum/methodology-v0.2-asks.md` | Original Quartz-side asks driving early methodology revisions. |
+| Quartz integration ledger | `/Users/mvid/Development/reliq/quartz/.colosseum/ledger.md` | Axiom classification, theorem-lift index, cross-bundle composition map. Verified-rcv inherits via the Quartz cross-project boundary. |
+| Verified-rcv intent doc | `/Users/mvid/Development/reliq/verified-rcv/.colosseum/intent.md` | Greenfield dogfood target. ~728 lines after revision pass against the 7-voice re-adversarial. |
+| First-pass adversarial report | `verified-rcv/.colosseum/attacks/intent-first-draft-*.md` | 42 findings (13 critical + 24 serious + 5 cosmetic). Revision-1 was driven by this. |
+| Sanity check (interim) | `verified-rcv/.colosseum/attacks/intent-revised-sanity-*.md` | Two-voice interim sanity check between revision-1 and the full re-adversarial. |
+| Re-adversarial run dir | `verified-rcv/.colosseum/attacks/intent-revised-*/` | 8 voices dispatched; 7 returned structured reports; goedel errored. `run.json` (manifest), `synthesis.md` (orchestrator output), `synthesis-input.md` (verbatim concat), per-voice files. |
+| Gateway bugs report | `verified-rcv/.colosseum/gateway-bugs-*.md` | 4 documented gateway bugs: (1) Gemini route via OpenAI BYOK (resolved); (2) ReadableStream disturbed (resolved); (3) gateway-wide ~240s cap; (4) Anthropic-route Cloudflare 524 at ~127s. |
+| Re-adversarial dispatch plan | `verified-rcv/.colosseum/attacks/re-adversarial-dispatch-plan.md` | Lineup design + blindness restrictions for the 6-voice fan-out. |
+| Manifest tool | `colosseum/scripts/colosseum_run.py` + `colosseum/scripts/README.md` | Harness-agnostic dispatch coordinator. Verified-rcv was its first dogfood. |
+| External-model MCP | `colosseum/mcp/external-model-mcp/` | OpenAI/Google/gateway provider MCP. Extended with the gateway channel during verified-rcv. |
 
 ## H. Citation hygiene notes
 
 - Every external link in this register has been seen at time of authoring (per session web-search results). External links can rot; entries record the *title + identifying author / venue* alongside the URL so a future reviewer can re-locate the source if the URL breaks.
 - Academic papers (arxiv, ACM, springer): the arXiv / DOI is the canonical identifier; URLs are for convenience.
-- Industry / blog references: snapshotted views; treat as "current at time of Round 3a (May 2026)" unless re-verified.
+- Industry / blog references: snapshotted views; treat as "current at time of authoring" unless re-verified.
 - Internal artifacts under `colosseum/` or sibling repos: always reachable as long as the repos exist; the methodology repo's `references.md` is the index.
 
 ## I. How to add an entry

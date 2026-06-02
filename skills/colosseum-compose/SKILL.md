@@ -1,6 +1,6 @@
 ---
 name: colosseum-compose
-description: Promote cross-component composition to a first-class verification artifact. Inventories which spec artifacts depend on which others, surfaces composition theorems that span tools (Quint property + Lean theorem + Verus annotation + Kani harness as one trust claim), and maintains a project integration ledger. Includes a top-down Kani harness catalog derived from the §8.7-style trust-chain ledger (Step 4.4) and a code-line-citation CI gate that fails the ledger build when any link drifts from executable code (Step 5.5). Use when verifying a system whose trust claims cannot be made by any single tool alone — i.e., most non-trivial systems.
+description: Promote cross-component composition to a first-class verification artifact. Inventories which spec artifacts depend on which others, surfaces composition theorems that span tools (Quint property + Lean theorem + Verus annotation + Kani harness as one trust claim), and maintains a project integration ledger. Includes a top-down Kani harness catalog derived from the trust-chain ledger and a code-line-citation CI gate that fails the ledger build when any link drifts from executable code. Use when verifying a system whose trust claims cannot be made by any single tool alone — i.e., most non-trivial systems.
 ---
 
 You are operating the **composition layer** of the Colosseum methodology. The per-artifact pyramid layers — types, lints, property tests, Kani, Verus, Aeneas/Lean, Quint — each verify what their single tool can verify. The highest-value trust claims in real systems cannot be made by any single layer; they chain across tools. This skill makes those cross-tool theorems first-class.
@@ -78,11 +78,11 @@ Bundle cardinality: <K — count of `probabilistic-failure mode` rows in the per
 Bundle cardinality (prior ledger): <K' — what this number was last time, if there is a prior ledger>
 ```
 
-**Per-conjunct failure-mode table is load-bearing** (v0.2 Ask 6, surfaced from Quartz cycle-6.4-through-6.11 implementation; cross-validated against verified-rcv Round 3a). The bundle cardinality must be **derivable from the per-conjunct table** — specifically the count of `probabilistic-failure mode` rows — NOT a free number pulled from axiom-closure size. The prior Step 6.0–6.3 work in Quartz over-bundled 7 of 8 lifts because it derived cardinality from "how many axioms are in the classical-proof closure" rather than "how many conjuncts of the conclusion have an actual probabilistic-failure event". The terminal lift `cross_component_session_bind_negl` was the most extreme case: 5-summand → single after the table-driven recount.
+**Per-conjunct failure-mode table is load-bearing.** The bundle cardinality must be **derivable from the per-conjunct table** — specifically the count of `probabilistic-failure mode` rows — NOT a free number pulled from axiom-closure size. Earlier Quartz work over-bundled 7 of 8 lifts because it derived cardinality from "how many axioms are in the classical-proof closure" rather than "how many conjuncts of the conclusion have an actual probabilistic-failure event". The terminal lift `cross_component_session_bind_negl` was the most extreme case: 5-summand → single after the table-driven recount.
 
 A conjunct is `probabilistic-failure mode` only if it has an actual probabilistic-failure event under the current spec abstraction. Conjuncts that are unconditional theorems (derived rewrites, equalities, projections from `Accepted`) do not contribute to bundle cardinality.
 
-Verified-rcv's B9 negligibility decomposition went from 5 → 4 summands during Round 3a's revision pass, driven by ad-hoc attack analysis (KMS-leakage = confidentiality, image-registration = operational-fault). The per-conjunct table would have surfaced both at setup time, not as a corrective revision.
+Verified-rcv's B9 negligibility decomposition went from 5 → 4 summands during a revision pass, driven by ad-hoc attack analysis (KMS-leakage = confidentiality, image-registration = operational-fault). The per-conjunct table would have surfaced both at setup time, not as a corrective revision.
 
 The Trust boundary line is load-bearing: it makes explicit which assumptions the composition theorem rides on. A composition theorem with twelve axioms beneath it is a different claim than one with two — both are real verification, but the ledger must show the difference.
 
@@ -92,7 +92,7 @@ If `bundle cardinality` increased without a deliberate change record explaining 
 
 ### Code-line citations on every link (ledger-as-gate)
 
-Every entry in `Depends on:` carries a `code:` annotation pointing at the file:line that discharges the claim in executable code. A ledger entry without `code:` is verification-debt-by-default; the project's CI gate (Step 5.5) refuses to merge.
+Every entry in `Depends on:` carries a `code:` annotation pointing at the file:line that discharges the claim in executable code. A ledger entry without `code:` is verification-debt-by-default; the project's CI ledger-as-gate (below) refuses to merge.
 
 - For *on-chain* claims: the citation points at the contract / runtime line that enforces or witnesses the claim. Example: `code: crates/contract/src/handle.rs:201` for an attestation-verification step.
 - For *off-chain* claims (computation that happens off-chain, e.g., a trusted oracle, a ZK prover, an external attestation service): the citation points at a *testing* harness, an external verifier, or an explicit `axiom: <reason>` annotation. Example: `axiom: gnark verifier is upstream-trusted; no executable target on chain`.
@@ -101,9 +101,9 @@ Every entry in `Depends on:` carries a `code:` annotation pointing at the file:l
 The annotation is load-bearing in two directions:
 
 1. **Drift detection**: when code moves, the citation breaks. A broken citation is louder than silent drift. CI runs `check_ledger_citations.py` (or equivalent) to confirm every cited line exists in the live codebase and is non-empty.
-2. **Ledger-as-gate**: ledger entries that name the right structure are not sufficient — they must hook into code. Verified-rcv §8.7 had 9 trust-chain links named pre-audit; finding `N1` surfaced when link 5's "chain verifies proof" claim hit a contract that only checked envelope shape. The ledger looked complete; the code did not honor the claim. A `code:` annotation pointing at the verification function would have surfaced the gap at ledger-emission time (the citation would have resolved to a stub or a comment instead of a real check), not at audit time.
+2. **Ledger-as-gate**: ledger entries that name the right structure are not sufficient — they must hook into code. Verified-rcv's trust-chain ledger had 9 links named pre-audit; a Major finding surfaced when link 5's "chain verifies proof" claim hit a contract that only checked envelope shape. The ledger looked complete; the code did not honor the claim. A `code:` annotation pointing at the verification function would have surfaced the gap at ledger-emission time (the citation would have resolved to a stub or a comment instead of a real check), not at audit time.
 
-**Worked example**: verified-rcv §8.7 link 5 said "chain verifies proof". A ledger-as-gate run would have required `code: crates/contract/src/handle.rs:<line>` pointing at the proof-verification site. The contract had no such site (envelope-only verification); the only resolution was either `axiom: gnark verification deferred to vN.M.K` (honest deferral, surfaces the gap explicitly) or to update the contract. Either way the gap surfaces at ledger time, not at audit time.
+**Worked example**: verified-rcv's trust-chain link "chain verifies proof". A ledger-as-gate run would have required `code: crates/contract/src/handle.rs:<line>` pointing at the proof-verification site. The contract had no such site (envelope-only verification); the only resolution was either `axiom: gnark verification deferred` (honest deferral, surfaces the gap explicitly) or to update the contract. Either way the gap surfaces at ledger time, not at audit time.
 
 ## Step 4: Trust-boundary axiom inventory
 
@@ -113,33 +113,33 @@ Separately from the composition theorems, produce a flat list of every axiomatic
 Axiom: <fully-qualified name>
 Located at: <file>:<line>
 Kind: <Lean axiom | Verus uninterp spec fn | Verus external_body | sorry-marker | quint assume>
-Bucket: <(a) demotable-to-def-or-dead | (b) demotable-to-derived-theorem | (c) honest-computational-assumption | (d) impossibility-or-over-strength>
+Category: <see categories below>
 Sub-tag: <see sub-taxonomy below>
 Justification: <one-line — extracted from comments adjacent to the axiom, or "no justification provided">
 Used by: <list of composition theorems that depend on this axiom>
 Discharge path: <what external work would remove the axiom — e.g. "ArkLib Groth16-KS reduction", "concrete bytes hash specification", or "none — axiom is structural">
 ```
 
-### 4-bucket sub-taxonomy
+### Categories and sub-taxonomy
 
-When you assign a bucket, also assign a sub-tag. The sub-taxonomy makes (d) inspectable — without it, (d) collapses into "we shrugged" and reviewers cannot tell whether an axiom is provably impossible vs cryptographically standard vs over-strong.
+Every axiom belongs to one category. The category is a coarse classification (refactor target / cryptographic assumption / over-strength); the sub-tag is the actual claim shape. The sub-taxonomy makes the "over-strength" category inspectable — without it, "over-strength" collapses into "we shrugged" and reviewers cannot tell whether an axiom is provably impossible vs cryptographically standard vs over-strong.
 
-- **(a)** sub-tags: `pure-def` (axiom is a constant or derived computation) · `dead-axiom` (zero downstream dependents; see Step 4.5) · `blocked-by-abstract-carrier` (would be a `def` if the carrier were concrete)
-- **(b)** sub-tags: `derived-from-bundle-axiom` (the axiom is a corollary of a single record/embedding bundle) · `derived-from-spec-model` (the axiom follows from a deterministic spec model the project added)
-- **(c)** sub-tags: `carrier` (opaque type for an externally-supplied representation) · `unforgeability` · `collision-resistance` · `knowledge-soundness` · `circuit-equivalence` · `decisional-hardness` · `named-constant`
-- **(d)** sub-tags: `pigeonhole-impossible` (the axiom's statement is provably false in the spec category — e.g. asserting a collision on a `Function.Embedding`) · `classically-over-strong-single-negligibility` (a single hardness assumption stated as a `Prop` when honesty requires a negligible-advantage hypothesis) · `classically-over-strong-doubled-negligibility` (two distinct hardness assumptions collapsed into one `Prop`) · `classically-over-strong-preconditional` (the axiom is honest only under a stronger precondition than its `Prop` statement admits) · `vacuous-impossible-as-hypothesis` (the axiom appears in a hypothesis position where the impossibility makes the consuming theorem vacuous; lifting the theorem to its probabilistic form forces an honest restatement) · `disjunction-vs-decomposition` (a disjunctive hardness assumption that collapsed at intermediate composition levels but must decompose at the load-bearing terminal lift)
+- **refactor-target — demotable to def or dead**: `pure-def` (axiom is a constant or derived computation) · `dead-axiom` (zero downstream dependents; see the dead-axiom scan below) · `blocked-by-abstract-carrier` (would be a `def` if the carrier were concrete)
+- **refactor-target — derivable from existing structure**: `derived-from-bundle-axiom` (the axiom is a corollary of a single record/embedding bundle) · `derived-from-spec-model` (the axiom follows from a deterministic spec model the project added)
+- **cryptographic-assumption — honest standard primitive**: `carrier` (opaque type for an externally-supplied representation) · `unforgeability` · `collision-resistance` · `knowledge-soundness` · `circuit-equivalence` · `decisional-hardness` · `named-constant`
+- **over-strength-or-impossibility**: `pigeonhole-impossible` (the axiom's statement is provably false in the spec category — e.g. asserting a collision on a `Function.Embedding`) · `classically-over-strong-single-negligibility` (a single hardness assumption stated as a `Prop` when honesty requires a negligible-advantage hypothesis) · `classically-over-strong-doubled-negligibility` (two distinct hardness assumptions collapsed into one `Prop`) · `classically-over-strong-preconditional` (the axiom is honest only under a stronger precondition than its `Prop` statement admits) · `vacuous-impossible-as-hypothesis` (the axiom appears in a hypothesis position where the impossibility makes the consuming theorem vacuous; lifting the theorem to its probabilistic form forces an honest restatement) · `disjunction-vs-decomposition` (a disjunctive hardness assumption that collapsed at intermediate composition levels but must decompose at the load-bearing terminal lift)
 
-Every axiom is a trust claim. The team has earned the right to take it on faith *only if* the justification stands up to review *and* the bucket-plus-sub-tag stands up to review. The ledger makes both inspectable.
+Every axiom is a trust claim. The team has earned the right to take it on faith *only if* the justification stands up to review *and* the category-plus-sub-tag stands up to review. The ledger makes both inspectable.
 
-## Step 4.4: Kani harness catalog — derive top-down from the trust-chain ledger
+## Step 5: Kani harness catalog — derive top-down from the trust-chain ledger
 
-The pyramid's Kani layer covers what its harnesses target. The naive harness catalog grows bottom-up from the theorem inventory: "this struct is interesting; write a harness for it." The result is a catalog that mirrors the prover's mental model rather than the trust-boundary surface. Verified-rcv Round 3a shipped with 10 Kani harnesses (B1, S4, S6, S7, S8, S9, S10, already-voted, already-resolved, derive_phase) — every one targeting IRV result structure, zero targeting attestation verification, registry shape, gnark public_inputs construction, canonical_serialization byte layout, or ECIES decoder rejection paths. The audit's 6 of 13 high-severity findings lived on the uncovered trust-boundary surfaces. `M4` (declaration-order discipline) would have been caught by Kani in seconds had a harness existed; none did.
+The pyramid's Kani layer covers what its harnesses target. The naive harness catalog grows bottom-up from the theorem inventory: "this struct is interesting; write a harness for it." The result is a catalog that mirrors the prover's mental model rather than the trust-boundary surface. Verified-rcv shipped with 10 Kani harnesses (B1, S4, S6, S7, S8, S9, S10, already-voted, already-resolved, derive_phase) — every one targeting IRV result structure, zero targeting attestation verification, registry shape, gnark public_inputs construction, canonical_serialization byte layout, or ECIES decoder rejection paths. The audit's 6 of 13 high-severity findings lived on the uncovered trust-boundary surfaces. A declaration-order-discipline finding would have been caught by Kani in seconds had a harness existed; none did.
 
 The top-down protocol fixes this:
 
-1. Open the integration ledger and read the §8.7-style trust-chain links one by one (the ledger's per-theorem dependency list, plus any explicit trust-chain section if the project carries one).
+1. Open the integration ledger and read the trust-chain links one by one (the ledger's per-theorem dependency list, plus any explicit trust-chain section if the project carries one).
 2. For each link, decide one of:
-   - **Has Kani harness**: name it (`<link_id>_<assertion>` — e.g. `n4_chain_id_canonical_binding`, `m4_per_round_counts_declaration_order`). Confirm the harness exists in code; if it doesn't, the link is uncovered, regardless of intent.
+   - **Has Kani harness**: name it (`<link_id>_<assertion>` — e.g. `chain_id_canonical_binding`, `per_round_counts_declaration_order`). Confirm the harness exists in code; if it doesn't, the link is uncovered, regardless of intent.
    - **Skipped with closed-list reason**: annotate `kani: skipped because <reason>` where `<reason>` is one of:
      - `off-chain` — claim lives in code Kani cannot reach (frontend, untrusted off-chain runtime)
      - `covered by cross-layer-ledger byte-equality test` — claim is structurally enforced by a deterministic equality test at the ledger layer rather than a Kani harness
@@ -150,20 +150,20 @@ The top-down protocol fixes this:
 
 The protocol's output is a Kani-coverage table in the ledger:
 
-| §8.7 link | Claim summary | Kani | Status |
+| Trust-chain link | Claim summary | Kani | Status |
 |---|---|---|---|
-| 1 | image registration replay binding | `n22_registration_replay_binding` | exists, verified |
-| 2 | chain_id canonical binding | `n4_chain_id_canonical_binding` | exists, verified |
+| 1 | image registration replay binding | `registration_replay_binding` | exists, verified |
+| 2 | chain_id canonical binding | `chain_id_canonical_binding` | exists, verified |
 | 3 | gnark proof verification on chain | n/a | `axiom` — gnark verifier is a trusted upstream library; covered by ledger axiom |
 | 4 | per-round-counts declaration order | — | **GAP** — must add harness |
 
 Every gap row is a methodology-debt item. The ledger's `## Outstanding work` section names each gap by link number.
 
-CI enforcement (paired with Step 5.5): a missing harness without a closed-list skip-annotation fails the CI verification feature. The CI gate is the same one Step 5.5 documents for AD; the two checks share infrastructure.
+CI enforcement (paired with the ledger-as-gate step below): a missing harness without a closed-list skip-annotation fails the CI verification feature. The CI gate is the same one the ledger-as-gate step documents; the two checks share infrastructure.
 
-**Worked example**: verified-rcv `M4` (declaration-order discipline). Intent §2.5 named declaration-order as load-bearing (T5). The ledger §8.7 listed a link "per-round-counts honor declaration-order". The bottom-up Kani catalog never wrote a harness for this link because the harness construction started from "interesting structs" rather than from "ledger links". Top-down catalog derived from §8.7 would have produced the row above with `**GAP**` status, prompting a harness in the same round as the link landed. Kani would have caught the bug in seconds.
+**Worked example**: verified-rcv's declaration-order-discipline finding. Intent §2.5 named declaration-order as load-bearing. The ledger listed a link "per-round-counts honor declaration-order". The bottom-up Kani catalog never wrote a harness for this link because the harness construction started from "interesting structs" rather than from "ledger links". Top-down catalog derived from the trust-chain section would have produced the row above with `**GAP**` status, prompting a harness in the same round as the link landed. Kani would have caught the bug in seconds.
 
-## Step 4.5: Dead-axiom scan
+## Step 6: Dead-axiom scan
 
 After the inventory is built but before the ledger is emitted, run a dependent-count pass over every axiom. For each axiom:
 
@@ -172,12 +172,12 @@ After the inventory is built but before the ledger is emitted, run a dependent-c
 
 Dead axioms should be:
 
-1. **Flagged in the inventory** with bucket `(a)` and sub-tag `dead-axiom`.
+1. **Flagged in the inventory** with category `refactor-target` and sub-tag `dead-axiom`.
 2. **Listed in their own ledger section** (`## Dead axioms`) with file:line and a one-line recommendation: either delete, or document why the axiom is intentionally kept as a forward-compatibility hook.
 
 This scan is cheap and catches axiom accretion — the failure mode where a refactor removes an axiom's last consumer without removing the axiom. The first time you run this scan on a mature project, expect at least one hit. The first time you run it and find zero, *explicitly say so* — "Dead-axiom scan: 0 hits" is a meaningful ledger entry, not an omission.
 
-## Step 5: Emit the ledger
+## Step 7: Emit the ledger
 
 Write the ledger to `<project>/.colosseum/ledger.md`. Format:
 
@@ -214,15 +214,15 @@ Write the ledger to `<project>/.colosseum/ledger.md`. Format:
 
 ## Trust density
 
-| Bucket | Sub-tag distribution | Count | Delta vs prior |
-|--------|----------------------|-------|----------------|
-| (a) demotable-to-def-or-dead | <e.g. 3 blocked-by-abstract-carrier> | <count> | <±N> |
-| (b) demotable-to-derived-theorem | <distribution> | <count> | <±N> |
-| (c) honest-computational-assumption | <e.g. 7 carrier, 5 unforgeability, 4 collision-resistance, 3 knowledge-soundness> | <count> | <±N> |
-| (d) impossibility-or-over-strength | <e.g. 2 pigeonhole-impossible, 1 doubled-negligibility, 1 preconditional> | <count> | <±N> |
+| Category | Sub-tag distribution | Count | Delta vs prior |
+|---|---|---|---|
+| refactor-target: demotable-to-def-or-dead | <e.g. 3 blocked-by-abstract-carrier> | <count> | <±N> |
+| refactor-target: derivable | <distribution> | <count> | <±N> |
+| cryptographic-assumption | <e.g. 7 carrier, 5 unforgeability, 4 collision-resistance, 3 knowledge-soundness> | <count> | <±N> |
+| over-strength-or-impossibility | <e.g. 2 pigeonhole-impossible, 1 doubled-negligibility, 1 preconditional> | <count> | <±N> |
 | **Total** | | <sum> | <±N> |
 
-Trust density is the readout that says, in one table, *what kind* of trust the project asks reviewers to take. The right shape after a mature refactor is `(b) = 0` (everything bundle-derivable has been derived), `(c)` carrying the bulk (honest cryptographic assumptions), `(d)` minimised and each instance separately accounted for, `(a)` reduced to genuinely-structural items. A project with high `(b)` is verification debt; a project with growing `(d)` without sub-tag justification is silent surface widening.
+Trust density is the readout that says, in one table, *what kind* of trust the project asks reviewers to take. The right shape after a mature refactor: `derivable = 0` (everything bundle-derivable has been derived), `cryptographic-assumption` carrying the bulk (honest cryptographic assumptions), `over-strength-or-impossibility` minimised and each instance separately accounted for, `refactor-target: demotable` reduced to genuinely-structural items. A project with high `derivable` is verification debt; a project with growing `over-strength-or-impossibility` without sub-tag justification is silent surface widening.
 
 ## Coverage delta vs. prior ledger
 
@@ -243,29 +243,29 @@ Before merging the current branch:
 - [ ] No composition theorem's dependency graph silently lost a node (compare to prior ledger)
 - [ ] Coverage delta is in the expected direction (added coverage, not regressed)
 - [ ] Every Depends-on entry carries a `code:` (or `axiom:`) annotation that resolves to a non-empty line in the current codebase
-- [ ] Every §8.7-style trust-chain link has either a Kani harness or a closed-list `kani: skipped because <reason>` annotation
+- [ ] Every trust-chain link has either a Kani harness or a closed-list `kani: skipped because <reason>` annotation
 ```
 
-## Step 5.5: CI gate — ledger-as-gate enforcement
+## Step 8: CI gate — ledger-as-gate enforcement
 
 The ledger is verification-relevant only when it stays in sync with code. The gate runs in CI on every revision (every PR; not just at release):
 
 1. **Citation-resolution check**: parse every `code: <file>:<line>` annotation from `ledger.md`. For each, confirm the file exists and the line number is within the file. If the file or line doesn't exist, the gate fails with the offending entry named.
 2. **Citation-content sanity check**: for each citation, confirm the cited line is non-empty and is not a comment-only line. (A `code:` annotation pointing at a `// TODO` line is the same shape of drift as a missing citation.)
-3. **Kani-coverage check** (paired with Step 4.4): every §8.7 link in the ledger has either a Kani harness reference OR a closed-list `kani: skipped because <reason>` annotation. Missing both fails the gate.
+3. **Kani-coverage check** (paired with the Kani-catalog step above): every trust-chain link in the ledger has either a Kani harness reference OR a closed-list `kani: skipped because <reason>` annotation. Missing both fails the gate.
 4. **Axiom annotation check**: every `axiom:` annotation has a justification phrase (not just `axiom:` alone).
 
 Reference implementation: a Python or Bash script at `<project>/.colosseum/scripts/check_ledger_citations.py` invoked from the project's CI workflow (GitHub Actions / equivalent). The colosseum repo's reference impl lives at `scripts/check_ledger_citations.py` (see `scripts/README.md` for invocation).
 
 The gate is fast (<1s on a ledger of any reasonable size). The cost of running it on every revision is negligible; the cost of skipping it is silent ledger drift.
 
-**Worked example**: verified-rcv §8.7 link 5 ("chain verifies proof"). Without the gate: ledger and code drifted across multiple revisions; audit caught `N1`. With the gate: the first revision that introduced the envelope-only check would have failed the gate because no `code:` annotation resolved to a real verification site, forcing either the code fix or an explicit `axiom: gnark verification deferred to vN.M.K` annotation.
+**Worked example**: verified-rcv's "chain verifies proof" trust-chain link. Without the gate: ledger and code drifted across multiple revisions; audit caught it as a Major finding. With the gate: the first revision that introduced the envelope-only check would have failed the gate because no `code:` annotation resolved to a real verification site, forcing either the code fix or an explicit `axiom: gnark verification deferred` annotation.
 
-## Step 6: Summarize for the user
+## Step 9: Summarize for the user
 
 After persisting, report:
 
-- One-line summary: `Composition theorems: N (M with no unproven dependencies). Axioms: K (J justified, K-J unjustified). Trust density: (a)=X (b)=Y (c)=Z (d)=W. Bundle-cardinality drift: <largest increase, name + Δ>. Dead-axiom scan: <count> hits.`
+- One-line summary: `Composition theorems: N (M with no unproven dependencies). Axioms: K (J justified, K-J unjustified). Trust density: refactor-demotable=X derivable=Y cryptographic=Z over-strength=W. Bundle-cardinality drift: <largest increase, name + Δ>. Dead-axiom scan: <count> hits.`
 - Absolute path to the ledger
 - Top three outstanding items by criticality
 - A concrete suggested next step:

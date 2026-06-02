@@ -1,6 +1,6 @@
 ---
 name: colosseum-adversarial
-description: Run the Colosseum spec adversary against a specification — single-model or multi-model. Reads the spec and the intent document, dispatches the colosseum-spec-adversary subagent (Claude) and optionally fans the same attack out to local (lm-studio-mcp) and/or cloud (external-model-mcp) providers, captures each structured report verbatim, persists them under .colosseum/attacks/, and summarizes overlap and divergence. Includes a separately-run Quint-adversarial sub-step (Step 4.5) that generates counterexample traces against named Quint invariants distinct from intent-adversarial prose critique. Use when a draft spec needs scrutiny before commitment, to re-attack a revised spec after a prior round's findings were addressed, or to mechanically check Quint invariants at milestones.
+description: Run the Colosseum spec adversary against a specification — single-model or multi-model. Reads the spec and the intent document, dispatches the colosseum-spec-adversary subagent (Claude) and optionally fans the same attack out to local (lm-studio-mcp) and/or cloud (external-model-mcp) providers, captures each structured report verbatim, persists them under .colosseum/attacks/, and summarizes overlap and divergence. Includes a separate Quint-adversarial trace-generation step that drives the model checker against named invariants, distinct from intent-adversarial prose critique. Use when a draft spec needs scrutiny before commitment, to re-attack a revised spec after a prior round's findings were addressed, or to mechanically check Quint invariants at milestones.
 ---
 
 You are orchestrating an adversarial review of a specification. The methodology rests on the claim that *the unit of trust is surviving adversarial scrutiny*, not consensus. Your job is the orchestration: locate the artifacts, dispatch one or more adversaries, capture their output verbatim, persist it, and report overlap + divergence.
@@ -66,11 +66,11 @@ attacks.
 
 The system-prompt portion is read from `agents/colosseum-spec-adversary.md` (strip the YAML frontmatter; use the body text). This ensures every provider operates under identical instructions.
 
-## Step 4: Dispatch the adversaries
+## Step 4: Dispatch the intent-adversarial voices
 
 Dispatch happens in parallel — every requested provider attacks concurrently.
 
-**Three dispatch modes, ordered by preference.** The verified-rcv Round 3a calibration (2026-05-14 → 2026-05-16) demonstrated that Mode 1 produces strictly better output than Mode 3 for non-trivial specs: more attacks per voice, less hedging, no first-attempt-truncation pattern, and sidesteps the gateway 240s cap structurally. Use Mode 1 as the default; fall back to Mode 3 only when the listed conditions apply.
+**Three dispatch modes, ordered by preference.** Verified-rcv calibration runs demonstrated that Mode 1 produces strictly better output than Mode 3 for non-trivial specs: more attacks per voice, less hedging, no first-attempt-truncation pattern, and sidesteps the gateway 240s cap structurally. Use Mode 1 as the default; fall back to Mode 3 only when the listed conditions apply.
 
 | Mode | When to use | Key property |
 |---|---|---|
@@ -81,7 +81,7 @@ Dispatch happens in parallel — every requested provider attacks concurrently.
 **Two orchestration shapes** layered on top of the modes above:
 
 - **In-process** — the running Claude Code session dispatches each voice as a child Agent / MCP call, blocks until all return, then synthesizes. Works when every voice can be invoked from one harness (Mode 2 + Mode 3 inlined MCPs).
-- **Harness-agnostic manifest** (`scripts/colosseum_run.py` — v0.3+) — voices live in different harnesses (Claude voice in Claude Code via Mode 2, non-Claude voices in OpenCode via Mode 1). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage. Required when Mode 1 is in the panel and Claude must remain in-process.
+- **Harness-agnostic manifest** (`scripts/colosseum_run.py`) — voices live in different harnesses (Claude voice in Claude Code via Mode 2, non-Claude voices in OpenCode via Mode 1). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage. Required when Mode 1 is in the panel and Claude must remain in-process.
 
 ### Mode 1: OpenCode + spec-adversary agent (ReAct) — recommended default
 
@@ -101,7 +101,7 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 
 - `burnt/claude-opus-4-7`, `burnt/claude-sonnet-4-6` — Anthropic via gateway (Bug 4 status open under ReAct — single-call response stays under 127s)
 - `burnt/kimi-k2-6` — Moonshot
-- `burnt/glm-4-7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per Round 3a 2026-05-16 calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class, glm-4-7-flash is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use the full glm-4-7 (non-flash) or pull a comparable model into LM Studio
+- `burnt/glm-4-7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per verified-rcv calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class, glm-4-7-flash is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use the full glm-4-7 (non-flash) or pull a comparable model into LM Studio
 - `burnt/gpt-oss-120b` — OpenAI-OSS
 - `burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b` — NVIDIA Nemotron 3 120B-A12B MoE via Cloudflare; reasoning-on; added to gateway 2026-05-16
 - `burnt/gemini-2-5-flash`, `burnt/gemini-3-1-flash-lite` — Google
@@ -109,7 +109,7 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 
 **Required configuration in `opencode.jsonc`**: set `limit.output ≥ 65536` (recommend `131072`) per gateway model so Turn 2's analysis response budget never hits a cap mid-report. With the default 16K cap, thorough reasoning models truncate mid-sentence and the orchestrator's retry loop fires; raising to 64K+ makes that pattern disappear.
 
-**Empirical results (2026-05-16 verified-rcv calibration on intent v0.3.0, single-voice sequential, output cap 131072)**:
+**Empirical results (verified-rcv calibration, single-voice sequential, output cap 131072)**:
 
 | Voice | Per-slice wall time | Per-slice output | Retry rate |
 |---|---|---|---|
@@ -152,7 +152,7 @@ When Mode 1 isn't viable (small spec, tool-use-unfriendly voice, OpenCode not av
 
 ### Excluded model classes — theorem-prover specialists
 
-**Do not include theorem-prover specialist models (e.g., `goedel-prover-v2-32b`, ProofGPT-class, math-tactic-tuned models) in adversarial spec review.** These models pattern-match the prompt as a *proof goal* and attempt Lean / Coq tactics rather than treating the spec as a target to *attack*. Round 3a (verified-rcv) included goedel-prover-v2-32b in an 8-voice fan-out and observed 8K tokens of degenerate tautology loops with abstract variable lists — wall time 852 seconds, output unusable. Use these models at the **verify-pyramid layer** instead (proof completion / tactic suggestion via `mcp__goedel__propose_lean_tactic`).
+**Do not include theorem-prover specialist models (e.g., `goedel-prover-v2-32b`, ProofGPT-class, math-tactic-tuned models) in adversarial spec review.** These models pattern-match the prompt as a *proof goal* and attempt Lean / Coq tactics rather than treating the spec as a target to *attack*. Verified-rcv calibration included goedel-prover-v2-32b in an 8-voice fan-out and observed 8K tokens of degenerate tautology loops with abstract variable lists — wall time 852 seconds, output unusable. Use these models at the **verify-pyramid layer** instead (proof completion / tactic suggestion via `mcp__goedel__propose_lean_tactic`).
 
 ### Cross-session local-model contention (LM Studio ops notes)
 
@@ -166,7 +166,7 @@ Three discipline items:
 
 Wait for all parallel dispatches to complete. Capture each response.
 
-## Step 4.5: Quint-adversarial — separately-run trace generation
+## Step 5: Quint-adversarial trace generation
 
 The intent-adversarial dispatch above operates on the *intent doc* (and optionally on a Lean / Verus / Quint spec read as prose). It produces voice critiques. It does NOT, by itself, drive a model checker against the Quint spec to produce adversarial traces against named properties.
 
@@ -217,20 +217,20 @@ Write to `<project>/.colosseum/attacks/quint-adversarial-<ISO-date>.md`:
 | QA-01 | Major | `inv_b1_tally_write_once` | `[CreateElection, SubmitBallot, CreateElection]` | reject second `CreateElection` while any election is active |
 ```
 
-### Worked example: verified-rcv M1
+### Worked example: verified-rcv CreateElection bug
 
-Verified-rcv intent v0.3.7 stated `B1` (tally write-once per election) and the Quint model encoded `inv_b1_tally_write_once`. The contract code's `CreateElection` handler at `crates/contract/src/handle.rs` did NOT check the current phase — a second `CreateElection` would clobber the in-flight election's state including its tally. A `colosseum-adversarial` intent-adversarial pass against intent v0.3.7 did NOT surface this bug; the intent stated B1 correctly, and adversarial critiques focused on intent-level concerns. A Quint-adversarial pass on `specs/rcv.qnt` running `quint run --invariant inv_b1_tally_write_once` would have produced the trace `[CreateElection { id: 0 }, SubmitBallot { id: 0, ... }, CreateElection { id: 0 }]` violating the invariant at step 3. Cross-reference to code at `handle.rs` would have identified the missing phase check.
+Verified-rcv's intent stated `B1` (tally write-once per election) and the Quint model encoded `inv_b1_tally_write_once`. The contract code's `CreateElection` handler at `crates/contract/src/handle.rs` did NOT check the current phase — a second `CreateElection` would clobber the in-flight election's state including its tally. An intent-adversarial pass did NOT surface this bug; the intent stated B1 correctly, and adversarial critiques focused on intent-level concerns. A Quint-adversarial pass on `specs/rcv.qnt` running `quint run --invariant inv_b1_tally_write_once` produces the trace `[CreateElection { id: 0 }, SubmitBallot { id: 0, ... }, CreateElection { id: 0 }]` violating the invariant at step 3. Cross-reference to code at `handle.rs` identifies the missing phase check.
 
-The skill caught nothing of this kind before audit. The audit R1 surfaced `M1` (CreateElection clobbers in-flight election). A separately-run Quint-adversarial step at v0.3.7 landing would have surfaced it mechanically.
+The intent-adversarial skill caught nothing of this kind before audit. The audit surfaced it as a Major finding. A Quint-adversarial pass at the spec's landing would have surfaced it mechanically.
 
 ### Distinction from `colosseum-lifecycle-adversary`
 
 - **`colosseum-lifecycle-adversary`** is triggered by *new admin transitions* (Propose/Finalize/Cancel, timelocks, state archival). It extends the Quint model FIRST, then runs the trace generation. Use it when the spec is being extended.
-- **`colosseum-adversarial` Step 4.5** (this step) runs trace generation against an EXISTING Quint model with EXISTING invariants. Use it as a regular maintenance pass and at milestones.
+- **This step** runs trace generation against an EXISTING Quint model with EXISTING invariants. Use it as a regular maintenance pass and at milestones.
 
 Both produce trace deliverables in the same format. Use whichever skill matches your trigger; do not run both.
 
-## Step 5: Persist verbatim
+## Step 6: Persist verbatim
 
 Create the directory `<project>/.colosseum/attacks/<spec-basename>-<ISO-timestamp>/` if multi-model, or use the flat `.colosseum/attacks/<spec-basename>-<ISO-timestamp>.md` file if single-model.
 
@@ -284,13 +284,13 @@ Each per-model file starts with a small metadata header:
 
 Round number is determined by counting prior attack reports against the same spec basename in `.colosseum/attacks/`.
 
-**Voice metadata discipline** (Round 3a evidence): provider family + inference seat + finish_reason are load-bearing for synthesis. Family diversity is the actual signal multi-model dispatch produces; the synthesis must be able to distinguish "5 of 7 voices flagging the same bug" from "5 of 7 voices from the same provider family". Finish reason distinguishes "voice said its piece" (`stop`) from "voice ran out of budget mid-attack" (`length`) from "voice errored or timed out" (`error`) — the synthesis-time interpretation of the verdict depends on which.
+**Voice metadata discipline** (verified-rcv evidence): provider family + inference seat + finish_reason are load-bearing for synthesis. Family diversity is the actual signal multi-model dispatch produces; the synthesis must be able to distinguish "5 of 7 voices flagging the same bug" from "5 of 7 voices from the same provider family". Finish reason distinguishes "voice said its piece" (`stop`) from "voice ran out of budget mid-attack" (`length`) from "voice errored or timed out" (`error`) — the synthesis-time interpretation of the verdict depends on which.
 
 When using the manifest tool (`colosseum_run.py`), these fields live in `run.json` under each voice's `metadata` object; the markdown header is a courtesy copy for human reviewers.
 
 **Never edit any per-model report.** The whole point of multi-model adversarial is that each model's blind spots are different. Editing flattens them.
 
-## Step 6: Synthesize overlap and divergence
+## Step 7: Synthesize overlap and divergence
 
 Only after persisting verbatim reports, produce a synthesis. Mark it explicitly as orchestrator output. It is a *summary*, not a meta-attack — you do not get to add or weaken findings.
 
@@ -298,7 +298,7 @@ The synthesis is structured around **three required sections** (in addition to t
 
 ### Section A: Overlap matrix — findings ordered by multi-voice support
 
-Cluster the per-voice findings into *themes*. A theme is a single underlying issue (e.g., "B9 vacuity due to retracted Quartz substrate"). For each theme:
+Cluster the per-voice findings into *themes*. A theme is a single underlying issue. For each theme:
 
 - A per-voice support table: which voice flagged the issue, at what severity, with which spec citation.
 - A one-line consensus framing.
@@ -311,7 +311,7 @@ Themes are listed in descending order of multi-voice support. Themes with only o
 
 Voices fail in known ways. Synthesis must surface and refute the failure cases the multi-voice ensemble exposes:
 
-- **Cross-block / cross-section confusion** — a voice flags a contradiction between two distinct sections / blocks but actually conflated them (e.g., Round 3a's gpt-oss-120b "Block 6 self-contradicts" finding that actually conflated Block 5's idempotent self-loop with Block 6's transitional rejection).
+- **Cross-block / cross-section confusion** — a voice flags a contradiction between two distinct sections / blocks but actually conflated them (e.g., a verified-rcv gpt-oss-120b "Block 6 self-contradicts" finding that actually conflated Block 5's idempotent self-loop with Block 6's transitional rejection).
 - **Mis-read existing fix** — a voice flags a defect that the spec already addresses; re-reading the relevant section confirms the spec is correct.
 - **Hallucinated content** — a voice cites text that doesn't appear in the spec, or attributes a property to a section that doesn't have it.
 - **Misunderstanding of methodology terms** — a voice flags a "temporal_state_mismatch" but the property is genuinely temporal and correctly tagged.
@@ -326,11 +326,11 @@ The synthesis surfaces the divergence so reviewers know the affirmation is shall
 
 ### Failure-mode catalog the synthesis must process
 
-Round 3a's evidence base catalogues voice-level failure modes that synthesis must recognize:
+Verified-rcv calibration catalogues voice-level failure modes that synthesis must recognize:
 
 - **Truncation** (`finish_reason: length`): voice ran out of output budget mid-attack-list. Content is partial; remaining findings unknown. Synthesis records but does not over-interpret a truncated voice's silence on a theme.
-- **Reasoning-budget burnout**: reasoning model exhausted its hidden reasoning tokens before producing substantive visible output, or burned through visible output by repeating already-stated material (Round 3a's gemma-4-26b-a4b "Final check" loop after ~220 lines).
-- **Degeneration**: voice produced syntactically valid but semantically empty content — tautology loops, abstract variable enumerations, prompt-template echoes (Round 3a's goedel-prover-v2-32b case + glm-4-7-flash's verdict-template echo).
+- **Reasoning-budget burnout**: reasoning model exhausted its hidden reasoning tokens before producing substantive visible output, or burned through visible output by repeating already-stated material (gemma-4-26b-a4b "Final check" loop after ~220 lines, observed in verified-rcv).
+- **Degeneration**: voice produced syntactically valid but semantically empty content — tautology loops, abstract variable enumerations, prompt-template echoes (goedel-prover-v2-32b case + glm-4-7-flash's verdict-template echo, observed in verified-rcv).
 - **Verdict-template echo**: voice's verdict line literally repeats the prompt's enumeration menu ("VERDICT: BREAKS | SURVIVES | INDETERMINATE") instead of choosing one. Verdict-extraction regex must filter; synthesis examines content for the implicit verdict.
 
 Synthesis writer should test each voice's report for these failure modes before clustering its findings.
@@ -351,9 +351,9 @@ For runs that return BREAKS / BREAKS-AGAIN, end the synthesis with an ordered pu
 
 Write the synthesis to `synthesis.md` in the multi-model directory.
 
-**Exemplar**: `verified-rcv/.colosseum/attacks/intent-revised-2026-05-14T200029Z/synthesis.md` (Round 3a) is the reference implementation of this format. ~300 lines, 7 voices, 16 themes catalogued, 5 false positives refuted, 1 depth-of-attack divergence surfaced, 17-item punch list.
+**Exemplar**: the verified-rcv `intent-revised` attack directory contains a reference implementation of this format (~300 lines, 7 voices, 16 themes catalogued, 5 false positives refuted, 1 depth-of-attack divergence surfaced, 17-item punch list).
 
-## Step 7: Summarize for the user
+## Step 8: Summarize for the user
 
 After persisting, report:
 
