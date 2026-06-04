@@ -1,6 +1,34 @@
 # colosseum/scripts/
 
-Operational tooling that supports the methodology but is not itself part of any single skill. Currently houses the harness-agnostic dispatch manifest:
+Operational tooling that supports the methodology but is not itself part of any single skill.
+
+## `opencode_dispatch.py` — canonical OpenCode adversarial orchestrator
+
+**Purpose.** The Mode 1 dispatch path described in `colosseum/skills/colosseum-adversarial/SKILL.md`. Drives the `spec-adversary` OpenCode agent against a target spec across a roster of voices (gateway-routed `burnt/*` frontier voices plus local `lmstudio/*` voices), one (voice, slice) pair per `opencode run` invocation. Captures stdout, detects truncated stubs, retries on failure, aggregates per-voice files plus a summary.
+
+**This is the primary dispatch surface for non-Claude voices.** The `external-model-mcp` MCP tools (`query_gateway`, `query_openai`, `query_google`, `fan_out_query`) are Mode 3 fallbacks, not this script's purpose. Reach for the MCP tools only when OpenCode is not installed on the host.
+
+**Usage.** Copy this script to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a per-project config at `<project>/.colosseum/dispatch.json`:
+
+```bash
+uv run --script <project>/.colosseum/scripts/opencode_dispatch.py \
+    --config <project>/.colosseum/dispatch.json \
+    [--voices=A,B,C] [--slices=X,Y] [--sequential]
+```
+
+Config schema is documented in `dispatch.config.example.json` alongside this script. Required fields: `project_root`, `target_spec`, `run_tag_prefix`, `voices[]`, `slices[]`. Optional: `context_appendix`, `per_call_timeout`, `max_retries`.
+
+**Output.** `<project_root>/.colosseum/attacks/<run-tag>/` containing `per-section/<voice>/<slice>.md` (one per call), `opencode-<voice>.md` (per-voice aggregate), `dispatch.log`, `summary.json`.
+
+**Required OpenCode configuration.** `~/.config/opencode/opencode.jsonc` must define the `burnt` and `lmstudio` providers and set `limit.output ≥ 65536` (recommend `131072`) per gateway model so the analysis response budget never hits a cap mid-report.
+
+## `install-agents.py` — install the canonical agent bodies into a target harness
+
+Builds per-harness agent wrappers (Claude Code subagent or OpenCode subagent) from the canonical bodies under `colosseum/agents/*-body.md`. Run before the first OpenCode dispatch in a new project:
+
+```bash
+colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/
+```
 
 ## `colosseum_run.py` — multi-harness adversarial dispatch coordinator
 

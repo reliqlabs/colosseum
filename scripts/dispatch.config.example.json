@@ -1,0 +1,89 @@
+{
+  "_comment_top": "Example dispatch config for opencode_dispatch.py. Copy to <project>/.colosseum/dispatch.json and edit. Schema described in colosseum/scripts/opencode_dispatch.py.",
+
+  "project_root": "/absolute/path/to/your/project",
+  "target_spec": "/absolute/path/to/your/project/intent.md",
+  "run_tag_prefix": "intent-v1",
+
+  "_comment_voices": "Voice roster. id is a filesystem-safe slug used in output paths and headers. model is the OpenCode model string. burnt/* routes through the gateway; lmstudio/* routes through local LM Studio. Add or remove voices to match your panel. For routine work, 2-3 voices including one local; for high-stakes milestones, 5-7 voices spanning multiple families.",
+  "voices": [
+    {
+      "id": "kimi-k2-6",
+      "model": "burnt/kimi-k2-6",
+      "note": "Moonshot frontier tier; clean sequential ReAct produces 6.8-15K-char per-slice reports"
+    },
+    {
+      "id": "gpt-oss-120b",
+      "model": "burnt/gpt-oss-120b",
+      "note": "OpenAI-OSS 120B; clean sequential ReAct"
+    },
+    {
+      "id": "nemotron-3-120b-a12b",
+      "model": "burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b",
+      "note": "NVIDIA gateway 120B-A12B MoE, reasoning-on"
+    },
+    {
+      "id": "claude-opus-4-7",
+      "model": "burnt/claude-opus-4-7",
+      "note": "Anthropic via gateway; for the Claude voice in a multi-model ensemble, prefer the Agent subagent (Mode 2). This entry only makes sense in a cross-harness manifest run."
+    },
+    {
+      "id": "gemma-4-26b-a4b",
+      "model": "lmstudio/google/gemma-4-26b-a4b",
+      "note": "Google local 26B; needs ≥30min per-call timeout for ReAct loops on consumer GPU"
+    },
+    {
+      "id": "qwen3.6-27b",
+      "model": "lmstudio/qwen/qwen3.6-27b",
+      "note": "Alibaba local 27B"
+    },
+    {
+      "id": "mistral-small-4-119b-2603",
+      "model": "lmstudio/mistral-small-4-119b-2603",
+      "note": "Mistral local 119B non-reasoning; family-diversity gap-filler"
+    }
+  ],
+
+  "_comment_excluded_voices": "Voices known to fail adversarial spec review: glm-4-7-flash (degenerate loops at 30B 'flash' tier); goedel-prover-v2-32b and other theorem-prover specialists (treat prompts as proof goals instead of attack targets — use at verify-pyramid layer instead).",
+
+  "_comment_slices": "Slice plan. Each slice is one (voice, slice) call. headers[] are the markdown header ranges the agent should read from the target spec. attack_emphasis is the per-slice attack-category hint. Replace this example with your project's actual sections.",
+  "slices": [
+    {
+      "name": "scope",
+      "label": "System identity, non-goals, external contracts",
+      "headers": [
+        "## 1. System Identity   → through end of ## 1.",
+        "## 5. Non-Goals         → through end of ## 5."
+      ],
+      "attack_emphasis": "Identity overreach; non-goals that should be in scope; caller-contract clauses that admit clients the doc intends to exclude."
+    },
+    {
+      "name": "behaviors-core",
+      "label": "Worked examples — happy path, boundary, edge, explicit failures",
+      "headers": [
+        "### 2.1 Happy path",
+        "### 2.2 Boundary cases",
+        "### 2.3 Edge cases",
+        "### 2.4 Explicit failures",
+        "→ end at: ### 2.5 Structured behavior blocks"
+      ],
+      "attack_emphasis": "Worked-example arithmetic; edge-case completeness; explicit-failure listing completeness; happy-path implicit assumptions."
+    },
+    {
+      "name": "invariants",
+      "label": "Structural and behavioral invariants",
+      "headers": [
+        "## 3. Invariants",
+        "→ end at: ## 4. Failure Modes"
+      ],
+      "attack_emphasis": "Pointwise evaluability of state invariants; temporal-tag correctness; coverage gaps; derived-flag soundness."
+    }
+  ],
+
+  "_comment_context_appendix": "Optional shared-context block prepended to every call. Use for type signatures, invariant labels, or cross-section glossary entries that are load-bearing but not under attack. Mark clearly as read-only / not-to-be-attacked.",
+  "context_appendix": "=== CONTEXT APPENDIX (read-only — DO NOT ATTACK; these sections are attacked in their own invocations) ===\n\nSystem under review: <your system name and one-line description>.\nIntent doc: version <X.Y.Z>.\n\n=== END CONTEXT APPENDIX ===",
+
+  "_comment_timeouts": "per_call_timeout: seconds budget per (voice, slice) call. Local reasoning models on consumer hardware can take 10-25 min per slice. max_retries: per-call retry budget on truncated stubs or HTTP errors.",
+  "per_call_timeout": 1800,
+  "max_retries": 2
+}

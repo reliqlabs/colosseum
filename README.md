@@ -119,7 +119,7 @@ Initial target stack (Rust ecosystem):
 | Proof specialist | Goedel Prover V2 | Lean tactic proposal (local) |
 | Lean integration | `lean-lsp-mcp` | Proof state, mathlib search, diagnostics |
 | Orchestration | Claude Code (primary harness) | Planning, error recovery, failure routing, single-voice agent dispatch via the Agent tool |
-| Multi-voice dispatch | OpenCode CLI (`opencode run --agent ... --model ... --variant high`) | Project-local agent dispatch across cloud providers + gateway + local LM Studio; used for adversarial fan-out, cross-critique, defense rounds, re-cross-critique. Reference dispatch scripts under `verified-rcv/.colosseum/scripts/*_dispatch.py` |
+| Multi-voice dispatch | OpenCode CLI (`opencode run --agent ... --model ... --variant high`) | Project-local agent dispatch across cloud providers + gateway + local LM Studio; used for adversarial fan-out, cross-critique, defense rounds, re-cross-critique. **Canonical orchestrator: `colosseum/scripts/opencode_dispatch.py`** (copy to `<project>/.colosseum/scripts/`). The `external-model-mcp` MCP tools are a fallback for hosts without OpenCode, not the primary dispatch path |
 
 Model selection follows the same principle as tool selection: cheapest model that can handle the job, with adversarial pairing on critical outputs.
 

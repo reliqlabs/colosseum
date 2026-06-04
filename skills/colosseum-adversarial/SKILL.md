@@ -1,20 +1,22 @@
 ---
 name: colosseum-adversarial
-description: Run the Colosseum spec adversary against a specification — single-model or multi-model. Reads the spec and the intent document, dispatches the colosseum-spec-adversary subagent (Claude) and optionally fans the same attack out to local (lm-studio-mcp) and/or cloud (external-model-mcp) providers, captures each structured report verbatim, persists them under .colosseum/attacks/, and summarizes overlap and divergence. Includes a separate Quint-adversarial trace-generation step that drives the model checker against named invariants, distinct from intent-adversarial prose critique. Use when a draft spec needs scrutiny before commitment, to re-attack a revised spec after a prior round's findings were addressed, or to mechanically check Quint invariants at milestones.
+description: Run the Colosseum spec adversary against a specification, single-model or multi-model. Reads the spec and the intent document. Primary dispatch for non-Claude voices is OpenCode CLI (`opencode run --agent spec-adversary --model burnt/<voice>` for gateway-routed frontier voices, or `lmstudio/<local-model-id>` for local voices), orchestrated by the per-project script at `<project>/.colosseum/scripts/opencode_dispatch.py` whose canonical template lives at `colosseum/scripts/opencode_dispatch.py`. The Claude voice runs in-harness via the `colosseum-spec-adversary` Agent subagent. The `external-model-mcp` single-shot calls (`query_gateway` / `query_openai` / `query_google`) and `lm-studio-mcp` `fan_out_local` are NOT the primary dispatch path; they are a fallback used only when OpenCode is not installed on this host. Captures each structured report verbatim under `.colosseum/attacks/`, summarizes overlap and divergence. Includes a separate Quint-adversarial trace-generation step that drives the model checker against named invariants, distinct from intent-adversarial prose critique. Use when a draft spec needs scrutiny before commitment, to re-attack a revised spec after a prior round's findings were addressed, or to mechanically check Quint invariants at milestones.
 ---
 
 You are orchestrating an adversarial review of a specification. The methodology rests on the claim that *the unit of trust is surviving adversarial scrutiny*, not consensus. Your job is the orchestration: locate the artifacts, dispatch one or more adversaries, capture their output verbatim, persist it, and report overlap + divergence.
 
 You are not the adversary. You do not produce the attacks. You do not soften them. You provide each adversary with everything it needs and stand out of its way.
 
-## Single-model vs multi-model
+## Single-voice vs multi-voice
 
 This skill supports two modes:
 
-- **Single-model (default)** — invoke the `colosseum-spec-adversary` subagent (Claude). Fast, free under the Claude Code subscription, no setup.
-- **Multi-model** — invoke Claude *and* fan the same attack prompt out to local models (`lm-studio-mcp`) and/or cloud providers (`external-model-mcp`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
+- **Single-voice (default)** — invoke the `colosseum-spec-adversary` subagent (Claude). Fast, free under the Claude Code subscription, no setup.
+- **Multi-voice** — invoke Claude *and* fan the same attack out to non-Claude voices via the OpenCode CLI orchestrator (gateway-routed frontier voices like `burnt/kimi-k2-6` plus local LM Studio voices like `lmstudio/qwen/qwen3.6-27b`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
 
-The user selects via the `models` parameter. Default is `["claude"]`. Recommended for routine spec milestones: `["claude", "local"]` (Claude + local floor; free). Recommended for high-stakes spec milestones: `["claude", "local", "openai", "google"]`.
+The user selects via the `voices` parameter (a roster of explicit voice IDs, NOT bucket names — see Step 1 below). Default is `["claude-agent"]`. Recommended for routine spec milestones: `["claude-agent", "lmstudio/<one-loaded-local>"]` (Claude + local floor; free). Recommended for high-stakes spec milestones: 5–7 voices spanning `burnt/` + `lmstudio/` for family diversity (Anthropic / OpenAI-OSS / Moonshot / NVIDIA / Google / Alibaba / Mistral).
+
+**Anti-pattern to avoid.** Do NOT reach for `mcp__external-model__query_gateway` or `mcp__external-model__fan_out_query` as the dispatch path. Those MCP tools exist as a fallback for hosts without OpenCode installed (Step 4 Mode 3 below); they are not the primary dispatch surface. Agents keep defaulting to them because their schemas surface in the harness's deferred-tool list; that is the trap this skill is structured to prevent. Use OpenCode (Mode 1) for every non-Claude voice unless `opencode --version` actually fails on this host.
 
 ## Step 1: Locate the artifacts
 
@@ -24,7 +26,14 @@ Ask the user for, or determine from context:
 - **Path to the intent document** — the human-anchored source of truth the spec is supposed to encode. Typically `intent.md` at the project root, but allow override.
 - **Optional context** — paths to existing tests, related specs, prior attack reports, type signatures, anything that strengthens grounding.
 - **Project root** — where `.colosseum/attacks/` should be created. Infer from the spec's location if not given.
-- **Models to dispatch** — list. Subset of `["claude", "local", "openai", "google"]`. Default `["claude"]`. Ask the user if not specified for a non-trivial spec — the multi-model option is a load-bearing capability and should not be silently bypassed.
+- **Voices to dispatch** — a roster of explicit voice IDs, NOT bucket names. Three ID shapes are valid:
+  - `claude-agent` — the Claude voice; runs in-harness via the `colosseum-spec-adversary` Agent subagent (Mode 2 below). This is the only voice that does NOT go through OpenCode.
+  - `burnt/<gateway-route>` — gateway-routed frontier voice via OpenCode (Mode 1). Examples: `burnt/kimi-k2-6`, `burnt/gpt-oss-120b`, `burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b`, `burnt/gemini-2-5-flash`, `burnt/gemini-3-1-flash-lite`, `burnt/claude-opus-4-7`, `burnt/claude-sonnet-4-6`.
+  - `lmstudio/<local-model-id>` — local LM Studio voice via OpenCode (Mode 1). Examples: `lmstudio/qwen/qwen3.6-27b`, `lmstudio/google/gemma-4-26b-a4b`, `lmstudio/mistral-small-4-119b-2603`.
+
+  Default panel for routine work: `["claude-agent", "lmstudio/<one-loaded-local>"]` (free). Default for high-stakes spec milestones: 5–7 voices spanning `burnt/` + `lmstudio/` with family diversity across Anthropic / OpenAI-OSS / Moonshot / NVIDIA / Google / Alibaba / Mistral. Ask the user if not specified for a non-trivial spec — the multi-voice option is load-bearing and should not be silently bypassed.
+
+  **Do NOT accept bucket names** (`"openai"`, `"google"`, `"local"`, `"gateway"`) in the roster. Those names route to the Step 4 Mode 3 single-shot MCP fallbacks, which are not the primary dispatch path. If the user gives you a bucket name, translate it to an explicit voice ID before proceeding.
 
 If either the spec or the intent is missing, stop and ask. An adversary with no intent reference produces vague complaints rather than grounded attacks.
 
@@ -95,7 +104,7 @@ opencode run --agent spec-adversary --model burnt/kimi-k2-6 \
   "TARGET_SPEC: /path/to/intent.md\n\nTARGET_SLICE: temporal-invariants — ..."
 ```
 
-Orchestrate (voice × slice) pairs from a Python script that captures stdout per call and writes per-section files. Reference implementation: `verified-rcv/.colosseum/scripts/opencode_dispatch.py`.
+Orchestrate (voice × slice) pairs from a Python script that captures stdout per call and writes per-section files. **Canonical orchestrator: `colosseum/scripts/opencode_dispatch.py`** — copy to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a project-local config at `<project>/.colosseum/dispatch.json` (voice roster + slice plan + optional context appendix). See `colosseum/scripts/dispatch.config.example.json` for the schema. The verified-rcv project keeps a pinned variant of this script as its in-tree history; the colosseum/ copy is the one new projects should start from.
 
 **Per-voice voice IDs to pass to `--model`** (gateway-routed via OpenCode's `burnt` provider configured in `~/.config/opencode/opencode.jsonc`):
 
@@ -128,9 +137,17 @@ Claude operates with native tool access; the inlined prompt body is supplemental
 
 This is the canonical Claude voice for multi-model ensembles. Run it via the Agent tool in parallel with the OpenCode voices; results are captured as the Agent tool's returned text.
 
-### Mode 3: Inline single-HTTP-request (fallback)
+### Mode 3: Inline single-HTTP-request MCP fallback (use only when Mode 1 is unavailable)
 
-When Mode 1 isn't viable (small spec, tool-use-unfriendly voice, OpenCode not available):
+**STOP.** Before reaching for this mode, verify Mode 1 is genuinely unavailable. Conditions that justify Mode 3 are narrow:
+
+1. `opencode --version` fails on this host (CLI not installed).
+2. The target spec is small (< 5K tokens) AND the project has no `<project>/.colosseum/scripts/opencode_dispatch.py` AND copying the template from `colosseum/scripts/` would not amortize over future runs.
+3. The voice is local + tool-use-unfriendly (older non-tool-trained LM Studio models that fail the ReAct loop).
+
+If you are in this skill and reaching for `mcp__external-model__query_gateway` or `mcp__external-model__fan_out_query` because those tools' schemas are easy to load via ToolSearch, **that is the failure mode this skill exists to prevent**. The deferred-tool list surfaces those MCPs with first-class schemas; OpenCode dispatch requires Bash plus a per-project orchestrator script. The path-of-least-friction is the wrong path. Mode 1 produces strictly better output (verified-rcv calibration: more attacks per voice, less hedging, no truncation, sidesteps gateway timeout caps). Take the friction.
+
+Once you have confirmed Mode 1 is genuinely unavailable per a condition above, the inline channels are:
 
 - **gateway** — call `external-model-mcp`'s `query_gateway(prompt=..., model="<gateway-model-id>")`. The gateway is an operator-curated OpenAI-format multi-model endpoint; available `model` ids drift with operator curation (current set: `claude-opus-4-7`, `claude-sonnet-4-6`, `gemini-2-5-flash`, `gemini-3-1-flash-lite`, `glm-4-7-flash`, `gpt-oss-120b`, `kimi-k2-6`).
 - **local** — call `lm-studio-mcp`'s `fan_out_local` with `models=` set to the user's preferred local pair (default: all loaded). The inlined prompt is the only input — local models have no file access in this mode.
@@ -357,7 +374,7 @@ Write the synthesis to `synthesis.md` in the multi-model directory.
 
 After persisting, report:
 
-- One-line per-model verdict summary: `claude: BREAKS (3 critical, 5 serious) | openai: BREAKS (2 critical) | google: SURVIVES | local-qwen: BREAKS (1 critical)`
+- One-line per-voice verdict summary using explicit voice IDs (NOT bucket names): `claude-agent: BREAKS (3 critical, 5 serious) | burnt/kimi-k2-6: BREAKS (2 critical) | burnt/gpt-oss-120b: SURVIVES | lmstudio/qwen/qwen3.6-27b: BREAKS (1 critical)`
 - **Shared-finding count** — bugs surfaced by ≥2 models (high signal)
 - **Unique-finding count** per model — blind-spot escapes
 - The absolute path to the saved report directory (or single file)
