@@ -138,6 +138,7 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 async def dispatch_one(
     voice_id: str,
     model_id: str,
+    variant: str | None,
     slice_spec: dict,
     cfg: dict,
     outdir: Path,
@@ -153,8 +154,10 @@ async def dispatch_one(
         "--model", model_id,
         "--format", "default",
         "--dangerously-skip-permissions",
-        message,
     ]
+    if variant:
+        cmd.extend(["--variant", variant])
+    cmd.append(message)
     t0 = datetime.now(timezone.utc)
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -231,6 +234,7 @@ def _log_both(msg: str, logf) -> None:
 async def dispatch_voice(
     voice_id: str,
     model_id: str,
+    variant: str | None,
     slices: list[dict],
     cfg: dict,
     outdir: Path,
@@ -241,12 +245,13 @@ async def dispatch_voice(
     total = len(slices)
     voice_t0 = datetime.now(timezone.utc)
     with log_path.open("a") as logf:
-        _log_both(f"→ voice {voice_id}: starting {total}-slice dispatch", logf)
+        variant_label = f" [variant={variant}]" if variant else ""
+        _log_both(f"→ voice {voice_id}{variant_label}: starting {total}-slice dispatch", logf)
         for idx, slice_spec in enumerate(slices, start=1):
             slice_name = slice_spec["name"]
             _log_both(f"  ⇢ [{idx}/{total}] {voice_id}/{slice_name} dispatching...", logf)
             for attempt in range(cfg["max_retries"] + 1):
-                r = await dispatch_one(voice_id, model_id, slice_spec, cfg, outdir)
+                r = await dispatch_one(voice_id, model_id, variant, slice_spec, cfg, outdir)
                 if "error" not in r:
                     if attempt > 0:
                         _log_both(f"    ↻ {voice_id}/{slice_name} succeeded on attempt {attempt + 1}", logf)
@@ -306,7 +311,11 @@ async def main() -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "per-section").mkdir(exist_ok=True)
 
-    voices_cfg = [(v["id"], v["model"], v.get("note", "")) for v in cfg["voices"]]
+    default_variant = cfg.get("default_variant", "max")
+    voices_cfg = [
+        (v["id"], v["model"], v.get("variant", default_variant), v.get("note", ""))
+        for v in cfg["voices"]
+    ]
     if args.voices:
         wanted = set(args.voices.split(","))
         voices_cfg = [v for v in voices_cfg if v[0] in wanted]
@@ -331,22 +340,22 @@ async def main() -> None:
 
     if args.sequential:
         all_results = {}
-        for voice_id, model_id, _note in voices_cfg:
-            print(f"\n→ Dispatching voice {voice_id} sequentially...")
-            results = await dispatch_voice(voice_id, model_id, slices_cfg, cfg, outdir, log_path)
+        for voice_id, model_id, variant, _note in voices_cfg:
+            print(f"\n→ Dispatching voice {voice_id} (variant={variant}) sequentially...")
+            results = await dispatch_voice(voice_id, model_id, variant, slices_cfg, cfg, outdir, log_path)
             all_results[voice_id] = results
     else:
         print("\nDispatching all voices in parallel...")
         tasks = [
-            dispatch_voice(voice_id, model_id, slices_cfg, cfg, outdir, log_path)
-            for voice_id, model_id, _note in voices_cfg
+            dispatch_voice(voice_id, model_id, variant, slices_cfg, cfg, outdir, log_path)
+            for voice_id, model_id, variant, _note in voices_cfg
         ]
         results_list = await asyncio.gather(*tasks, return_exceptions=False)
         all_results = {v[0]: r for v, r in zip(voices_cfg, results_list)}
 
     print("\n=== Aggregating per-voice files ===")
     summary = []
-    for voice_id, model_id, _note in voices_cfg:
+    for voice_id, model_id, variant, _note in voices_cfg:
         results = all_results[voice_id]
         agg_path = aggregate_voice(voice_id, slices_cfg, results, outdir, cfg["target_spec"])
         n_ok = sum(1 for r in results if "error" not in r)
@@ -355,6 +364,7 @@ async def main() -> None:
         summary.append({
             "voice": voice_id,
             "model": model_id,
+            "variant": variant,
             "slices_ok": n_ok,
             "slices_total": len(results),
             "total_elapsed_s": total_elapsed,

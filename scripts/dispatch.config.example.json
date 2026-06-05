@@ -5,48 +5,39 @@
   "target_spec": "/absolute/path/to/your/project/intent.md",
   "run_tag_prefix": "intent-v1",
 
-  "_comment_voices": "Voice roster. id is a filesystem-safe slug used in output paths and headers. model is the OpenCode model string. burnt/* routes through the gateway; lmstudio/* routes through local LM Studio. Add or remove voices to match your panel. For routine work, 2-3 voices including one local; for high-stakes milestones, 5-7 voices spanning multiple families.",
+  "_comment_canonical_panel": "CANONICAL 5-VOICE PANEL for adversarial spec review. Each voice is pinned to the strongest most-recent variant of its model family with max thinking enabled. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent (NOT through this script) — dispatch claude-agent separately alongside opencode_dispatch.py. The four voices below are the OpenCode-dispatched roster. For Lean-specific tasks substitute leanstral for one of these voices (lmstudio/leanstral-2603).",
+
   "voices": [
+    {
+      "id": "gpt-5.1-thinking",
+      "model": "openai/gpt-5.1-thinking",
+      "note": "ChatGPT latest via OpenCode direct openai provider. Invoked at --variant max. Verify the model id against `opencode models openai` if the gpt-5.1-thinking string drifts."
+    },
     {
       "id": "kimi-k2-6",
       "model": "burnt/kimi-k2-6",
-      "note": "Moonshot frontier tier; clean sequential ReAct produces 6.8-15K-char per-slice reports"
+      "note": "Moonshot Kimi via Burnt gateway. Frontier tier; ReAct loop produces 6.8-15K-char per-slice reports. Reasoning toggle is gateway-controlled; if the gateway gains a kimi-thinking route, update this entry."
     },
     {
-      "id": "gpt-oss-120b",
-      "model": "burnt/gpt-oss-120b",
-      "note": "OpenAI-OSS 120B; clean sequential ReAct"
+      "id": "deepseek-v4-flash",
+      "model": "ds4/deepseek-v4-flash",
+      "note": "DeepSeek V4 Flash via local ds4 provider (DwarfStar4, http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant. Invoked at --variant max."
     },
     {
-      "id": "nemotron-3-120b-a12b",
-      "model": "burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b",
-      "note": "NVIDIA gateway 120B-A12B MoE, reasoning-on"
-    },
-    {
-      "id": "claude-opus-4-7",
-      "model": "burnt/claude-opus-4-7",
-      "note": "Anthropic via gateway; for the Claude voice in a multi-model ensemble, prefer the Agent subagent (Mode 2). This entry only makes sense in a cross-harness manifest run."
-    },
-    {
-      "id": "gemma-4-26b-a4b",
-      "model": "lmstudio/google/gemma-4-26b-a4b",
-      "note": "Google local 26B; needs ≥30min per-call timeout for ReAct loops on consumer GPU"
-    },
-    {
-      "id": "qwen3.6-27b",
-      "model": "lmstudio/qwen/qwen3.6-27b",
-      "note": "Alibaba local 27B"
-    },
-    {
-      "id": "mistral-small-4-119b-2603",
-      "model": "lmstudio/mistral-small-4-119b-2603",
-      "note": "Mistral local 119B non-reasoning; family-diversity gap-filler"
+      "id": "gemini-3-pro",
+      "model": "google/gemini-3-pro",
+      "note": "Gemini 3 Pro (strongest current Gemini) via OpenCode direct google provider. Invoked at --variant max. Verify the model id against `opencode models google` if the gemini-3-pro string drifts."
     }
   ],
 
-  "_comment_excluded_voices": "Voices known to fail adversarial spec review: glm-4-7-flash (degenerate loops at 30B 'flash' tier); goedel-prover-v2-32b and other theorem-prover specialists (treat prompts as proof goals instead of attack targets — use at verify-pyramid layer instead).",
+  "_comment_claude_voice": "The fifth voice in the canonical panel is Claude Opus 4.x (most recent: 4.7) dispatched in-harness as `claude-agent` via the colosseum-spec-adversary Agent subagent. That voice does NOT run through opencode_dispatch.py — the Agent tool invocation happens from the Claude Code session that owns the adversarial pass. See SKILL Step 4 Mode 2.",
+
+  "_comment_excluded_voices": "Voices known to fail adversarial spec review: glm-4-7-flash (degenerate loops at 30B 'flash' tier); goedel-prover-v2-32b and other theorem-prover specialists (treat prompts as proof goals instead of attack targets — use at verify-pyramid layer instead). leanstral-2603 belongs in Lean-specific verification work, not general adversarial spec review — substitute only when the spec is a Lean theorem.",
+
+  "_comment_dispatch_invocation": "opencode_dispatch.py passes --format default and --dangerously-skip-permissions to each `opencode run` call. To pin --variant max per voice, modify the `cmd` list in opencode_dispatch.py:dispatch_one to append the --variant flag, or set the variant in each voice's opencode.jsonc model definition.",
 
   "_comment_slices": "Slice plan. Each slice is one (voice, slice) call. headers[] are the markdown header ranges the agent should read from the target spec. attack_emphasis is the per-slice attack-category hint. Replace this example with your project's actual sections.",
+
   "slices": [
     {
       "name": "scope",

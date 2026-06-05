@@ -31,7 +31,18 @@ Ask the user for, or determine from context:
   - `burnt/<gateway-route>` — gateway-routed frontier voice via OpenCode (Mode 1). Examples: `burnt/kimi-k2-6`, `burnt/gpt-oss-120b`, `burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b`, `burnt/gemini-2-5-flash`, `burnt/gemini-3-1-flash-lite`, `burnt/claude-opus-4-7`, `burnt/claude-sonnet-4-6`.
   - `lmstudio/<local-model-id>` — local LM Studio voice via OpenCode (Mode 1). Examples: `lmstudio/qwen/qwen3.6-27b`, `lmstudio/google/gemma-4-26b-a4b`, `lmstudio/mistral-small-4-119b-2603`.
 
-  Default panel for routine work: `["claude-agent", "lmstudio/<one-loaded-local>"]` (free). Default for high-stakes spec milestones: 5–7 voices spanning `burnt/` + `lmstudio/` with family diversity across Anthropic / OpenAI-OSS / Moonshot / NVIDIA / Google / Alibaba / Mistral. Ask the user if not specified for a non-trivial spec — the multi-voice option is load-bearing and should not be silently bypassed.
+  **Canonical 5-voice panel** (the default for non-trivial specs; each voice is the strongest most-recent variant of its family with max thinking enabled, invoked at `--variant max` where supported):
+  1. `claude-agent` — Claude Opus 4.x latest (Mode 2 in-harness Agent subagent)
+  2. `openai/gpt-5.1-thinking` — ChatGPT latest via OpenCode direct openai provider
+  3. `burnt/kimi-k2-6` — Moonshot Kimi latest via OpenCode through the Burnt gateway
+  4. `ds4/deepseek-v4-flash` — DeepSeek V4 Flash via OpenCode through the local ds4 provider (DwarfStar4 at `http://127.0.0.1:8000`)
+  5. `google/gemini-3-pro` — Gemini latest strongest via OpenCode direct google provider
+
+  For Lean-specific verification work, substitute `lmstudio/leanstral-2603` for one of the general voices; do NOT include Leanstral in general adversarial spec review.
+
+  Smaller routine panels (`["claude-agent", "ds4/deepseek-v4-flash"]` is the cheapest viable multi-voice ensemble — free, two families). Ask the user if not specified for a non-trivial spec — the multi-voice option is load-bearing and should not be silently bypassed.
+
+  Verify the exact `openai/...` and `google/...` model strings against `opencode models openai` and `opencode models google` before dispatch; provider model IDs drift, and the canonical panel above pins names that may need updating to whatever each provider currently exposes as "latest with max thinking".
 
   **Do NOT accept bucket names** (`"openai"`, `"google"`, `"local"`, `"gateway"`) in the roster. Those names route to the Step 4 Mode 3 single-shot MCP fallbacks, which are not the primary dispatch path. If the user gives you a bucket name, translate it to an explicit voice ID before proceeding.
 

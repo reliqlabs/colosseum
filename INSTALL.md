@@ -240,9 +240,111 @@ The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration n
 
 ---
 
-## 7. Optional: cloud model layer
+## 7. OpenCode CLI providers (canonical adversarial dispatch path)
 
-`external-model-mcp` exposes three provider channels — `query_openai` (OpenAI BYOK), `query_google` (Google BYOK), and `query_gateway` (operator-curated multi-model gateway). The MCP loads credentials from `.env` files (gitignored) following this search order: `$COLOSSEUM_DOTENV` override → `$CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Setting env vars on the MCP launch line still works as before; the `.env` path is operationally cleaner.
+The Mode 1 dispatch path described in `skills/colosseum-adversarial/SKILL.md` runs `opencode run --agent spec-adversary --model <voice> --variant max` once per (voice, slice) pair. This requires OpenCode CLI (`brew install sst/tap/opencode` or per upstream instructions) plus provider definitions in `~/.config/opencode/opencode.jsonc`.
+
+The canonical 5-voice panel needs these providers configured:
+
+```jsonc
+{
+  "provider": {
+    // Gateway-routed frontier voices (single credential, multiple models)
+    "burnt": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Burnt AI Gateway",
+      "options": {
+        "baseURL": "https://<your-gateway-host>/v1",
+        "apiKey": "<gateway-api-key>"
+      },
+      "models": {
+        "kimi-k2-6": {
+          "name": "kimi-k2-6",
+          "tool_call": true,
+          "reasoning": false,
+          "limit": { "context": 128000, "output": 131072 }
+        }
+        // ... claude-opus-4-7, gemini-*, gpt-oss-*, nemotron-* per your gateway's roster
+      }
+    },
+
+    // Local DeepSeek V4 Flash via DwarfStar4 runner
+    "ds4": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DwarfStar4 (local)",
+      "options": { "baseURL": "http://127.0.0.1:8000/v1" },
+      "models": {
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 400000, "output": 32768 },
+          "variants": { "max": { "reasoningEffort": "high" } }
+        }
+      }
+    },
+
+    // OpenAI direct (canonical ChatGPT voice)
+    "openai": {
+      "npm": "@ai-sdk/openai",
+      "name": "OpenAI (direct)",
+      "options": { "apiKey": "{env:OPENAI_API_KEY}" },
+      "models": {
+        "gpt-5.1-thinking": {
+          "name": "GPT-5.1 (thinking)",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 400000, "output": 131072 },
+          "variants": {
+            "high": { "reasoningEffort": "high" },
+            "max": { "reasoningEffort": "high" }
+          }
+        }
+      }
+    },
+
+    // Google Gemini direct (canonical Gemini voice)
+    "google": {
+      "npm": "@ai-sdk/google",
+      "name": "Google Gemini (direct)",
+      "options": { "apiKey": "{env:GOOGLE_GENERATIVE_AI_API_KEY}" },
+      "models": {
+        "gemini-3-pro": {
+          "name": "Gemini 3 Pro",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 2000000, "output": 65536 },
+          "variants": {
+            "high": { "reasoningEffort": "high" },
+            "max": { "reasoningEffort": "high" }
+          }
+        }
+      }
+    },
+
+    // Local LM Studio voices (free family-diversity layer)
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio (local)",
+      "options": { "baseURL": "http://127.0.0.1:1234/v1" },
+      "models": {
+        "leanstral-2603": { "name": "Leanstral 2603" }
+        // ... per your loaded model list
+      }
+    }
+  }
+}
+```
+
+Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environment (or directly in `opencode.jsonc` if you prefer hardcoded keys to env interpolation). Verify the model IDs against the providers' current docs — `gpt-5.1-thinking` and `gemini-3-pro` are pinned as of writing but provider model IDs drift; run `opencode models openai` and `opencode models google` to confirm.
+
+Verify with `opencode run --model openai/gpt-5.1-thinking "say hi"` and similar one-shot probes per provider before relying on the dispatch script.
+
+## 8. Optional: cloud model layer via external-model-mcp (Mode 3 fallback only)
+
+`external-model-mcp` exposes three provider channels — `query_openai` (OpenAI BYOK), `query_google` (Google BYOK), and `query_gateway` (operator-curated multi-model gateway). These are the **Mode 3 fallback** dispatch path used only when OpenCode is not installed on the host. For routine adversarial work use Section 7 above (OpenCode CLI), not this MCP.
+
+The MCP loads credentials from `.env` files (gitignored) following this search order: `$COLOSSEUM_DOTENV` override → `$CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Setting env vars on the MCP launch line still works as before; the `.env` path is operationally cleaner.
 
 For BYOK across Claude + GPT + Gemini:
 
@@ -274,7 +376,7 @@ Any single credential channel works alone; using all three gives maximum coverag
 
 ---
 
-## 8. Verify the full install
+## 9. Verify the full install
 
 From a fresh Claude Code session, call each MCP's health check. Expected: `ok: true` for tools you installed, graceful "not installed" for tools you skipped.
 
@@ -290,7 +392,7 @@ mcp__external-model__check_external_health()
 
 ---
 
-## 9. Optional: load the skills and agents into Claude Code
+## 10. Optional: load the skills and agents into Claude Code
 
 The MCPs cover the verification tools. The Colosseum **skills** (`colosseum-intent`, `colosseum-adversarial`, `colosseum-verify`, `colosseum-compose`, `colosseum-change`, `colosseum-reverse-intent`) and **agents** (`colosseum-spec-adversary`, `colosseum-failure-classifier`) need to be made discoverable to Claude Code by symlinking into your user config:
 
@@ -304,7 +406,7 @@ Alternatively, for project-local use only, symlink into `.claude/skills/` and `.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 **`charon: error: unexpected argument '--version'`** — Charon uses subcommand syntax. Use `charon version`.
 
