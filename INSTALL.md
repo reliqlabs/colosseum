@@ -258,13 +258,26 @@ The canonical 5-voice panel needs these providers configured:
         "apiKey": "<gateway-api-key>"
       },
       "models": {
-        "kimi-k2-6": {
-          "name": "kimi-k2-6",
+        "cloudflare-100/@cf/moonshotai/kimi-k2.6": {
+          "name": "kimi-k2.6",
+          "tool_call": true,
+          "reasoning": false,
+          "limit": { "context": 128000, "output": 131072 }
+        },
+        "cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b": {
+          "name": "nemotron-3-120b-a12b",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 128000, "output": 131072 },
+          "variants": { "max": { "reasoningEffort": "high" } }
+        },
+        "cloudflare-100/@cf/openai/gpt-oss-120b": {
+          "name": "gpt-oss-120b",
           "tool_call": true,
           "reasoning": false,
           "limit": { "context": 128000, "output": 131072 }
         }
-        // ... claude-opus-4-7, gemini-*, gpt-oss-*, nemotron-* per your gateway's roster
+        // ... add other gateway routes per `curl <baseURL>/models`. Verify periodically; operator roster drifts. Claude and Gemini are NOT in the Burnt gateway — use direct openai/google providers and in-harness claude-agent.
       }
     },
 

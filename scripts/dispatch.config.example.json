@@ -14,9 +14,9 @@
       "note": "ChatGPT latest via OpenCode direct openai provider. Invoked at --variant max. Verify the model id against `opencode models openai` if the gpt-5.1-thinking string drifts."
     },
     {
-      "id": "kimi-k2-6",
-      "model": "burnt/kimi-k2-6",
-      "note": "Moonshot Kimi via Burnt gateway. Frontier tier; ReAct loop produces 6.8-15K-char per-slice reports. Reasoning toggle is gateway-controlled; if the gateway gains a kimi-thinking route, update this entry."
+      "id": "kimi-k2.6",
+      "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "note": "Moonshot Kimi K2.6 via Burnt gateway (Cloudflare AI Workers). ReAct loop produces 6.8-15K-char per-slice reports. Reasoning is currently off on this route (gateway-controlled); if the gateway gains a kimi-thinking route, update this entry."
     },
     {
       "id": "deepseek-v4-flash",

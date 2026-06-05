@@ -12,7 +12,7 @@ You are not the adversary. You do not produce the attacks. You do not soften the
 This skill supports two modes:
 
 - **Single-voice (default)** — invoke the `colosseum-spec-adversary` subagent (Claude). Fast, free under the Claude Code subscription, no setup.
-- **Multi-voice** — invoke Claude *and* fan the same attack out to non-Claude voices via the OpenCode CLI orchestrator (gateway-routed frontier voices like `burnt/kimi-k2-6` plus local LM Studio voices like `lmstudio/qwen/qwen3.6-27b`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
+- **Multi-voice** — invoke Claude *and* fan the same attack out to non-Claude voices via the OpenCode CLI orchestrator (gateway-routed frontier voices like `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` plus local LM Studio voices like `lmstudio/qwen/qwen3.6-27b`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
 
 The user selects via the `voices` parameter (a roster of explicit voice IDs, NOT bucket names — see Step 1 below). Default is `["claude-agent"]`. Recommended for routine spec milestones: `["claude-agent", "lmstudio/<one-loaded-local>"]` (Claude + local floor; free). Recommended for high-stakes spec milestones: 5–7 voices spanning `burnt/` + `lmstudio/` for family diversity (Anthropic / OpenAI-OSS / Moonshot / NVIDIA / Google / Alibaba / Mistral).
 
@@ -28,13 +28,13 @@ Ask the user for, or determine from context:
 - **Project root** — where `.colosseum/attacks/` should be created. Infer from the spec's location if not given.
 - **Voices to dispatch** — a roster of explicit voice IDs, NOT bucket names. Three ID shapes are valid:
   - `claude-agent` — the Claude voice; runs in-harness via the `colosseum-spec-adversary` Agent subagent (Mode 2 below). This is the only voice that does NOT go through OpenCode.
-  - `burnt/<gateway-route>` — gateway-routed frontier voice via OpenCode (Mode 1). Examples: `burnt/kimi-k2-6`, `burnt/gpt-oss-120b`, `burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b`, `burnt/gemini-2-5-flash`, `burnt/gemini-3-1-flash-lite`, `burnt/claude-opus-4-7`, `burnt/claude-sonnet-4-6`.
+  - `burnt/<gateway-route>` — gateway-routed frontier voice via OpenCode (Mode 1). Current gateway roster (verify against `curl <gateway-base>/models` since the operator's roster drifts): `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `burnt/cloudflare-100/@cf/openai/gpt-oss-120b`, `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash`. Note: the gateway no longer exposes Claude or Gemini routes — use direct `openai/`, `google/`, and in-harness `claude-agent` for those families instead.
   - `lmstudio/<local-model-id>` — local LM Studio voice via OpenCode (Mode 1). Examples: `lmstudio/qwen/qwen3.6-27b`, `lmstudio/google/gemma-4-26b-a4b`, `lmstudio/mistral-small-4-119b-2603`.
 
   **Canonical 5-voice panel** (the default for non-trivial specs; each voice is the strongest most-recent variant of its family with max thinking enabled, invoked at `--variant max` where supported):
   1. `claude-agent` — Claude Opus 4.x latest (Mode 2 in-harness Agent subagent)
   2. `openai/gpt-5.1-thinking` — ChatGPT latest via OpenCode direct openai provider
-  3. `burnt/kimi-k2-6` — Moonshot Kimi latest via OpenCode through the Burnt gateway
+  3. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot Kimi K2.6 via OpenCode through the Burnt gateway
   4. `ds4/deepseek-v4-flash` — DeepSeek V4 Flash via OpenCode through the local ds4 provider (DwarfStar4 at `http://127.0.0.1:8000`)
   5. `google/gemini-3-pro` — Gemini latest strongest via OpenCode direct google provider
 
@@ -385,7 +385,7 @@ Write the synthesis to `synthesis.md` in the multi-model directory.
 
 After persisting, report:
 
-- One-line per-voice verdict summary using explicit voice IDs (NOT bucket names): `claude-agent: BREAKS (3 critical, 5 serious) | burnt/kimi-k2-6: BREAKS (2 critical) | burnt/gpt-oss-120b: SURVIVES | lmstudio/qwen/qwen3.6-27b: BREAKS (1 critical)`
+- One-line per-voice verdict summary using explicit voice IDs (NOT bucket names): `claude-agent: BREAKS (3 critical, 5 serious) | openai/gpt-5.1-thinking: BREAKS (2 critical) | burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6: SURVIVES | ds4/deepseek-v4-flash: BREAKS (1 critical) | google/gemini-3-pro: BREAKS (2 critical)`
 - **Shared-finding count** — bugs surfaced by ≥2 models (high signal)
 - **Unique-finding count** per model — blind-spot escapes
 - The absolute path to the saved report directory (or single file)
