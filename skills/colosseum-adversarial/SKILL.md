@@ -23,7 +23,7 @@ The user selects via the `voices` parameter (a roster of explicit voice IDs, NOT
 Ask the user for, or determine from context:
 
 - **Path to the spec under review** — the artifact being attacked. May be a Lean file, Quint module, Verus annotations in a Rust source, a `#[kani::proof]` harness, or any other spec artifact.
-- **Path to the intent document** — the human-anchored source of truth the spec is supposed to encode. Typically `intent.md` at the project root, but allow override.
+- **Path to the intent document** — the human-anchored source of truth the spec is supposed to encode. Check `<project>/.colosseum/intent.md` first (canonical per CONCEPTS.md "Project layout"), then `<project>/intent.md`, then ask.
 - **Optional context** — paths to existing tests, related specs, prior attack reports, type signatures, anything that strengthens grounding.
 - **Project root** — where `.colosseum/attacks/` should be created. Infer from the spec's location if not given.
 - **Voices to dispatch** — a roster of explicit voice IDs, NOT bucket names. Three ID shapes are valid:
@@ -110,22 +110,26 @@ Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adver
 **Invocation shape**:
 
 ```bash
-opencode run --agent spec-adversary --model burnt/kimi-k2-6 \
-  --format default --dangerously-skip-permissions \
+opencode run --agent spec-adversary --model burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6 \
+  --variant max --format default --dangerously-skip-permissions \
   "TARGET_SPEC: /path/to/intent.md\n\nTARGET_SLICE: temporal-invariants — ..."
 ```
 
 Orchestrate (voice × slice) pairs from a Python script that captures stdout per call and writes per-section files. **Canonical orchestrator: `colosseum/scripts/opencode_dispatch.py`** — copy to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a project-local config at `<project>/.colosseum/dispatch.json` (voice roster + slice plan + optional context appendix). See `colosseum/scripts/dispatch.config.example.json` for the schema. The verified-rcv project keeps a pinned variant of this script as its in-tree history; the colosseum/ copy is the one new projects should start from.
 
-**Per-voice voice IDs to pass to `--model`** (gateway-routed via OpenCode's `burnt` provider configured in `~/.config/opencode/opencode.jsonc`):
+**Per-voice voice IDs to pass to `--model`** (configured in `~/.config/opencode/opencode.jsonc`; the gateway roster drifts with operator curation, so verify against `curl <gateway-base>/models` before a milestone run):
 
-- `burnt/claude-opus-4-7`, `burnt/claude-sonnet-4-6` — Anthropic via gateway (Bug 4 status open under ReAct — single-call response stays under 127s)
-- `burnt/kimi-k2-6` — Moonshot
-- `burnt/glm-4-7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per verified-rcv calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class, glm-4-7-flash is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use the full glm-4-7 (non-flash) or pull a comparable model into LM Studio
-- `burnt/gpt-oss-120b` — OpenAI-OSS
-- `burnt/cloudflare-100-cf-nvidia-nemotron-3-120b-a12b` — NVIDIA Nemotron 3 120B-A12B MoE via Cloudflare; reasoning-on; added to gateway 2026-05-16
-- `burnt/gemini-2-5-flash`, `burnt/gemini-3-1-flash-lite` — Google
+- `openai/gpt-5.1-thinking` — ChatGPT latest, direct provider (canonical panel voice)
+- `google/gemini-3-pro` — Gemini strongest, direct provider (canonical panel voice)
+- `ds4/deepseek-v4-flash` — DeepSeek V4 Flash, local DwarfStar4 runner (canonical panel voice)
+- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot via gateway (canonical panel voice)
+- `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA Nemotron 3 120B-A12B MoE via gateway; reasoning-on
+- `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS via gateway
+- `burnt/google-1/gemini-3.5-flash` — Gemini Flash via gateway; cheap fallback when the direct google provider is not configured (Flash tier, not Pro — direct `google/gemini-3-pro` is the canonical Gemini voice)
+- `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per verified-rcv calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class it is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use a full (non-flash) glm tier or pull a comparable model into LM Studio
 - `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`)
+
+The gateway no longer exposes Anthropic routes; the Claude voice always runs in-harness via Mode 2.
 
 **Required configuration in `opencode.jsonc`**: set `limit.output ≥ 65536` (recommend `131072`) per gateway model so Turn 2's analysis response budget never hits a cap mid-report. With the default 16K cap, thorough reasoning models truncate mid-sentence and the orchestrator's retry loop fires; raising to 64K+ makes that pattern disappear.
 
@@ -160,7 +164,7 @@ If you are in this skill and reaching for `mcp__external-model__query_gateway` o
 
 Once you have confirmed Mode 1 is genuinely unavailable per a condition above, the inline channels are:
 
-- **gateway** — call `external-model-mcp`'s `query_gateway(prompt=..., model="<gateway-model-id>")`. The gateway is an operator-curated OpenAI-format multi-model endpoint; available `model` ids drift with operator curation (current set: `claude-opus-4-7`, `claude-sonnet-4-6`, `gemini-2-5-flash`, `gemini-3-1-flash-lite`, `glm-4-7-flash`, `gpt-oss-120b`, `kimi-k2-6`).
+- **gateway** — call `external-model-mcp`'s `query_gateway(prompt=..., model="<gateway-model-id>")`. The gateway is an operator-curated OpenAI-format multi-model endpoint; available `model` ids drift with operator curation, so list them first via the gateway's `/models` endpoint (current chat-tier set: `cloudflare-100/@cf/moonshotai/kimi-k2.6`, `cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `cloudflare-100/@cf/openai/gpt-oss-120b`, `cloudflare-100/@cf/zai-org/glm-4.7-flash`, `google-1/gemini-2.5-flash`, `google-1/gemini-3.1-flash-lite`, `google-1/gemini-3.5-flash`; no Anthropic routes).
 - **local** — call `lm-studio-mcp`'s `fan_out_local` with `models=` set to the user's preferred local pair (default: all loaded). The inlined prompt is the only input — local models have no file access in this mode.
 - **openai** — call `external-model-mcp`'s `query_openai(prompt=...)`. The inlined prompt is the only input.
 - **google** — call `external-model-mcp`'s `query_google(prompt=...)`.
@@ -170,7 +174,7 @@ Once you have confirmed Mode 1 is genuinely unavailable per a condition above, t
 **Inline-mode timeout caveats** (do NOT apply to Mode 1, which sidesteps them via ReAct):
 
 - **Gateway-wide ~240s ceiling** (Bug 3). Calibrate `max_tokens` per upstream model's generation speed to fit under it. Empirical values at a ~22K-token prompt: `kimi-k2-6` ≤ 8K (133s); `glm-4-7-flash` ≤ 16K (152s); `gpt-oss-120b` 16K in 47s. Above these, HTTP 408. Truncation at the cap loses the verdict line and most of the latter half of the report.
-- **Anthropic-route ~127s ceiling** (Bug 4, Cloudflare 524). `claude-opus-4-7` and `claude-sonnet-4-6` hit it on long+high-budget inlined dispatches. Anthropic-via-gateway is unviable for long-output single-request adversarial passes. For the Claude voice, **prefer Mode 2** (Agent subagent).
+- **Anthropic-route ~127s ceiling** (Bug 4, Cloudflare 524). Historical: when the gateway carried Anthropic routes, `claude-opus-4-7` and `claude-sonnet-4-6` hit it on long+high-budget inlined dispatches. The gateway no longer exposes Anthropic routes; the Claude voice always runs via **Mode 2** (Agent subagent).
 
 **Parameter quirk**: `claude-opus-4-7` rejects the `temperature` request parameter (HTTP 400). Omit `temperature` when calling that model id. The MCP's `query_gateway` accepts `temperature=None` to opt out.
 

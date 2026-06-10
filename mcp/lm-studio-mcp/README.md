@@ -47,7 +47,7 @@ Same prompt against multiple loaded local models in parallel. Returns a dict key
 {
   "mcpServers": {
     "lm-studio": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/lm-studio-mcp/lm_studio_mcp.py"
+      "command": "/Users/you/path/to/colosseum/mcp/lm-studio-mcp/lm_studio_mcp.py"
     }
   }
 }
@@ -59,7 +59,7 @@ To set a default model:
 {
   "mcpServers": {
     "lm-studio": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/lm-studio-mcp/lm_studio_mcp.py",
+      "command": "/Users/you/path/to/colosseum/mcp/lm-studio-mcp/lm_studio_mcp.py",
       "env": {
         "LMSTUDIO_DEFAULT_MODEL": "qwen-3.6-27b-instruct"
       }

@@ -57,7 +57,7 @@ Add to `.mcp.json`:
 {
   "mcpServers": {
     "verus": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/verus-mcp/verus_mcp.py"
+      "command": "/Users/you/path/to/colosseum/mcp/verus-mcp/verus_mcp.py"
     }
   }
 }
@@ -69,7 +69,7 @@ If `verus` is not on PATH, point at the absolute binary:
 {
   "mcpServers": {
     "verus": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/verus-mcp/verus_mcp.py",
+      "command": "/Users/you/path/to/colosseum/mcp/verus-mcp/verus_mcp.py",
       "env": {
         "VERUS_BIN": "/abs/path/to/verus"
       }

@@ -1,7 +1,14 @@
 # Archive — Colosseum development record
 
 Snapshot of the Claude Code transcripts and auto-memory files captured at the
-moment of the `crucible/` → `colosseum/` directory rename (2026-05-12).
+moment of the `crucible/` → `colosseum/` directory rename (2026-05-12), plus
+retired documents kept for traceability:
+
+- `methodology-asks-historical.md` — the pre-rename "Ask X" improvement
+  ledger; current improvements live in `../methodology-improvements.md`
+- `opencode-dispatch-design.md` — the design draft that became
+  `../scripts/opencode_dispatch.py`; superseded 2026-06 when the
+  orchestrator landed as the canonical Mode 1 dispatch script
 
 ## Why this is here
 

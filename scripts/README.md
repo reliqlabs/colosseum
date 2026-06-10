@@ -22,12 +22,27 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 **Required OpenCode configuration.** `~/.config/opencode/opencode.jsonc` must define the `burnt` and `lmstudio` providers and set `limit.output ≥ 65536` (recommend `131072`) per gateway model so the analysis response budget never hits a cap mid-report.
 
+## `check_ledger_citations.py` — ledger-as-gate CI check
+
+Reference implementation of the Step 8 CI gate in `skills/colosseum-compose/SKILL.md`. Parses every `<file>:<line>` citation in a project's `.colosseum/ledger.md` (backtick-quoted or `code:`-annotated), confirms the file exists and the cited line is in range, non-empty, and not comment-only. Also checks that `axiom:` annotations carry a justification phrase. Kani-coverage annotations warn by default; `--strict-kani` upgrades them to failures.
+
+```bash
+# Copy into the project, then wire into CI:
+cp colosseum/scripts/check_ledger_citations.py <project>/.colosseum/scripts/
+<project>/.colosseum/scripts/check_ledger_citations.py <project>/.colosseum/ledger.md
+# exit 0 = gate passed; 1 = drift detected; 2 = usage error
+```
+
+`--root` overrides the directory citations resolve against (defaults to the ledger's grandparent, i.e. the project root for a ledger at `<project>/.colosseum/ledger.md`).
+
 ## `install-agents.py` — install the canonical agent bodies into a target harness
 
 Builds per-harness agent wrappers (Claude Code subagent or OpenCode subagent) from the canonical bodies under `colosseum/agents/*-body.md`. Run before the first OpenCode dispatch in a new project:
 
 ```bash
 colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/
+colosseum/scripts/install-agents.py build   # regenerate all wrappers in-repo
+colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bodies (0 = clean)
 ```
 
 ## `colosseum_run.py` — multi-harness adversarial dispatch coordinator

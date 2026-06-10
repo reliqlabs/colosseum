@@ -56,6 +56,18 @@ The verbs you actually run. Each is a SKILL the harness can invoke.
 | `colosseum-compose` | Maintain cross-component trust ledger with code-line citations | 8 (continuous) |
 | `colosseum-change` | Upstream-first change loop with re-verification | when changing a spec'd project |
 
+## Project layout
+
+Canonical locations within a Colosseum-managed project. Skills cite these; do not invent alternatives per skill.
+
+- `<project>/.colosseum/intent.md` — the intent document (canonical). `<project>/intent.md` at the root is the recognized alternative for projects that want the intent visible at top level; a skill that needs the intent checks `.colosseum/intent.md` first, then `intent.md`, then asks.
+- `<project>/.colosseum/ledger.md` — the trust ledger
+- `<project>/.colosseum/attacks/` — adversarial reports, verbatim
+- `<project>/.colosseum/changes/` — change impact reports
+- `<project>/.colosseum/verify/` — pyramid run reports
+- `<project>/.colosseum/scripts/` — project-local copies of dispatch + CI-gate scripts
+- `<project>/.opencode/agent/` — per-project OpenCode agents, built from `colosseum/agents/*-body.md` (never hand-edited)
+
 ## The trust ledger
 
 A project's `.colosseum/ledger.md` records every cross-component trust claim with:
@@ -100,7 +112,7 @@ Inside a single review, findings are numbered (Critical 1, Critical 2, High 1, .
 
 Three rules to keep the namespace cheap to learn.
 
-1. **No cycle numbers.** Git commits are the chronology. Commit messages carry the descriptive title. There is no "Cycle 7.5" — there is the commit whose title is "axiom demotion via DCAP reference verifier".
+1. **No cycle numbers.** Git commits are the chronology. Commit messages carry the descriptive title. There is no "Cycle 7.5" — there is the commit whose title is "axiom demotion via DCAP reference verifier". (Exemption: the `Round: <N>` field in an attack report's metadata header is an ordinal within one spec's attack series — "the third attack against this intent" — not project chronology. It stays.)
 2. **No fractional steps.** A step inserted later gets a name, not `Step 4.5`. If the name doesn't fit, the step shape was wrong.
 3. **No alphabetical asks.** Methodology improvements live in `methodology-improvements.md` under their practice name (e.g., "system-of-intents shape", "per-section adversarial dispatch", "ghost-variable encoding"). Historical letter labels (Ask A, Ask AB) remain in archive only.
 

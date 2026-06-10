@@ -39,7 +39,7 @@ Ask the user for, or determine from context:
 - **Target scope** — which module, crate, or service is this intent for? Reverse-intent should be narrow; if the answer is "the whole monorepo," push back and pick a single coherent surface (one crate, one bounded subsystem).
 - **Code root** — absolute path to the directory you should read.
 - **Auxiliary docs** — paths to relevant CLAUDE.md, AGENTS.md, README, ARCHITECTURE.md, ADRs. Default: walk the code root and pick up anything matching those names.
-- **Output location** — default `<code_root>/intent.md` or `<code_root>/.colosseum/intent.md`. Confirm before overwriting.
+- **Output location** — default `<code_root>/.colosseum/intent.md` (canonical per CONCEPTS.md "Project layout"); `<code_root>/intent.md` is the recognized alternative. Confirm before overwriting.
 
 If a `intent.md` already exists, ask whether this is a refresh (read existing, fold in changes) or a starting-fresh authoring (rename or back up the existing file first). Do not silently overwrite a prior intent doc.
 

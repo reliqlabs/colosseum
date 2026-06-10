@@ -87,7 +87,7 @@ If verify hangs the first time, run it manually once outside Claude Code to let 
 {
   "mcpServers": {
     "quint": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/quint-mcp/quint_mcp.py"
+      "command": "/Users/you/path/to/colosseum/mcp/quint-mcp/quint_mcp.py"
     }
   }
 }

@@ -31,7 +31,7 @@ You work conversationally with the user. Walk them through the document one sect
 
 ## Step 1: Locate the document
 
-Ask the user where the intent document should live. Default to `./intent.md` in the current working directory if they have no preference. Common alternatives: `docs/intent.md`, `colosseum/projects/<project-name>/intent.md`.
+Ask the user where the intent document should live. Default to `<project>/.colosseum/intent.md` (the canonical location per CONCEPTS.md "Project layout"); `<project>/intent.md` at the root is the recognized alternative if they want it visible at top level. Create the `.colosseum/` directory if it doesn't exist.
 
 Confirm the path is writable and the file does not silently overwrite existing content. If a file exists at that path, ask whether to revise it or create a new one alongside.
 

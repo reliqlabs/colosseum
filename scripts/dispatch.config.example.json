@@ -74,6 +74,9 @@
   "_comment_context_appendix": "Optional shared-context block prepended to every call. Use for type signatures, invariant labels, or cross-section glossary entries that are load-bearing but not under attack. Mark clearly as read-only / not-to-be-attacked.",
   "context_appendix": "=== CONTEXT APPENDIX (read-only — DO NOT ATTACK; these sections are attacked in their own invocations) ===\n\nSystem under review: <your system name and one-line description>.\nIntent doc: version <X.Y.Z>.\n\n=== END CONTEXT APPENDIX ===",
 
+  "_comment_variant": "default_variant is passed as `--variant` to every voice that lacks its own `variant` field. Canonical setting is max (maximum thinking budget on every voice that supports it). A per-voice `variant` field overrides; set it to an empty string to omit the flag for that voice.",
+  "default_variant": "max",
+
   "_comment_timeouts": "per_call_timeout: seconds budget per (voice, slice) call. Local reasoning models on consumer hardware can take 10-25 min per slice. max_retries: per-call retry budget on truncated stubs or HTTP errors.",
   "per_call_timeout": 1800,
   "max_retries": 2

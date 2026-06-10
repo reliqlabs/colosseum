@@ -28,7 +28,7 @@ Run the full pipeline. Produces `.lean` files (or `.v` / `.fst` / `.sml` dependi
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
-| `crate_path` | string | — | Absolute path to the crate root |
+| `crate_path` | string | — | Absolute path to a single crate root (the directory holding that crate's `Cargo.toml`). A Cargo workspace root is rejected — pass the specific member crate's path instead |
 | `output_dir` | string | — | Where extraction outputs go (created if absent) |
 | `backend` | string? | `lean` | One of `lean`, `coq`, `fstar`, `hol4` |
 | `extra_charon_args` | list? | null | Verbatim charon flags |
@@ -69,7 +69,7 @@ aeneas --version
 {
   "mcpServers": {
     "aeneas": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/aeneas-mcp/aeneas_mcp.py"
+      "command": "/Users/you/path/to/colosseum/mcp/aeneas-mcp/aeneas_mcp.py"
     }
   }
 }

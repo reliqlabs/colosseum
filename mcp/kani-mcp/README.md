@@ -45,7 +45,7 @@ Add to `.mcp.json` in your project root, or to `~/.claude/mcp.json` globally:
 {
   "mcpServers": {
     "kani": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/kani-mcp/kani_mcp.py"
+      "command": "/Users/you/path/to/colosseum/mcp/kani-mcp/kani_mcp.py"
     }
   }
 }

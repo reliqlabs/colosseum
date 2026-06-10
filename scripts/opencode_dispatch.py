@@ -36,12 +36,15 @@ CONFIG SCHEMA
       project_root       - absolute path to the project being attacked
       target_spec        - absolute path to the spec/intent doc
       run_tag_prefix     - filesystem-safe prefix for the output dir
-      voices[]           - list of {id, model, note?}
+      voices[]           - list of {id, model, variant?, note?}
       slices[]           - list of {name, label, headers[], attack_emphasis}
       context_appendix?  - optional shared-context block for all calls
+      default_variant?   - variant passed as `--variant` to every voice that
+                           lacks its own `variant` field; default "max".
+                           Per-voice `variant` overrides it. Set a voice's
+                           variant to null/"" to omit the flag entirely.
       per_call_timeout?  - seconds, default 1800
       max_retries?       - default 2
-      output_caps?       - optional {limit_output: N} reminder note
 
 OUTPUT
     <project_root>/.colosseum/attacks/<run-tag>/

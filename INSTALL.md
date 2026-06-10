@@ -240,11 +240,20 @@ The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration n
 
 ---
 
-## 7. OpenCode CLI providers (canonical adversarial dispatch path)
+## 7. OpenCode CLI + providers (canonical adversarial dispatch path)
 
-The Mode 1 dispatch path described in `skills/colosseum-adversarial/SKILL.md` runs `opencode run --agent spec-adversary --model <voice> --variant max` once per (voice, slice) pair. This requires OpenCode CLI (`brew install sst/tap/opencode` or per upstream instructions) plus provider definitions in `~/.config/opencode/opencode.jsonc`.
+The Mode 1 dispatch path described in `skills/colosseum-adversarial/SKILL.md` runs `opencode run --agent spec-adversary --model <voice> --variant max` once per (voice, slice) pair. This is the **primary** dispatch surface for multi-voice adversarial work; the MCP channel in Section 8 is the fallback for hosts where OpenCode can't be installed.
 
-The canonical 5-voice panel needs these providers configured:
+### 7.1 Install OpenCode CLI
+
+```bash
+brew install sst/tap/opencode    # or see https://opencode.ai for other platforms
+opencode --version               # verify
+```
+
+### 7.2 Configure providers
+
+Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 5-voice panel needs these providers configured (the fifth voice, Claude, runs in-harness via the Agent subagent and needs no OpenCode entry):
 
 ```jsonc
 {

@@ -4,7 +4,11 @@
 
 A methodology for building dependable software in a world of fast, unreliable LLM workers.
 
-This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The first concrete output will be a small Rust program built end-to-end through this process to validate the approach on real code.
+This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The methodology is validated against real dogfood projects (Quartz, verified-rcv, bidboard — see the table below); each produces concrete evidence that drives the next iteration.
+
+## Starting a new project
+
+See **[QUICKSTART.md](./QUICKSTART.md)** — the front door for anyone bringing a new project into the methodology. It traces the minimal install, the project directory setup, and the ten-stage workflow as concrete skill invocations.
 
 ## Installing
 
@@ -161,7 +165,7 @@ Improvement proposals awaiting validation live in [methodology-improvements.md](
 | `external-model-mcp` | MCP server (single-shot cloud queries; primary fan-out is OpenCode) | `mcp/external-model-mcp/` |
 | `lm-studio-mcp` | MCP server (local model layer) | `mcp/lm-studio-mcp/` |
 | `colosseum-spec-adversary` | Subagent (spec attack; canonical body + per-harness wrappers) | `agents/spec-adversary-body.md` |
-| `colosseum-quint-spec-generator` | Subagent (Quint spec authoring loop) | `agents/quint-spec-generator-body.md` |
+| `colosseum-quint-spec-generator` | Subagent (Quint spec authoring loop; invoked directly via the Agent tool or `opencode run --agent quint-spec-generator` at workflow stage 4 — no SKILL wraps it) | `agents/quint-spec-generator-body.md` |
 | `colosseum-failure-classifier` | Subagent (verification-failure triage) | `agents/colosseum-failure-classifier.md` |
 | `colosseum-intent` | SKILL (intent elicitation, forward) | `skills/colosseum-intent/` |
 | `colosseum-reverse-intent` | SKILL (intent distillation from existing code) | `skills/colosseum-reverse-intent/` |

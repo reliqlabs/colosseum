@@ -77,7 +77,7 @@ Fill in only the keys you have. All `.env` files matching `*.env` are gitignored
 {
   "mcpServers": {
     "external-model": {
-      "command": "/Users/mvid/Development/reliq/colosseum/mcp/external-model-mcp/external_model_mcp.py",
+      "command": "/Users/you/path/to/colosseum/mcp/external-model-mcp/external_model_mcp.py",
       "env": {}
     }
   }
