@@ -101,7 +101,7 @@ Produced during the verified-rcv and Quartz dogfood projects. Cited by methodolo
 | Gateway bugs report | `verified-rcv/.colosseum/gateway-bugs-*.md` | 4 documented gateway bugs: (1) Gemini route via OpenAI BYOK (resolved); (2) ReadableStream disturbed (resolved); (3) gateway-wide ~240s cap; (4) Anthropic-route Cloudflare 524 at ~127s. |
 | Re-adversarial dispatch plan | `verified-rcv/.colosseum/attacks/re-adversarial-dispatch-plan.md` | Lineup design + blindness restrictions for the 6-voice fan-out. |
 | Manifest tool | `colosseum/scripts/colosseum_run.py` + `colosseum/scripts/README.md` | Harness-agnostic dispatch coordinator. Verified-rcv was its first dogfood. |
-| External-model MCP | `colosseum/mcp/external-model-mcp/` | OpenAI/Google/gateway provider MCP. Extended with the gateway channel during verified-rcv. |
+| External-model MCP (removed) | — | Former OpenAI/Google/gateway single-shot provider MCP, used during early verified-rcv dogfooding. Removed 2026-06: all external-model dispatch now goes through OpenCode (agentic ReAct), so single-shot MCP completions no longer have a role. See `colosseum/scripts/opencode_dispatch.py`. |
 
 ## H. Citation hygiene notes
 

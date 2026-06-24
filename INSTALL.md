@@ -200,7 +200,6 @@ claude mcp add -s user kani -- $COLOSSEUM/mcp/kani-mcp/kani_mcp.py
 claude mcp add -s user quint -- $COLOSSEUM/mcp/quint-mcp/quint_mcp.py
 claude mcp add -s user goedel -- $COLOSSEUM/mcp/goedel-mcp/goedel_mcp.py
 claude mcp add -s user lm-studio -- $COLOSSEUM/mcp/lm-studio-mcp/lm_studio_mcp.py
-claude mcp add -s user external-model -- $COLOSSEUM/mcp/external-model-mcp/external_model_mcp.py
 
 # Verus + Aeneas need env vars pointing at the binaries you installed in §4
 claude mcp add -s user verus \
@@ -242,7 +241,7 @@ The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration n
 
 ## 7. OpenCode CLI + providers (canonical adversarial dispatch path)
 
-The Mode 1 dispatch path described in `skills/colosseum-adversarial/SKILL.md` runs `opencode run --agent spec-adversary --model <voice> --variant max` once per (voice, slice) pair. This is the **primary** dispatch surface for multi-voice adversarial work; the MCP channel in Section 8 is the fallback for hosts where OpenCode can't be installed.
+The dispatch path described in `skills/colosseum-adversarial/SKILL.md` runs `opencode run --agent spec-adversary --model <voice> --variant max` once per (voice, slice) pair. This is the **only** dispatch surface for non-Claude adversarial voices — external models are called through OpenCode so they get an agentic ReAct loop with file access, never a single-shot MCP completion.
 
 ### 7.1 Install OpenCode CLI
 
@@ -362,43 +361,11 @@ Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environmen
 
 Verify with `opencode run --model openai/gpt-5.1-thinking "say hi"` and similar one-shot probes per provider before relying on the dispatch script.
 
-## 8. Optional: cloud model layer via external-model-mcp (Mode 3 fallback only)
-
-`external-model-mcp` exposes three provider channels — `query_openai` (OpenAI BYOK), `query_google` (Google BYOK), and `query_gateway` (operator-curated multi-model gateway). These are the **Mode 3 fallback** dispatch path used only when OpenCode is not installed on the host. For routine adversarial work use Section 7 above (OpenCode CLI), not this MCP.
-
-The MCP loads credentials from `.env` files (gitignored) following this search order: `$COLOSSEUM_DOTENV` override → `$CWD/.env` → `<colosseum-repo-root>/.env` → `~/.colosseum.env`. Setting env vars on the MCP launch line still works as before; the `.env` path is operationally cleaner.
-
-For BYOK across Claude + GPT + Gemini:
-
-```bash
-claude mcp remove -s user external-model
-
-claude mcp add -s user external-model \
-  --env OPENAI_API_KEY=sk-... \
-  --env GEMINI_API_KEY=... \
-  -- $COLOSSEUM/mcp/external-model-mcp/external_model_mcp.py
-```
-
-For the **gateway** channel (one credential, multiple models including non-Western frontier voices like kimi-k2-6, glm-4-7-flash, gpt-oss-120b):
-
-```bash
-# Drop credentials into <colosseum-repo-root>/.env (gitignored). Example:
-cat >> $COLOSSEUM/.env <<EOF
-COLOSSEUM_GATEWAY_BASE_URL=https://your-gateway-host/v1
-COLOSSEUM_GATEWAY_API_KEY=xxx
-COLOSSEUM_GATEWAY_DEFAULT_MODEL=claude-opus-4-7
-EOF
-
-# Restart the MCP / Claude Code session so the env is picked up.
-```
-
-The gateway is operator-curated; the model list drifts. Pin model IDs in adversarial-pass artifacts (see `skills/colosseum-adversarial/SKILL.md` dispatch section for the gateway-route caveats and per-route failure-mode notes).
-
-Any single credential channel works alone; using all three gives maximum coverage.
+> **No external-model MCP.** External models are called only through OpenCode (Section 7), so every adversarial voice gets an agentic ReAct loop with file access. There is no single-shot MCP dispatch channel: a `query_gateway` / `query_openai` / `query_google`-style MCP would do no agentic work and is intentionally absent. If OpenCode can't be installed on a host, that host can't run multi-voice adversarial passes — there is no degraded fallback.
 
 ---
 
-## 9. Verify the full install
+## 8. Verify the full install
 
 From a fresh Claude Code session, call each MCP's health check. Expected: `ok: true` for tools you installed, graceful "not installed" for tools you skipped.
 
@@ -409,12 +376,11 @@ mcp__verus__check_verus_health()
 mcp__aeneas__check_aeneas_health()
 mcp__goedel__check_goedel_health()
 mcp__lm-studio__check_lmstudio_health()
-mcp__external-model__check_external_health()
 ```
 
 ---
 
-## 10. Optional: load the skills and agents into Claude Code
+## 9. Optional: load the skills and agents into Claude Code
 
 The MCPs cover the verification tools. The Colosseum **skills** (`colosseum-intent`, `colosseum-adversarial`, `colosseum-verify`, `colosseum-compose`, `colosseum-change`, `colosseum-reverse-intent`) and **agents** (`colosseum-spec-adversary`, `colosseum-failure-classifier`) need to be made discoverable to Claude Code by symlinking into your user config:
 
@@ -428,7 +394,7 @@ Alternatively, for project-local use only, symlink into `.claude/skills/` and `.
 
 ---
 
-## 11. Troubleshooting
+## 10. Troubleshooting
 
 **`charon: error: unexpected argument '--version'`** — Charon uses subcommand syntax. Use `charon version`.
 

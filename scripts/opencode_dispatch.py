@@ -12,11 +12,11 @@ the target spec, the voice roster, and the slice plan. The script invokes
 (voice, slice) pair, captures stdout, runs a truncation-detection pass,
 retries on failure, and aggregates per-voice files plus a summary.
 
-This is the Mode 1 dispatch path described in
-`colosseum/skills/colosseum-adversarial/SKILL.md`. The
-`external-model-mcp` MCP tools (`query_gateway`, `query_openai`,
-`query_google`, `fan_out_query`) are Mode 3 fallbacks, NOT this script's
-purpose. Reach for the MCP tools only when OpenCode is not installed.
+This is the dispatch path described in
+`colosseum/skills/colosseum-adversarial/SKILL.md`. It is the only way
+non-Claude adversarial voices are invoked: external models are called
+through OpenCode so each gets an agentic ReAct loop with file access.
+There is no single-shot MCP dispatch path.
 
 USAGE
     # Copy this script to <project>/.colosseum/scripts/opencode_dispatch.py

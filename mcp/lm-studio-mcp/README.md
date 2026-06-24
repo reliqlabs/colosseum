@@ -1,8 +1,10 @@
 # lm-studio-mcp
 
-General-purpose wrapper for local models served via LM Studio's OpenAI-compatible endpoint. The **adversarial floor** of Colosseum's multi-model story: zero marginal cost, genuine architectural diversity (different training data, different RLHF lineage than Claude / GPT / Gemini), always-on.
+General-purpose wrapper for local models served via LM Studio's OpenAI-compatible endpoint. Provides health checks, model listing, and ad-hoc single-shot local completions.
 
-Separate from [`goedel-mcp`](../goedel-mcp/), which is specialized for Lean tactic proposal. This MCP is the general voice — adversarial review, synthesis, anything where a non-frontier-but-architecturally-different opinion is valuable.
+> **Adversarial dispatch is not done through this MCP.** Local adversarial voices are dispatched through OpenCode's `lmstudio/` provider (see `skills/colosseum-adversarial/SKILL.md`), which hits the same LM Studio server but gives each voice an agentic ReAct loop with file access. Single-shot completions do no agentic work, so they are not the dispatch path. This MCP remains useful for confirming the LM Studio server is up, listing loaded models, and quick one-off local queries.
+
+Separate from [`goedel-mcp`](../goedel-mcp/), which is specialized for Lean tactic proposal.
 
 ## Why local diversity matters
 
@@ -10,7 +12,7 @@ The methodology's "adversarial beats consensus" claim depends on family diversit
 
 Local models like Qwen and Gemma have **different blind spots** from Claude — different pretraining data, different RLHF, different fine-tuning. They are not frontier-quality on most tasks, but for adversarial review of a spec they don't need to be: they need to be wrong in different ways than Claude.
 
-Local also means free. The floor of adversarial review can run on every spec without budget anxiety; cloud diversity (external-model-mcp) is reserved for high-stakes milestones.
+Local also means free. The floor of adversarial review (local voices via OpenCode's `lmstudio/` provider) can run on every spec without budget anxiety; cloud and gateway voices are reserved for high-stakes milestones.
 
 ## Tools
 
@@ -98,15 +100,13 @@ Models smaller than ~7B are usually too weak for spec-attack quality. The sweet 
 
 ## Typical usage pattern
 
-In a Colosseum adversarial session:
+This MCP's role in a Colosseum session is operational, not dispatch:
 
-1. Claude calls `list_loaded_models()` to see what's available
-2. Claude crafts a single adversarial prompt inlining spec + intent
-3. Claude calls `fan_out_local(prompt, models=["qwen-3.6-27b-instruct", "gemma-3-27b-it"])` to get parallel local attacks
-4. Each model's attack is persisted verbatim by the `colosseum-adversarial` skill
-5. Combined with cloud diversity from `external-model-mcp` (if opted in), the result is a true multi-family attack on the spec
+1. Before a multi-voice run, confirm the LM Studio server is up and the intended local models are loaded: `check_lmstudio_health()` / `list_loaded_models()`.
+2. Pre-load a model that JIT-evicts under contention (`lms load <model> --gpu max`) so OpenCode's dispatch doesn't race a cold load.
+3. Use `query_local(...)` for a quick one-off local sanity check outside an adversarial run.
 
-The local floor's job is *not* to find the same bugs Claude or GPT would find — it is to occasionally find something they all missed because of their shared lineage. One genuine catch per quarter justifies the always-on cost (which is zero).
+The adversarial dispatch itself — local voices attacking the spec in parallel — runs through OpenCode's `lmstudio/` provider via `opencode_dispatch.py`, so each local voice gets a ReAct loop with file access. The local floor's job is *not* to find the same bugs Claude or GPT would find; it is to occasionally find something they all missed because of their shared lineage. One genuine catch per quarter justifies the always-on cost (which is zero).
 
 ## Status
 

@@ -4,9 +4,9 @@ Operational tooling that supports the methodology but is not itself part of any 
 
 ## `opencode_dispatch.py` — canonical OpenCode adversarial orchestrator
 
-**Purpose.** The Mode 1 dispatch path described in `colosseum/skills/colosseum-adversarial/SKILL.md`. Drives the `spec-adversary` OpenCode agent against a target spec across a roster of voices (gateway-routed `burnt/*` frontier voices plus local `lmstudio/*` voices), one (voice, slice) pair per `opencode run` invocation. Captures stdout, detects truncated stubs, retries on failure, aggregates per-voice files plus a summary.
+**Purpose.** The dispatch path described in `colosseum/skills/colosseum-adversarial/SKILL.md`. Drives the `spec-adversary` OpenCode agent against a target spec across a roster of voices (gateway-routed `burnt/*` frontier voices, direct-provider `openai/*` and `google/*` voices, and local `lmstudio/*` and `ds4/*` voices), one (voice, slice) pair per `opencode run` invocation. Captures stdout, detects truncated stubs, retries on failure, aggregates per-voice files plus a summary.
 
-**This is the primary dispatch surface for non-Claude voices.** The `external-model-mcp` MCP tools (`query_gateway`, `query_openai`, `query_google`, `fan_out_query`) are Mode 3 fallbacks, not this script's purpose. Reach for the MCP tools only when OpenCode is not installed on the host.
+**This is the only dispatch surface for non-Claude voices.** External models are called exclusively through OpenCode so each voice gets an agentic ReAct loop with file access. There is no single-shot MCP dispatch path; the former `external-model-mcp` was removed.
 
 **Usage.** Copy this script to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a per-project config at `<project>/.colosseum/dispatch.json`:
 
@@ -167,6 +167,6 @@ The manifest is also the natural place to record *failure shape* — `error_deta
 
 ### Methodology back-port status
 
-This tool is the prototype for harness-agnostic dispatch. The `colosseum-adversarial` SKILL.md currently describes harness-specific recipes (Claude Code Agent + lm-studio-mcp + external-model-mcp). The intended shape: describe the manifest protocol once, then ship per-harness appendices (Claude Code recipe, OpenCode recipe, shell recipe) all pointing at the same manifest format.
+This tool coordinates dispatch across two harnesses: the Claude voice via the Claude Code Agent subagent, and every non-Claude voice via OpenCode (`opencode_dispatch.py`). The manifest is the shared state machine when those two harnesses must run side by side and Claude must remain in-process.
 
 Verified-rcv was the first project to dogfood it end-to-end.

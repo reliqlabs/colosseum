@@ -38,7 +38,6 @@ nul
 # --- Local secrets / private overrides ---
 .env
 .env.*
-!.env.example
 *.local
 *.secret
 secrets.toml

@@ -205,9 +205,11 @@ async def fan_out_local(
 ) -> dict[str, Any]:
     """Send the same prompt to multiple loaded local models in parallel.
 
-    The local equivalent of `external-model-mcp`'s fan_out_query — produces
-    architecturally-diverse responses from local-only inference. Useful as
-    the cheap always-on layer of adversarial review.
+    A convenience for ad-hoc parallel local queries (quick sanity checks,
+    one-off comparisons). NOT the adversarial dispatch path: adversarial
+    review of local voices runs through OpenCode's `lmstudio/` provider so
+    each voice gets an agentic ReAct loop with file access. Single-shot
+    completions like this one do no agentic work.
 
     Note: parallel local inference contends for the same GPU/CPU resources.
     On consumer hardware, two parallel calls to two large models will
