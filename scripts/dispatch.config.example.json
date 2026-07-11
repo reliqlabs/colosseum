@@ -79,5 +79,9 @@
 
   "_comment_timeouts": "per_call_timeout: seconds budget per (voice, slice) call. Local reasoning models on consumer hardware can take 10-25 min per slice. max_retries: per-call retry budget on truncated stubs or HTTP errors.",
   "per_call_timeout": 1800,
-  "max_retries": 2
+  "max_retries": 2,
+
+  "_comment_isolation": "Z2 isolation. Agents run in an ephemeral git worktree (detached at HEAD) with a preflight secret/symlink scan that blocks dispatch on violations; see opencode_dispatch.py ISOLATION. The child environment is reduced to a small allowlist; name any provider API keys the voices need in env_passthrough (they are read from the orchestrator's environment, never from a .env in the tree). opencode_version_pin, if set, blocks dispatch when `opencode --version` differs.",
+  "env_passthrough": ["GOOGLE_GENERATIVE_AI_API_KEY"],
+  "opencode_version_pin": null
 }

@@ -25,11 +25,30 @@ USAGE
 
     uv run --script opencode_dispatch.py \\
         --config <project>/.colosseum/dispatch.json \\
-        [--voices=A,B,C] [--slices=X,Y] [--sequential]
+        [--voices=A,B,C] [--slices=X,Y] [--sequential] \\
+        [--preflight-only] [--unsafe-in-place]
 
     --voices and --slices accept comma-separated subsets for retry / debug.
     --sequential runs voices one at a time (default: voices in parallel,
     slices sequential within each voice).
+    --preflight-only builds the isolation environment, runs the preflight
+    scan, writes preflight.json, and exits without dispatching.
+    --unsafe-in-place skips the ephemeral worktree and runs agents against
+    project_root directly. The preflight scan still runs and still blocks.
+
+ISOLATION (Z2, contract G5)
+    Agents run in an ephemeral git worktree detached at HEAD, created in a
+    temp dir and removed after the run. Untracked files (.env, local
+    overrides, credentials) never enter the agent-visible tree; the target
+    spec is copied in from the working tree so dispatch attacks what the
+    user sees, with its sha256 recorded in preflight.json. Before any
+    dispatch, a preflight scan of the agent-visible tree blocks on
+    secret-named files, private-key material, and symlinks resolving
+    outside the tree. The child process environment is reduced to a small
+    allowlist plus config `env_passthrough` names. Tool-level network and
+    write access is denied by the agent permission profiles (Z1); this
+    script does not impose an OS-level network block, so provider API
+    traffic from opencode itself is unaffected.
 
 CONFIG SCHEMA
     See colosseum/scripts/dispatch.config.example.json. Required fields:
@@ -39,6 +58,11 @@ CONFIG SCHEMA
       voices[]           - list of {id, model, variant?, note?}
       slices[]           - list of {name, label, headers[], attack_emphasis}
       context_appendix?  - optional shared-context block for all calls
+      env_passthrough?   - env var names forwarded to opencode child
+                           processes in addition to the built-in allowlist
+                           (e.g. provider API keys); default []
+      opencode_version_pin? - if set, preflight blocks when
+                           `opencode --version` differs
       default_variant?   - variant passed as `--variant` to every voice that
                            lacks its own `variant` field; default "max".
                            Per-voice `variant` overrides it. Set a voice's
@@ -59,10 +83,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import fnmatch
+import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -83,7 +112,151 @@ def load_config(config_path: Path) -> dict:
     cfg.setdefault("context_appendix", "")
     cfg.setdefault("per_call_timeout", 1800)
     cfg.setdefault("max_retries", 2)
+    cfg.setdefault("env_passthrough", [])
     return cfg
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Isolation preflight (Z2, contract G5)
+# ─────────────────────────────────────────────────────────────────────────
+
+# Filenames that must never appear in the agent-visible tree. Mirrors the
+# read-mask set in the agent permission profiles; the preflight is the
+# backstop for that layer, not a substitute for it.
+SECRET_NAME_PATTERNS = (
+    ".env", ".env.*", "*.secret", "secrets.*", "id_rsa*", "*.pem", "*.p12",
+)
+
+# Environment variables the opencode child process may inherit. Everything
+# else is dropped; forward provider keys deliberately via env_passthrough.
+ENV_ALLOWLIST = frozenset({
+    "HOME", "PATH", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "LANG",
+})
+ENV_ALLOW_PREFIXES = ("LC_", "XDG_")
+
+
+def sanitized_env(cfg: dict) -> dict[str, str]:
+    env = {
+        k: v for k, v in os.environ.items()
+        if k in ENV_ALLOWLIST or k.startswith(ENV_ALLOW_PREFIXES)
+    }
+    for name in cfg["env_passthrough"]:
+        if name in os.environ:
+            env[name] = os.environ[name]
+    return env
+
+
+def preflight_scan(root: Path) -> list[str]:
+    """Scan an agent-visible tree for isolation violations: secret-named
+    files, private-key material, and symlinks resolving outside the tree.
+    rglob does not descend into symlinked directories, so an escaping dir
+    symlink is reported once and never traversed."""
+    violations = []
+    root = root.resolve()
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root)
+        if rel.parts and rel.parts[0] == ".git":
+            continue
+        if path.is_symlink():
+            target = Path(os.path.realpath(path))
+            if not target.is_relative_to(root):
+                violations.append(f"symlink escapes root: {rel} -> {target}")
+            continue
+        if not path.is_file():
+            continue
+        if any(fnmatch.fnmatch(path.name, pat) for pat in SECRET_NAME_PATTERNS):
+            violations.append(f"secret-named file: {rel}")
+            continue
+        try:
+            head = path.open("rb").read(4096)
+        except OSError:
+            continue
+        if b"PRIVATE KEY-----" in head:
+            violations.append(f"private-key material: {rel}")
+    return violations
+
+
+def _git(project_root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(project_root), *args],
+        capture_output=True, text=True,
+    )
+
+
+def create_ephemeral_worktree(cfg: dict, run_tag: str) -> tuple[Path, Path, dict]:
+    """Detached git worktree at HEAD in a temp dir. Untracked files never
+    enter it. Returns (agent_root, spec_for_agent, meta). The target spec
+    is always copied from the working tree (HEAD may be stale or the spec
+    untracked) and hashed for the evidence binding."""
+    project_root: Path = cfg["project_root"]
+    head = _git(project_root, "rev-parse", "HEAD")
+    if head.returncode != 0:
+        sys.exit(
+            f"FATAL: cannot create ephemeral worktree — {project_root} is not a "
+            f"git repository with a commit ({head.stderr.strip()}). Use "
+            f"--unsafe-in-place to dispatch against the live tree (preflight "
+            f"scan still applies)."
+        )
+    dirty = bool(_git(project_root, "status", "--porcelain").stdout.strip())
+    tmp_parent = Path(tempfile.mkdtemp(prefix=f"colosseum-{run_tag}-"))
+    agent_root = tmp_parent / "tree"
+    wt = _git(project_root, "worktree", "add", "--detach", str(agent_root), "HEAD")
+    if wt.returncode != 0:
+        shutil.rmtree(tmp_parent, ignore_errors=True)
+        sys.exit(f"FATAL: git worktree add failed: {wt.stderr.strip()}")
+
+    # The agent's external_directory permission is denied, so the spec must
+    # live inside the agent-visible tree.
+    target_spec: Path = cfg["target_spec"]
+    spec_bytes = target_spec.read_bytes()
+    if target_spec.is_relative_to(project_root):
+        spec_for_agent = agent_root / target_spec.relative_to(project_root)
+    else:
+        spec_for_agent = agent_root / "__dispatch__" / target_spec.name
+    spec_for_agent.parent.mkdir(parents=True, exist_ok=True)
+    spec_for_agent.write_bytes(spec_bytes)
+
+    meta = {
+        "mode": "worktree",
+        "head": head.stdout.strip(),
+        "working_tree_dirty": dirty,
+        "agent_root": str(agent_root),
+        "target_spec_source": str(target_spec),
+        "target_spec_sha256": hashlib.sha256(spec_bytes).hexdigest(),
+    }
+    return agent_root, spec_for_agent, meta
+
+
+def remove_ephemeral_worktree(project_root: Path, agent_root: Path) -> None:
+    _git(project_root, "worktree", "remove", "--force", str(agent_root))
+    shutil.rmtree(agent_root.parent, ignore_errors=True)
+
+
+def run_preflight(cfg: dict, agent_root: Path, meta: dict, outdir: Path) -> None:
+    """Scan the agent-visible tree, record the report, and exit nonzero on
+    any violation. Nothing is dispatched past a failing preflight."""
+    violations = preflight_scan(agent_root)
+
+    ver = subprocess.run(["opencode", "--version"], capture_output=True, text=True)
+    opencode_version = ver.stdout.strip() if ver.returncode == 0 else "unknown"
+    pin = cfg.get("opencode_version_pin")
+    if pin and opencode_version != pin:
+        violations.append(f"opencode version {opencode_version} != pinned {pin}")
+
+    report = {
+        **meta,
+        "opencode_version": opencode_version,
+        "env_passthrough": list(cfg["env_passthrough"]),
+        "violations": violations,
+    }
+    (outdir / "preflight.json").write_text(json.dumps(report, indent=2) + "\n")
+
+    if violations:
+        for v in violations:
+            print(f"PREFLIGHT VIOLATION: {v}", file=sys.stderr)
+        sys.exit(f"FATAL: preflight blocked dispatch ({len(violations)} violation(s)); "
+                 f"see {outdir / 'preflight.json'}")
+    print(f"Preflight OK ({meta['mode']} mode) — report at {outdir / 'preflight.json'}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -150,7 +323,7 @@ async def dispatch_one(
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{slice_spec['name']}.md"
 
-    message = build_message(voice_id, slice_spec, cfg["target_spec"], cfg["context_appendix"])
+    message = build_message(voice_id, slice_spec, cfg["spec_for_agent"], cfg["context_appendix"])
     cmd = [
         "opencode", "run",
         "--agent", "spec-adversary",
@@ -166,7 +339,8 @@ async def dispatch_one(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(cfg["project_root"]),
+            cwd=str(cfg["agent_root"]),
+            env=cfg["child_env"],
         )
         try:
             stdout, stderr = await asyncio.wait_for(
@@ -299,6 +473,10 @@ async def main() -> None:
     ap.add_argument("--voices", default=None, help="comma-separated voice id slugs to dispatch (default: all)")
     ap.add_argument("--slices", default=None, help="comma-separated slice names to dispatch (default: all)")
     ap.add_argument("--sequential", action="store_true", help="run voices sequentially (default: parallel)")
+    ap.add_argument("--preflight-only", action="store_true",
+                    help="build isolation environment, run preflight scan, and exit without dispatching")
+    ap.add_argument("--unsafe-in-place", action="store_true",
+                    help="skip the ephemeral worktree; agents see project_root directly (preflight still blocks)")
     args = ap.parse_args()
 
     cfg = load_config(Path(args.config).resolve())
@@ -313,69 +491,99 @@ async def main() -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "per-section").mkdir(exist_ok=True)
 
-    default_variant = cfg.get("default_variant", "max")
-    voices_cfg = [
-        (v["id"], v["model"], v.get("variant", default_variant), v.get("note", ""))
-        for v in cfg["voices"]
-    ]
-    if args.voices:
-        wanted = set(args.voices.split(","))
-        voices_cfg = [v for v in voices_cfg if v[0] in wanted]
-
-    slices_cfg = cfg["slices"]
-    if args.slices:
-        wanted = set(args.slices.split(","))
-        slices_cfg = [s for s in slices_cfg if s["name"] in wanted]
-
-    log_path = outdir / "dispatch.log"
-    with log_path.open("a") as logf:
-        logf.write(f"\n=== Subagent dispatch starting {datetime.now(timezone.utc).isoformat()} ===\n")
-        logf.write(f"Config: {args.config}\n")
-        logf.write(f"Voices: {[v[0] for v in voices_cfg]}\n")
-        logf.write(f"Slices: {[s['name'] for s in slices_cfg]}\n")
-        logf.write(f"Output: {outdir}\n\n")
-
-    print(f"Output dir: {outdir}")
-    print(f"Voices ({len(voices_cfg)}): {[v[0] for v in voices_cfg]}")
-    print(f"Slices ({len(slices_cfg)}): {[s['name'] for s in slices_cfg]}")
-    print(f"Total calls: {len(voices_cfg) * len(slices_cfg)}")
-
-    if args.sequential:
-        all_results = {}
-        for voice_id, model_id, variant, _note in voices_cfg:
-            print(f"\n→ Dispatching voice {voice_id} (variant={variant}) sequentially...")
-            results = await dispatch_voice(voice_id, model_id, variant, slices_cfg, cfg, outdir, log_path)
-            all_results[voice_id] = results
+    # Isolation (Z2): build the agent-visible tree, then gate on preflight.
+    if args.unsafe_in_place:
+        worktree = None
+        agent_root = cfg["project_root"]
+        spec_for_agent = cfg["target_spec"]
+        meta = {
+            "mode": "in-place",
+            "agent_root": str(agent_root),
+            "target_spec_source": str(cfg["target_spec"]),
+            "target_spec_sha256": hashlib.sha256(cfg["target_spec"].read_bytes()).hexdigest(),
+        }
     else:
-        print("\nDispatching all voices in parallel...")
-        tasks = [
-            dispatch_voice(voice_id, model_id, variant, slices_cfg, cfg, outdir, log_path)
-            for voice_id, model_id, variant, _note in voices_cfg
+        agent_root, spec_for_agent, meta = create_ephemeral_worktree(cfg, run_tag)
+        worktree = agent_root
+
+    try:
+        run_preflight(cfg, agent_root, meta, outdir)  # exits nonzero on violation
+        if args.preflight_only:
+            print("Preflight-only run: nothing dispatched.")
+            return
+
+        cfg["agent_root"] = agent_root
+        cfg["spec_for_agent"] = spec_for_agent
+        cfg["child_env"] = sanitized_env(cfg)
+
+        default_variant = cfg.get("default_variant", "max")
+        voices_cfg = [
+            (v["id"], v["model"], v.get("variant", default_variant), v.get("note", ""))
+            for v in cfg["voices"]
         ]
-        results_list = await asyncio.gather(*tasks, return_exceptions=False)
-        all_results = {v[0]: r for v, r in zip(voices_cfg, results_list)}
+        if args.voices:
+            wanted = set(args.voices.split(","))
+            voices_cfg = [v for v in voices_cfg if v[0] in wanted]
 
-    print("\n=== Aggregating per-voice files ===")
-    summary = []
-    for voice_id, model_id, variant, _note in voices_cfg:
-        results = all_results[voice_id]
-        agg_path = aggregate_voice(voice_id, slices_cfg, results, outdir, cfg["target_spec"])
-        n_ok = sum(1 for r in results if "error" not in r)
-        total_elapsed = sum(r["elapsed_s"] for r in results)
-        total_chars = sum(r.get("chars", 0) for r in results if "error" not in r)
-        summary.append({
-            "voice": voice_id,
-            "model": model_id,
-            "variant": variant,
-            "slices_ok": n_ok,
-            "slices_total": len(results),
-            "total_elapsed_s": total_elapsed,
-            "total_chars": total_chars,
-        })
-        print(f"  {voice_id}: {n_ok}/{len(results)} slices OK, {total_elapsed:.0f}s total, {total_chars:,} chars → {agg_path.name}")
+        slices_cfg = cfg["slices"]
+        if args.slices:
+            wanted = set(args.slices.split(","))
+            slices_cfg = [s for s in slices_cfg if s["name"] in wanted]
 
-    (outdir / "summary.json").write_text(json.dumps(summary, indent=2))
-    print(f"\nSummary written to {outdir}/summary.json")
+        log_path = outdir / "dispatch.log"
+        with log_path.open("a") as logf:
+            logf.write(f"\n=== Subagent dispatch starting {datetime.now(timezone.utc).isoformat()} ===\n")
+            logf.write(f"Config: {args.config}\n")
+            logf.write(f"Voices: {[v[0] for v in voices_cfg]}\n")
+            logf.write(f"Slices: {[s['name'] for s in slices_cfg]}\n")
+            logf.write(f"Agent root: {agent_root} ({meta['mode']})\n")
+            logf.write(f"Output: {outdir}\n\n")
+
+        print(f"Output dir: {outdir}")
+        print(f"Agent root: {agent_root} ({meta['mode']})")
+        print(f"Voices ({len(voices_cfg)}): {[v[0] for v in voices_cfg]}")
+        print(f"Slices ({len(slices_cfg)}): {[s['name'] for s in slices_cfg]}")
+        print(f"Total calls: {len(voices_cfg) * len(slices_cfg)}")
+
+        if args.sequential:
+            all_results = {}
+            for voice_id, model_id, variant, _note in voices_cfg:
+                print(f"\n→ Dispatching voice {voice_id} (variant={variant}) sequentially...")
+                results = await dispatch_voice(voice_id, model_id, variant, slices_cfg, cfg, outdir, log_path)
+                all_results[voice_id] = results
+        else:
+            print("\nDispatching all voices in parallel...")
+            tasks = [
+                dispatch_voice(voice_id, model_id, variant, slices_cfg, cfg, outdir, log_path)
+                for voice_id, model_id, variant, _note in voices_cfg
+            ]
+            results_list = await asyncio.gather(*tasks, return_exceptions=False)
+            all_results = {v[0]: r for v, r in zip(voices_cfg, results_list)}
+
+        print("\n=== Aggregating per-voice files ===")
+        summary = []
+        for voice_id, model_id, variant, _note in voices_cfg:
+            results = all_results[voice_id]
+            agg_path = aggregate_voice(voice_id, slices_cfg, results, outdir, cfg["target_spec"])
+            n_ok = sum(1 for r in results if "error" not in r)
+            total_elapsed = sum(r["elapsed_s"] for r in results)
+            total_chars = sum(r.get("chars", 0) for r in results if "error" not in r)
+            summary.append({
+                "voice": voice_id,
+                "model": model_id,
+                "variant": variant,
+                "slices_ok": n_ok,
+                "slices_total": len(results),
+                "total_elapsed_s": total_elapsed,
+                "total_chars": total_chars,
+            })
+            print(f"  {voice_id}: {n_ok}/{len(results)} slices OK, {total_elapsed:.0f}s total, {total_chars:,} chars → {agg_path.name}")
+
+        (outdir / "summary.json").write_text(json.dumps(summary, indent=2))
+        print(f"\nSummary written to {outdir}/summary.json")
+    finally:
+        if worktree is not None:
+            remove_ephemeral_worktree(cfg["project_root"], worktree)
 
 
 if __name__ == "__main__":
