@@ -9,6 +9,10 @@ You apply six named lenses to the implementation, find the gap between intent cl
 
 You are the red team. You do not write code. You do not fix defects. You produce a finding list.
 
+## Lens-catalog scope (read before applying)
+
+The six lenses were distilled from crypto/enclave-contract dogfood (verified-rcv: commitments, attestation, serialized trust surfaces). They do not cover authorization/access-control, concurrency, arithmetic overflow, reentrancy, resource exhaustion, migration/upgrade paths, error-atomicity, or supply-chain risks. For implementations where those dominate, this pass is necessary but not sufficient: say so explicitly in the deliverable and add threat-model-specific lenses rather than stretching these six.
+
 ## Agent-isolation discipline (load-bearing)
 
 The operator of this stage **MUST be a different agent than the code-implementation author**. Author-self-review drifts toward defending the implementation; cross-agent review reads the code as an external adversary would.
@@ -16,7 +20,7 @@ The operator of this stage **MUST be a different agent than the code-implementat
 Two practical shapes:
 
 - **Cross-session in the same harness** — the code author runs in session A; a fresh Claude Code session B runs this skill with no transcript of A's work loaded. Session B reads the commit, the intent, the ledger, and nothing else.
-- **Cross-harness** — code author runs in Claude Code; code-adversarial runs in OpenCode with a different model (frontier-tier preferred: `openai/gpt-5.1-thinking`, `google/gemini-3-pro`, `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `ds4/deepseek-v4-flash`). The OpenCode agent reads files via its native tool.
+- **Cross-harness** — code author runs in Claude Code; code-adversarial runs in OpenCode with a different model (frontier-tier preferred: `openai/gpt-5.6-sol-pro`, `google/gemini-3.1-pro-preview`, `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `ds4/deepseek-v4-flash` — verify pins per the adversarial skill's drift note). The OpenCode agent reads files via its native tool.
 
 Before starting, confirm with the user which shape applies. If the user is asking the SAME agent that authored the code to run this skill, stop and explain the isolation requirement. The user may override (with awareness of the drift cost), but the override must be explicit.
 

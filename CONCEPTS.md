@@ -36,7 +36,7 @@ Ten stages. Each stage produces an artifact that anchors the next.
 6. **Spec adversarial review** — multi-model attack on each spec draft
 7. **Implementation** — Rust against validated specs
 8. **Verification** — the pyramid runs continuously
-9. **Failure classification** — spec wrong / code wrong / prover stuck
+9. **Failure classification** — spec wrong / code wrong / prover stuck / tool mismatch / state-space blowup / infrastructure (`INDETERMINATE` when the evidence cannot decide)
 10. **Coverage dashboard** — per-function trust calibration
 
 Steps are sequential; later additions get *names*, not fractional numbers. If a step gets inserted between two existing steps, it earns a real name and a real position.

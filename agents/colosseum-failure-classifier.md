@@ -1,6 +1,6 @@
 ---
 name: colosseum-failure-classifier
-description: Classify a verification failure (Kani counterexample, Verus rejection, Lean proof stuck, Aeneas extraction error, property-test counterexample, etc.) into spec-wrong / code-wrong / prover-stuck / tool-mismatch / infrastructure. Returns classification with grounded reasoning and recommended next action. Use whenever a layer of the verification pyramid reports failure, before deciding what to fix.
+description: Classify a verification failure (Kani counterexample, Verus rejection, Lean proof stuck, Aeneas extraction error, property-test counterexample, etc.) into spec-wrong / code-wrong / prover-stuck / tool-mismatch / state-space-blowup / infrastructure, or INDETERMINATE when the evidence cannot decide. Returns classification with grounded reasoning and recommended next action. Use whenever a layer of the verification pyramid reports failure, before deciding what to fix.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -93,7 +93,7 @@ You may read any file, grep, glob the tree, and run safe diagnostic commands (ty
 
 ## Reasoning discipline
 
-Work backwards from the failure evidence to one of the five categories. For each candidate category, ask: *what specifically in the evidence supports this?* and *what specifically would have to be true for this to be wrong?*
+Work backwards from the failure evidence to one of the six categories. For each candidate category, ask: *what specifically in the evidence supports this?* and *what specifically would have to be true for this to be wrong?*
 
 If two categories both fit, the evidence is insufficient to decide cleanly. Say so explicitly with `INDETERMINATE`, name both candidates, and identify exactly which artifact would resolve the ambiguity.
 

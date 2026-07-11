@@ -235,7 +235,7 @@ For the multi-model adversarial layer's local floor (free, always-on diversity),
 
 The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration needed.
 
-**Known caveat (reasoning-mode models):** modern frontier-style local models (Qwen 3+, Gemma 4+) default to thinking-mode and silently consume the entire `max_tokens` budget on hidden chain-of-thought. For adversarial use, pass `max_tokens` of 65536 or higher to leave room for visible output after reasoning. Documented in `mcp/lm-studio-mcp/README.md`.
+**Known caveat (reasoning-mode models):** modern frontier-style local models (Qwen 3+, Gemma 4+) default to thinking-mode and silently consume the entire `max_tokens` budget on hidden chain-of-thought. For adversarial use, pass `max_tokens` of 65536 or higher to leave room for visible output after reasoning.
 
 ---
 
@@ -311,8 +311,8 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
       "name": "OpenAI (direct)",
       "options": { "apiKey": "{env:OPENAI_API_KEY}" },
       "models": {
-        "gpt-5.1-thinking": {
-          "name": "GPT-5.1 (thinking)",
+        "gpt-5.6-sol-pro": {
+          "name": "GPT-5.6 Sol Pro",
           "tool_call": true,
           "reasoning": true,
           "limit": { "context": 400000, "output": 131072 },
@@ -321,6 +321,8 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
             "max": { "reasoningEffort": "high" }
           }
         }
+        // ChatGPT-account (Codex) auth rejects gpt-5.6-pro and the retired
+        // gpt-5.1-thinking; API-key installs may prefer gpt-5.6-pro.
       }
     },
 
@@ -330,8 +332,8 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
       "name": "Google Gemini (direct)",
       "options": { "apiKey": "{env:GOOGLE_GENERATIVE_AI_API_KEY}" },
       "models": {
-        "gemini-3-pro": {
-          "name": "Gemini 3 Pro",
+        "gemini-3.1-pro-preview": {
+          "name": "Gemini 3.1 Pro",
           "tool_call": true,
           "reasoning": true,
           "limit": { "context": 2000000, "output": 65536 },
@@ -340,6 +342,8 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
             "max": { "reasoningEffort": "high" }
           }
         }
+        // gemini-3-pro-preview was retired 2026-03 (now aliases 3.1);
+        // bare gemini-3-pro was never a valid API id.
       }
     },
 
@@ -349,7 +353,7 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
       "name": "LM Studio (local)",
       "options": { "baseURL": "http://127.0.0.1:1234/v1" },
       "models": {
-        "leanstral-2603": { "name": "Leanstral 2603" }
+        "leanstral-2603": { "name": "Leanstral 26.03 (upstream discontinued 2026-06-30; Leanstral 1.5 is the successor for new installs)" }
         // ... per your loaded model list
       }
     }
@@ -357,9 +361,9 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
 }
 ```
 
-Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environment (or directly in `opencode.jsonc` if you prefer hardcoded keys to env interpolation). Verify the model IDs against the providers' current docs — `gpt-5.1-thinking` and `gemini-3-pro` are pinned as of writing but provider model IDs drift; run `opencode models openai` and `opencode models google` to confirm.
+Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environment (or directly in `opencode.jsonc` if you prefer hardcoded keys to env interpolation; the OpenAI provider can alternatively authenticate via ChatGPT-account/Codex login, which supports a different model subset). `gpt-5.6-sol-pro` and `gemini-3.1-pro-preview` are pinned as of 2026-07-11 but provider model IDs drift — and `opencode models <provider>` lists catalog entries the provider may no longer accept, so a catalog listing is not confirmation.
 
-Verify with `opencode run --model openai/gpt-5.1-thinking "say hi"` and similar one-shot probes per provider before relying on the dispatch script.
+Verify with `opencode run --model openai/gpt-5.6-sol-pro "Reply with exactly: ok"` and similar one-shot probes per provider before relying on the dispatch script. A missing `GOOGLE_GENERATIVE_AI_API_KEY` fails every Gemini dispatch with an unregistered-caller error.
 
 > **No external-model MCP.** External models are called only through OpenCode (Section 7), so every adversarial voice gets an agentic ReAct loop with file access. There is no single-shot MCP dispatch channel: a `query_gateway` / `query_openai` / `query_google`-style MCP would do no agentic work and is intentionally absent. If OpenCode can't be installed on a host, that host can't run multi-voice adversarial passes — there is no degraded fallback.
 
@@ -422,6 +426,6 @@ Colosseum is methodology + wrappers; the verification tools themselves are indep
 
 - Just want Kani + property tests? Install §1.1, §1.2, §1.5, §4.1, register `kani-mcp` from §5.
 - Just want the spec-axis (Quint)? §1.1, §1.2, §1.3, §1.5, §3.1, register `quint-mcp`.
-- Just want adversarial spec review? §1.1, §1.2, §1.5, §6 (local) or §7 (cloud), register the model MCPs.
+- Just want adversarial spec review? §1.1, §1.2, §1.5, plus §6 (local voices) and/or §7 (OpenCode + providers). There are no model MCPs to register — OpenCode is the only dispatch surface; `lm-studio-mcp` (§5) is optional ops support for local voices.
 
 Each MCP's health check tells you what's installed; the pyramid skill (`colosseum-verify`) gracefully skips layers whose tools aren't available.

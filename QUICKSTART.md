@@ -8,7 +8,7 @@ You do not need everything in INSTALL.md on day one. The minimum to start:
 
 1. Rust, Python 3.11+ with `uv`, and Claude Code (INSTALL §1)
 2. Clone this repo (INSTALL §2)
-3. Symlink the skills and agents into Claude Code (INSTALL §10)
+3. Symlink the skills and agents into Claude Code (INSTALL §9)
 
 Add the rest when the workflow first calls for it:
 
@@ -43,8 +43,8 @@ Each stage produces an artifact that anchors the next. The skill names are Claud
 6. **Adversarial spec review.** Run `/colosseum-adversarial`. Single-voice (Claude) for routine drafts; the canonical 5-voice panel for milestones. Reports persist verbatim under `.colosseum/attacks/`. Revise and re-attack until the spec survives.
 7. **Implementation.** Rust against the validated specs. Pure cores, narrow effects, explicit state.
 8. **Verification.** Run `/colosseum-verify` continuously. The pyramid routes each property to the cheapest tool that can check it. Run `/colosseum-code-adversarial` here to read the implementation against the intent.
-9. **Failure classification.** When verification fails, dispatch the `colosseum-failure-classifier` agent: spec wrong, code wrong, prover stuck, tool mismatch, or infrastructure. Route the fix accordingly.
-10. **Trust ledger.** Run `/colosseum-compose` to maintain `.colosseum/ledger.md`: composition theorems, axiom inventory, code-line citations. Wire `check_ledger_citations.py` into CI so the ledger fails loudly when it drifts from code.
+9. **Failure classification.** When verification fails, dispatch the `colosseum-failure-classifier` agent: spec wrong, code wrong, prover stuck, tool mismatch, state-space blowup, or infrastructure — `INDETERMINATE` when the evidence cannot decide. Route the fix accordingly.
+10. **Coverage dashboard.** Per-function trust calibration: proven, tested-only, or unverified. Tooling is deferred; today the operational coverage record is the trust ledger — run `/colosseum-compose` (stage 8, continuous) to maintain `.colosseum/ledger.md` (composition theorems, axiom inventory, code-line citations) and wire `check_ledger_citations.py` into CI so the ledger fails loudly when it drifts from code.
 
 After the project is spec'd, every later change goes through `/colosseum-change`, which triages whether the change touches intent and walks the upstream-first revision sequence.
 

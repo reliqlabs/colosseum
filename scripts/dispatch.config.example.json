@@ -5,13 +5,13 @@
   "target_spec": "/absolute/path/to/your/project/intent.md",
   "run_tag_prefix": "intent-v1",
 
-  "_comment_canonical_panel": "CANONICAL 5-VOICE PANEL for adversarial spec review. Each voice is pinned to the strongest most-recent variant of its model family with max thinking enabled. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent (NOT through this script) — dispatch claude-agent separately alongside opencode_dispatch.py. The four voices below are the OpenCode-dispatched roster. For Lean-specific tasks substitute leanstral for one of these voices (lmstudio/leanstral-2603).",
+  "_comment_canonical_panel": "CANONICAL 5-VOICE PANEL for adversarial spec review. Each voice is pinned to the strongest variant of its family verified dispatchable at pin time (2026-07-11) with max thinking enabled. Pins drift, and `opencode models` lists catalog entries the provider may reject — probe with `opencode run --model <id> \"Reply with exactly: ok\"` before milestone runs. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent (NOT through this script) — dispatch claude-agent separately alongside opencode_dispatch.py. The four voices below are the OpenCode-dispatched roster. For Lean-specific tasks substitute the local Leanstral voice (lmstudio/leanstral-2603; upstream discontinued 2026-06-30, Leanstral 1.5 is the successor for new installs).",
 
   "voices": [
     {
-      "id": "gpt-5.1-thinking",
-      "model": "openai/gpt-5.1-thinking",
-      "note": "ChatGPT latest via OpenCode direct openai provider. Invoked at --variant max. Verify the model id against `opencode models openai` if the gpt-5.1-thinking string drifts."
+      "id": "gpt-5.6-sol-pro",
+      "model": "openai/gpt-5.6-sol-pro",
+      "note": "OpenAI frontier tier via OpenCode direct openai provider. Invoked at --variant max. Verified dispatchable under ChatGPT-account (Codex) auth, which rejects gpt-5.6-pro and the retired gpt-5.1-thinking; API-key installs may prefer openai/gpt-5.6-pro. Pro-tier reasoning latency is high — keep per_call_timeout generous."
     },
     {
       "id": "kimi-k2.6",
@@ -24,17 +24,17 @@
       "note": "DeepSeek V4 Flash via local ds4 provider (DwarfStar4, http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant. Invoked at --variant max."
     },
     {
-      "id": "gemini-3-pro",
-      "model": "google/gemini-3-pro",
-      "note": "Gemini 3 Pro (strongest current Gemini) via OpenCode direct google provider. Invoked at --variant max. Verify the model id against `opencode models google` if the gemini-3-pro string drifts."
+      "id": "gemini-3.1-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
+      "note": "Gemini 3.1 Pro (current Gemini Pro; gemini-3-pro-preview was retired 2026-03 and bare gemini-3-pro was never a valid API id) via OpenCode direct google provider. Invoked at --variant max. Requires GOOGLE_GENERATIVE_AI_API_KEY — without it every Gemini dispatch fails with an unregistered-caller error."
     }
   ],
 
-  "_comment_claude_voice": "The fifth voice in the canonical panel is Claude Opus 4.x (most recent: 4.7) dispatched in-harness as `claude-agent` via the colosseum-spec-adversary Agent subagent. That voice does NOT run through opencode_dispatch.py — the Agent tool invocation happens from the Claude Code session that owns the adversarial pass. See SKILL Step 4 Mode 2.",
+  "_comment_claude_voice": "The fifth voice in the canonical panel is the strongest Claude available to the harness session, dispatched in-harness as `claude-agent` via the colosseum-spec-adversary Agent subagent. That voice does NOT run through opencode_dispatch.py — the Agent tool invocation happens from the Claude Code session that owns the adversarial pass. See SKILL Step 4 Mode 2.",
 
   "_comment_excluded_voices": "Voices known to fail adversarial spec review: glm-4-7-flash (degenerate loops at 30B 'flash' tier); goedel-prover-v2-32b and other theorem-prover specialists (treat prompts as proof goals instead of attack targets — use at verify-pyramid layer instead). leanstral-2603 belongs in Lean-specific verification work, not general adversarial spec review — substitute only when the spec is a Lean theorem.",
 
-  "_comment_dispatch_invocation": "opencode_dispatch.py passes --format default and --dangerously-skip-permissions to each `opencode run` call. To pin --variant max per voice, modify the `cmd` list in opencode_dispatch.py:dispatch_one to append the --variant flag, or set the variant in each voice's opencode.jsonc model definition.",
+  "_comment_dispatch_invocation": "opencode_dispatch.py passes --format default to each `opencode run` call and appends --variant automatically: the per-voice `variant` field if set, else `default_variant` below. No script modification needed.",
 
   "_comment_slices": "Slice plan. Each slice is one (voice, slice) call. headers[] are the markdown header ranges the agent should read from the target spec. attack_emphasis is the per-slice attack-category hint. Replace this example with your project's actual sections.",
 

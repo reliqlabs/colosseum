@@ -4,7 +4,7 @@
 
 A methodology for building dependable software in a world of fast, unreliable LLM workers.
 
-This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The methodology is validated against real dogfood projects (Quartz, verified-rcv, bidboard — see the table below); each produces concrete evidence that drives the next iteration.
+This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The methodology is dogfooded against real projects (Quartz, verified-rcv, bidboard — see the table below); each produces concrete evidence that drives the next iteration. Prospective validation — measured defect recall against simpler baselines — has not yet been run.
 
 ## Starting a new project
 
@@ -12,7 +12,7 @@ See **[QUICKSTART.md](./QUICKSTART.md)** — the front door for anyone bringing 
 
 ## Installing
 
-See **[INSTALL.md](./INSTALL.md)** for full step-by-step instructions. Colosseum composes existing verification tools (Kani, Verus, Aeneas+charon, Quint+Apalache, Lean 4 + mathlib) through MCP wrappers, plus OpenCode CLI for multi-voice spec authoring and adversarial fan-out across cloud providers (OpenAI, Google, Mistral, Anthropic gateway) and local LM Studio models. Setup is incremental — each tool is optional, and each MCP's health check reports gracefully if its underlying tool is missing.
+See **[INSTALL.md](./INSTALL.md)** for full step-by-step instructions. Colosseum composes existing verification tools (Kani, Verus, Aeneas+charon, Quint+Apalache, Lean 4 + mathlib) through MCP wrappers, plus OpenCode CLI for multi-voice spec authoring and adversarial fan-out across cloud providers (OpenAI direct, Google direct, an operator-curated gateway) and local LM Studio models. Setup is incremental — each tool is optional, and each MCP's health check reports gracefully if its underlying tool is missing.
 
 Tested on **macOS 14+ Apple Silicon**. Linux should mostly work; Windows is untested.
 
@@ -32,7 +32,7 @@ Colosseum composes five complementary trust mechanisms. None alone is sufficient
 
 **2. Multi-model adversarial generation.** One model produces, another attacks. Different model families have different blind spots; combining them gives additive coverage. Crucially, *adversarial beats consensus* — multiple models agreeing can converge on shared wrongness, but an adversary's job is to find faults. This is the sharper version of "multi-model."
 
-The `colosseum-adversarial` SKILL dispatches attacks and spec authoring through one mechanism: **OpenCode CLI dispatch**. Each non-Claude voice runs via `opencode run --agent <agent-name> --model <provider/model> --variant max`, with OpenCode handling provider connections to OpenAI direct (`openai/gpt-5.1-thinking`), Google direct (`google/gemini-3-pro`), an operator-curated gateway routing non-Western frontier voices via Cloudflare AI Workers (`burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `burnt/cloudflare-100/@cf/openai/gpt-oss-120b`, `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash`), a local DeepSeek V4 Flash runner (`ds4/deepseek-v4-flash`), and local LM Studio models (`lmstudio/...`). The Claude voice runs natively in-harness via the Agent subagent (`claude-agent`), since the gateway no longer exposes Anthropic routes. Project-local agents under `<project>/.opencode/agent/` build from canonical bodies at `colosseum/agents/*-body.md` (rebuilt via `scripts/install-agents.py build`). There is no single-shot MCP dispatch path: external models are called only through OpenCode so they get an agentic ReAct loop with file access, not a one-shot completion.
+The `colosseum-adversarial` SKILL dispatches attacks and spec authoring through one mechanism: **OpenCode CLI dispatch**. Each non-Claude voice runs via `opencode run --agent <agent-name> --model <provider/model> --variant max`, with OpenCode handling provider connections to OpenAI direct (`openai/gpt-5.6-sol-pro`), Google direct (`google/gemini-3.1-pro-preview`), an operator-curated gateway routing non-Western frontier voices via Cloudflare AI Workers (`burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `burnt/cloudflare-100/@cf/openai/gpt-oss-120b`; the roster also exposes `@cf/zai-org/glm-4.7-flash`, which is excluded from adversarial dispatch per calibration), a local DeepSeek V4 Flash runner (`ds4/deepseek-v4-flash`), and local LM Studio models (`lmstudio/...`). Pins are verified-at-date (2026-07-11) and drift; probe before milestone runs. The Claude voice runs natively in-harness via the Agent subagent (`claude-agent`), since the gateway no longer exposes Anthropic routes. Project-local agents under `<project>/.opencode/agent/` build from canonical bodies at `colosseum/agents/*-body.md` (rebuilt via `scripts/install-agents.py build`). There is no single-shot MCP dispatch path: external models are called only through OpenCode so they get an agentic ReAct loop with file access, not a one-shot completion.
 
 Routine milestones default to Claude + local + 1–2 gateway voices; system-scale milestones require frontier-tier voices across multiple families. The full loop runs: fan-out → synthesis → cross-critique → defense → fix → re-cross-critique → encoding-discipline back-propagation to intent.
 
@@ -50,7 +50,7 @@ Most agent systems being built today default to cooperative multi-agent patterns
 
 ## The verification pyramid
 
-Each property a program must hold is routed to the cheapest tool that can verify it. Two axes, not one: a **spec axis** that runs upstream of code, and an **exec axis** that runs against real Rust. The two compose — system-level specs from the spec axis become refinement targets for the exec axis.
+Each property a program must hold is routed to the cheapest tool that can verify it. Two axes, not one: a **spec axis** that runs upstream of code, and an **exec axis** that runs against real Rust. The two are designed to compose — system-level specs from the spec axis become refinement targets for the exec axis. No mechanical refinement or conformance gate exists yet between the axes; until one lands, cross-axis composition claims are design intent, not verified evidence.
 
 **Exec axis** (against real Rust, cheap → expensive):
 
@@ -87,8 +87,8 @@ The process moves through stages. Each stage produces an artifact that anchors t
 6. **Adversarial spec validation.** Multiple models draft specs independently. A separate model attacks each draft, searching for ways it under- or over-constrains the intent. Specs survive when they survive scrutiny — not when they agree.
 7. **Implementation.** Rust written against the validated specs. Designed for verifiability: pure cores, narrow effects, explicit state.
 8. **Verification.** The pyramid runs continuously. Types first, then lints, then property tests, then fuzz, then Kani, then Verus, then Aeneas → Lean.
-9. **Failure classification.** When verification fails: spec wrong, code wrong, or prover stuck. Route accordingly. Loud failure beats silent success.
-10. **Coverage dashboard.** Per function: proven, tested-only, or unverified. Trust is calibrated to coverage, not to vibes.
+9. **Failure classification.** When verification fails: spec wrong, code wrong, prover stuck, tool mismatch, state-space blowup, or infrastructure — `INDETERMINATE` when the evidence cannot decide. Route accordingly. Loud failure beats silent success.
+10. **Coverage dashboard.** Per function: proven, tested-only, or unverified. Trust is calibrated to coverage, not to vibes. (Tooling deferred; until it lands, the stage-8 trust ledger is the operational coverage record.)
 
 ## What this is and isn't
 
@@ -142,10 +142,10 @@ Methodology validation runs against real projects. Each one produces concrete ev
 | Project | Scope | Status |
 |---|---|---|
 | Quartz | TDX + zkdcap attestation primitives; Lean trust-boundary refactor; 8 protocol lifts | Mature; multi-cycle adversarial-driven tightening of the spec surface ongoing |
-| verified-rcv | Instant-runoff voting CosmWasm contract + TDX enclave tabulation; greenfield methodology validation | Spec layer complete (intent → Quint → Lean → integration ledger); contract / enclave / frontend deferred |
-| bidboard | Sponsorship-auction contract with anti-sniping; first multi-component dogfood | Planned — first test of the system-of-intents shape |
+| verified-rcv | Instant-runoff voting CosmWasm contract + TDX enclave tabulation; greenfield methodology dogfood | Spec layer complete (intent → Quint → Lean); contract deployed to testnet and enclave exercised as uncommitted spike work; integration ledger stale (generated at intent v0.3.5, intent now v0.3.15) pending regeneration |
+| bidboard | Sponsorship-auction contract with anti-sniping; first multi-component dogfood | Planned — brownfield: a contract and an unattacked Quint spec predate Colosseum; entry path is `colosseum-reverse-intent` |
 
-Each project's evidence base lives under its own `.colosseum/attacks/`, `.colosseum/changes/`, and `.colosseum/ledger.md`. Improvements that surface flow into the relevant SKILLs / docs once they've been exercised in anger; proposals awaiting validation are tracked in `methodology-improvements.md`. External literature backing them is catalogued in `references.md`.
+Each project's evidence base lives under its own `.colosseum/` directory (`attacks/`, `changes/`, `ledger.md` — presence varies by project stage). Improvements that surface flow into the relevant SKILLs / docs once they've been exercised in anger; proposals awaiting validation are tracked in `methodology-improvements.md`. External literature backing them is catalogued in `references.md`.
 
 ## Status
 

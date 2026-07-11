@@ -12,7 +12,7 @@ You are not the adversary. You do not produce the attacks. You do not soften the
 This skill supports two modes:
 
 - **Single-voice (default)** — invoke the `colosseum-spec-adversary` subagent (Claude). Fast, free under the Claude Code subscription, no setup.
-- **Multi-voice** — invoke Claude *and* fan the same attack out to non-Claude voices via the OpenCode CLI orchestrator (gateway-routed frontier voices like `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, direct-provider voices like `openai/gpt-5.1-thinking` and `google/gemini-3-pro`, and local voices like `lmstudio/qwen/qwen3.6-27b` or `ds4/deepseek-v4-flash`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
+- **Multi-voice** — invoke Claude *and* fan the same attack out to non-Claude voices via the OpenCode CLI orchestrator (gateway-routed frontier voices like `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, direct-provider voices like `openai/gpt-5.6-sol-pro` and `google/gemini-3.1-pro-preview`, and local voices like `lmstudio/qwen/qwen3.6-27b` or `ds4/deepseek-v4-flash`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
 
 The user selects via the `voices` parameter (a roster of explicit voice IDs, NOT bucket names — see Step 1 below). Default is `["claude-agent"]`. Recommended for routine spec milestones: `["claude-agent", "lmstudio/<one-loaded-local>"]` (Claude + local floor; free). Recommended for high-stakes spec milestones: 5–7 voices spanning `burnt/` + `lmstudio/` for family diversity (Anthropic / OpenAI-OSS / Moonshot / NVIDIA / Google / Alibaba / Mistral).
 
@@ -31,18 +31,18 @@ Ask the user for, or determine from context:
   - `burnt/<gateway-route>` — gateway-routed frontier voice via OpenCode (Mode 1). Current gateway roster (verify against `curl <gateway-base>/models` since the operator's roster drifts): `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `burnt/cloudflare-100/@cf/openai/gpt-oss-120b`, `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash`. Note: the gateway no longer exposes Claude or Gemini routes — use direct `openai/`, `google/`, and in-harness `claude-agent` for those families instead.
   - `lmstudio/<local-model-id>` — local LM Studio voice via OpenCode (Mode 1). Examples: `lmstudio/qwen/qwen3.6-27b`, `lmstudio/google/gemma-4-26b-a4b`, `lmstudio/mistral-small-4-119b-2603`.
 
-  **Canonical 5-voice panel** (the default for non-trivial specs; each voice is the strongest most-recent variant of its family with max thinking enabled, invoked at `--variant max` where supported):
-  1. `claude-agent` — Claude Opus 4.x latest (Mode 2 in-harness Agent subagent)
-  2. `openai/gpt-5.1-thinking` — ChatGPT latest via OpenCode direct openai provider
+  **Canonical 5-voice panel** (the default for non-trivial specs; each voice is the strongest variant of its family verified dispatchable at pin time — 2026-07-11 — with max thinking enabled, invoked at `--variant max` where supported; pins drift, so re-verify before milestone runs):
+  1. `claude-agent` — the harness session's Claude model, strongest available (Mode 2 in-harness Agent subagent)
+  2. `openai/gpt-5.6-sol-pro` — OpenAI frontier tier via OpenCode direct openai provider. Verified dispatchable under ChatGPT-account (Codex) auth; that auth mode rejects `openai/gpt-5.6-pro` and the retired `gpt-5.1-thinking`. API-key installs may prefer `openai/gpt-5.6-pro`. Pro-tier reasoning latency is high; budget per-call timeouts accordingly.
   3. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot Kimi K2.6 via OpenCode through the Burnt gateway
   4. `ds4/deepseek-v4-flash` — DeepSeek V4 Flash via OpenCode through the local ds4 provider (DwarfStar4 at `http://127.0.0.1:8000`)
-  5. `google/gemini-3-pro` — Gemini latest strongest via OpenCode direct google provider
+  5. `google/gemini-3.1-pro-preview` — current Gemini Pro via OpenCode direct google provider (requires `GOOGLE_GENERATIVE_AI_API_KEY`; unset means every Gemini dispatch fails with an unregistered-caller error)
 
-  For Lean-specific verification work, substitute `lmstudio/leanstral-2603` for one of the general voices; do NOT include Leanstral in general adversarial spec review.
+  For Lean-specific verification work, substitute the local Leanstral voice for one of the general voices (`lmstudio/leanstral-2603` — upstream discontinued 2026-06-30 in favor of Leanstral 1.5; already-downloaded weights still run, new installs should load Leanstral 1.5); do NOT include Leanstral in general adversarial spec review.
 
   Smaller routine panels (`["claude-agent", "ds4/deepseek-v4-flash"]` is the cheapest viable multi-voice ensemble — free, two families). Ask the user if not specified for a non-trivial spec — the multi-voice option is load-bearing and should not be silently bypassed.
 
-  Verify the exact `openai/...` and `google/...` model strings against `opencode models openai` and `opencode models google` before dispatch; provider model IDs drift, and the canonical panel above pins names that may need updating to whatever each provider currently exposes as "latest with max thinking".
+  Verify the exact `openai/...` and `google/...` model strings before dispatch — but note that `opencode models <provider>` lists catalog entries the provider may no longer accept (`gpt-5.1-thinking` stayed in the catalog months after the API stopped taking it). The check that counts is a one-shot probe: `opencode run --model <id> "Reply with exactly: ok"`. Provider model IDs drift; the canonical panel above pins names that need re-verification at each milestone.
 
   **Do NOT accept bucket names** (`"openai"`, `"google"`, `"local"`, `"gateway"`) in the roster. They are ambiguous about which provider and model OpenCode should dispatch. If the user gives you a bucket name, translate it to an explicit `provider/model` voice ID before proceeding.
 
@@ -118,14 +118,13 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 
 **Per-voice voice IDs to pass to `--model`** (configured in `~/.config/opencode/opencode.jsonc`; the gateway roster drifts with operator curation, so verify against `curl <gateway-base>/models` before a milestone run):
 
-- `openai/gpt-5.1-thinking` — ChatGPT latest, direct provider (canonical panel voice)
-- `google/gemini-3-pro` — Gemini strongest, direct provider (canonical panel voice)
+- `openai/gpt-5.6-sol-pro` — OpenAI frontier, direct provider (canonical panel voice; verified under ChatGPT-account auth 2026-07-11)
+- `google/gemini-3.1-pro-preview` — current Gemini Pro, direct provider (canonical panel voice; requires `GOOGLE_GENERATIVE_AI_API_KEY`)
 - `ds4/deepseek-v4-flash` — DeepSeek V4 Flash, local DwarfStar4 runner (canonical panel voice)
 - `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot via gateway (canonical panel voice)
 - `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA Nemotron 3 120B-A12B MoE via gateway; reasoning-on
 - `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS via gateway
-- `burnt/google-1/gemini-3.5-flash` — Gemini Flash via gateway; cheap fallback when the direct google provider is not configured (Flash tier, not Pro — direct `google/gemini-3-pro` is the canonical Gemini voice)
-- `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per verified-rcv calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class it is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use a full (non-flash) glm tier or pull a comparable model into LM Studio
+- `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per verified-rcv calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class it is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use a full (non-flash) glm tier (`@cf/zai-org/glm-5.2` is live on Workers AI but not yet exposed on the operator gateway; calibrate before adding it to any panel) or pull a comparable model into LM Studio
 - `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`)
 
 The gateway no longer exposes Anthropic routes; the Claude voice always runs in-harness via Mode 2.
@@ -260,7 +259,7 @@ Multi-model layout:
 ├── claude-agent.md          # the Claude voice's verbatim report (Mode 2)
 ├── opencode-<voice-id>.md   # one per OpenCode voice, slug from the voice id
 │                            # (e.g. `opencode-kimi-k2.6.md`,
-│                            # `opencode-gpt-5.1-thinking.md`); produced by
+│                            # `opencode-gpt-5.6-sol-pro.md`); produced by
 │                            # opencode_dispatch.py's per-voice aggregation
 └── synthesis.md             # YOUR overlap/divergence summary (clearly marked
                              # as orchestrator output, NOT a model output)
@@ -281,7 +280,7 @@ Each per-model file starts with a small metadata header:
 - Intent document: <absolute path>
 - Reviewed at: <ISO timestamp>
 - Round: <N>
-- Model id: <exact id, e.g. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `openai/gpt-5.1-thinking`, `lmstudio/qwen/qwen3.6-27b`>
+- Model id: <exact id, e.g. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `openai/gpt-5.6-sol-pro`, `lmstudio/qwen/qwen3.6-27b`>
 - Provider family: <Anthropic / Google / OpenAI / Mistral / Alibaba / Moonshot / NVIDIA / DeepSeek / etc.>
 - Inference seat: <claude-agent (in-harness) / opencode-gateway / opencode-direct / opencode-lmstudio / opencode-ds4>
 - Elapsed (s): <float>
@@ -368,7 +367,7 @@ Write the synthesis to `synthesis.md` in the multi-model directory.
 
 After persisting, report:
 
-- One-line per-voice verdict summary using explicit voice IDs (NOT bucket names): `claude-agent: BREAKS (3 critical, 5 serious) | openai/gpt-5.1-thinking: BREAKS (2 critical) | burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6: SURVIVES | ds4/deepseek-v4-flash: BREAKS (1 critical) | google/gemini-3-pro: BREAKS (2 critical)`
+- One-line per-voice verdict summary using explicit voice IDs (NOT bucket names): `claude-agent: BREAKS (3 critical, 5 serious) | openai/gpt-5.6-sol-pro: BREAKS (2 critical) | burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6: SURVIVES | ds4/deepseek-v4-flash: BREAKS (1 critical) | google/gemini-3.1-pro-preview: BREAKS (2 critical)`
 - **Shared-finding count** — bugs surfaced by ≥2 models (high signal)
 - **Unique-finding count** per model — blind-spot escapes
 - The absolute path to the saved report directory (or single file)

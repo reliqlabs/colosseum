@@ -83,7 +83,7 @@ When a layer fails:
    - The full failure output (stdout, stderr, structured summary)
    - The spec artifact relevant to this layer (the Kani harness, the Verus-annotated source, the property test, the Lean theorem, etc.)
    - The Rust source under verification
-   - The intent document (located at `<crate_path>/intent.md` or `<crate_path>/.colosseum/intent.md`, or asked from user)
+   - The intent document (check `<crate_path>/.colosseum/intent.md` first — canonical per CONCEPTS "Project layout" — then `<crate_path>/intent.md`, then ask the user)
 3. Persist the classifier's report to `.colosseum/classifications/<layer>-<ISO-timestamp>.md`
 4. Attach the classification path to the layer's result entry
 5. If halt-on-failure: stop and produce the final pyramid report
