@@ -64,14 +64,28 @@ tools: Read, Grep, Glob, Bash
 description: Adversarial reviewer for Colosseum specs. Reads target on demand; produces structured attack reports. Supports slice-aware dispatch (when invocation provides TARGET_SLICE) and full-spec dispatch (no TARGET_SLICE).
 mode: all
 temperature: 0.3
-tools:
-  read: true
-  grep: true
-  glob: true
-  bash: false
-  edit: false
-  write: false
-  webfetch: false
+# Deny-first reviewer profile (G5): read-only over the project, secrets
+# masked, no shell / writes / network / subagents. Last matching rule wins.
+permission:
+  read:
+    "*": allow
+    "**/.env": deny
+    "**/.env.*": deny
+    "**/*.secret": deny
+    "**/secrets.*": deny
+    "**/id_rsa*": deny
+  glob: allow
+  grep: allow
+  edit: deny
+  bash: deny
+  task: deny
+  skill: deny
+  lsp: deny
+  question: deny
+  webfetch: deny
+  websearch: deny
+  external_directory: deny
+  doom_loop: deny
 ---
 """,
             },
@@ -94,17 +108,39 @@ tools: Read, Grep, Glob, Bash, Write, Edit
                 "dist_path": "opencode/quint-spec-generator.md",
                 "frontmatter": """\
 ---
-description: Generates Quint protocol-layer spec from intent. Reads intent + canonical Quint examples. Writes rcv.qnt + main.qnt + design-notes.md. Runs quint typecheck + quint run to self-verify before reporting status.
+description: Generates Quint protocol-layer spec from intent. Reads intent + canonical Quint examples. Writes the spec files into OUTPUT_DIR. Runs quint typecheck + quint checks and reports a STATUS proposal.
 mode: all
 temperature: 0.4
-tools:
-  read: true
-  grep: true
-  glob: true
-  bash: true
-  edit: true
-  write: true
-  webfetch: false
+# Deny-first generator profile (G5): read-only source and intent, writes for
+# spec output only, shell scoped to the quint CLI, no network / subagents.
+# The obligation manifest is orchestrator-owned and never generator-writable.
+# Last matching rule wins.
+permission:
+  read:
+    "*": allow
+    "**/.env": deny
+    "**/.env.*": deny
+    "**/*.secret": deny
+    "**/secrets.*": deny
+  glob: allow
+  grep: allow
+  edit:
+    "*": allow
+    "**/.colosseum/obligations*": deny
+    "**/intent.md": deny
+    "**/.env": deny
+    "**/.env.*": deny
+  bash:
+    "*": deny
+    "quint *": allow
+  task: deny
+  skill: deny
+  lsp: deny
+  question: deny
+  webfetch: deny
+  websearch: deny
+  external_directory: deny
+  doom_loop: deny
 ---
 """,
             },

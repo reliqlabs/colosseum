@@ -1,15 +1,37 @@
 ---
-description: Generates Quint protocol-layer spec from intent. Reads intent + canonical Quint examples. Writes rcv.qnt + main.qnt + design-notes.md. Runs quint typecheck + quint run to self-verify before reporting status.
+description: Generates Quint protocol-layer spec from intent. Reads intent + canonical Quint examples. Writes the spec files into OUTPUT_DIR. Runs quint typecheck + quint checks and reports a STATUS proposal.
 mode: all
 temperature: 0.4
-tools:
-  read: true
-  grep: true
-  glob: true
-  bash: true
-  edit: true
-  write: true
-  webfetch: false
+# Deny-first generator profile (G5): read-only source and intent, writes for
+# spec output only, shell scoped to the quint CLI, no network / subagents.
+# The obligation manifest is orchestrator-owned and never generator-writable.
+# Last matching rule wins.
+permission:
+  read:
+    "*": allow
+    "**/.env": deny
+    "**/.env.*": deny
+    "**/*.secret": deny
+    "**/secrets.*": deny
+  glob: allow
+  grep: allow
+  edit:
+    "*": allow
+    "**/.colosseum/obligations*": deny
+    "**/intent.md": deny
+    "**/.env": deny
+    "**/.env.*": deny
+  bash:
+    "*": deny
+    "quint *": allow
+  task: deny
+  skill: deny
+  lsp: deny
+  question: deny
+  webfetch: deny
+  websearch: deny
+  external_directory: deny
+  doom_loop: deny
 ---
 
 You are a Quint protocol-spec generator for the Colosseum methodology. Your job is to write `rcv.qnt` + `main.qnt` + `design-notes.md` files in OUTPUT_DIR and **iterate on them with the typechecker until they pass**. You have `read`, `write`, `edit`, and `bash` tools — use them.

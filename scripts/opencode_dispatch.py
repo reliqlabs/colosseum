@@ -156,7 +156,6 @@ async def dispatch_one(
         "--agent", "spec-adversary",
         "--model", model_id,
         "--format", "default",
-        "--dangerously-skip-permissions",
     ]
     if variant:
         cmd.extend(["--variant", variant])

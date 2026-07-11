@@ -110,9 +110,11 @@ Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adver
 
 ```bash
 opencode run --agent spec-adversary --model burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6 \
-  --variant max --format default --dangerously-skip-permissions \
+  --variant max --format default \
   "TARGET_SPEC: /path/to/intent.md\n\nTARGET_SLICE: temporal-invariants — ..."
 ```
+
+Permissions come from the agent's own deny-first `permission` frontmatter (read-only, secrets masked, no shell/network) — no permission-skipping flag is passed; the once-used `--dangerously-skip-permissions` flag does not exist in current OpenCode and was silently ignored.
 
 Orchestrate (voice × slice) pairs from a Python script that captures stdout per call and writes per-section files. **Canonical orchestrator: `colosseum/scripts/opencode_dispatch.py`** — copy to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a project-local config at `<project>/.colosseum/dispatch.json` (voice roster + slice plan + optional context appendix). See `colosseum/scripts/dispatch.config.example.json` for the schema. The verified-rcv project keeps a pinned variant of this script as its in-tree history; the colosseum/ copy is the one new projects should start from.
 
