@@ -22,18 +22,29 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 **Required OpenCode configuration.** `~/.config/opencode/opencode.jsonc` must define the `burnt` and `lmstudio` providers and set `limit.output ≥ 65536` (recommend `131072`) per gateway model so the analysis response budget never hits a cap mid-report.
 
-## `check_ledger_citations.py` — ledger-as-gate CI check
+## `check_ledger_references.py` — reference-integrity gate (Gate A)
 
-Reference implementation of the Step 8 CI gate in `skills/colosseum-compose/SKILL.md`. Parses every `<file>:<line>` citation in a project's `.colosseum/ledger.md` (backtick-quoted or `code:`-annotated), confirms the file exists and the cited line is in range, non-empty, and not comment-only. Also checks that `axiom:` annotations carry a justification phrase. Kani-coverage annotations warn by default; `--strict-kani` upgrades them to failures.
+Reference implementation of Gate A of the two-gate Step 8 CI check in `skills/colosseum-compose/SKILL.md`. Parses every `<file>:<line>` citation in a project's `.colosseum/ledger.md` (backtick-quoted or `code:`-annotated), confirms the file exists inside the canonical root and the cited line is in range, non-empty, and not comment-only (Rust `#[...]` attribute lines are valid targets). Citations may bind content with an `@sha256:<12hex>` suffix; bound citations fail when the line's content changes (`--suggest-hashes` prints the suffixes). Empty or zero-citation ledgers fail — no vacuous pass. Every `axiom:` occurrence needs a meaningful justification phrase. Per-link Kani coverage warns by default; `--strict-kani` upgrades to failures.
+
+This gate checks that references hook into live code. It does not judge whether the evidence discharges any claim — that is Gate B.
 
 ```bash
 # Copy into the project, then wire into CI:
-cp colosseum/scripts/check_ledger_citations.py <project>/.colosseum/scripts/
-<project>/.colosseum/scripts/check_ledger_citations.py <project>/.colosseum/ledger.md
+cp colosseum/scripts/check_ledger_references.py <project>/.colosseum/scripts/
+<project>/.colosseum/scripts/check_ledger_references.py <project>/.colosseum/ledger.md
 # exit 0 = gate passed; 1 = drift detected; 2 = usage error
 ```
 
 `--root` overrides the directory citations resolve against (defaults to the ledger's grandparent, i.e. the project root for a ledger at `<project>/.colosseum/ledger.md`).
+
+## `check_evidence_records.py` — semantic evidence gate (Gate B)
+
+Validates claim-ID-keyed G1 evidence records (JSON under `<project>/.colosseum/evidence/`) against the full binding set: snapshot, intent hash, manifest hash, profile, toolchain digests, command, configuration, seeds, raw-output hash, parser schema version, run ID, plus `evidence_class`, `result`, `scope`, and a mandatory `waiver` key. A record missing any field is rejected. Verdicts follow the G2 truth table: `FAILED` (exit 1) on any required-claim FAIL, `INCOMPLETE` (exit 3) on missing/invalid/stale records or unwaived assumptions, `VERIFIED[profile=...]` (exit 0, never bare VERIFIED) only when every required claim passes.
+
+```bash
+colosseum/scripts/check_evidence_records.py --records <project>/.colosseum/evidence/ \
+  --manifest <project>/.colosseum/obligations.json --expect-snapshot <commit>
+```
 
 ## `install-agents.py` — install the canonical agent bodies into a target harness
 

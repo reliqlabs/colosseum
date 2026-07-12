@@ -24,7 +24,7 @@ Each MCP's health check reports gracefully when its tool is missing, so a partia
 ```bash
 mkdir -p <project>/.colosseum/{attacks,changes,verify,scripts}
 cp colosseum/scripts/opencode_dispatch.py        <project>/.colosseum/scripts/
-cp colosseum/scripts/check_ledger_citations.py   <project>/.colosseum/scripts/
+cp colosseum/scripts/check_ledger_references.py   <project>/.colosseum/scripts/
 cp colosseum/scripts/dispatch.config.example.json <project>/.colosseum/dispatch.json   # then edit
 colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/
 ```
@@ -44,7 +44,7 @@ Each stage produces an artifact that anchors the next. The skill names are Claud
 7. **Implementation.** Rust against the validated specs. Pure cores, narrow effects, explicit state.
 8. **Verification.** Run `/colosseum-verify` continuously. The pyramid routes each property to the cheapest tool that can check it. Run `/colosseum-code-adversarial` here to read the implementation against the intent.
 9. **Failure classification.** When verification fails, dispatch the `colosseum-failure-classifier` agent: spec wrong, code wrong, prover stuck, tool mismatch, state-space blowup, or infrastructure — `INDETERMINATE` when the evidence cannot decide. Route the fix accordingly.
-10. **Coverage dashboard.** Per-function trust calibration: proven, tested-only, or unverified. Tooling is deferred; today the operational coverage record is the trust ledger — run `/colosseum-compose` (stage 8, continuous) to maintain `.colosseum/ledger.md` (composition theorems, axiom inventory, code-line citations) and wire `check_ledger_citations.py` into CI so the ledger fails loudly when it drifts from code.
+10. **Coverage dashboard.** Per-function trust calibration: proven, tested-only, or unverified. Tooling is deferred; today the operational coverage record is the trust ledger — run `/colosseum-compose` (stage 8, continuous) to maintain `.colosseum/ledger.md` (composition theorems, axiom inventory, code-line citations) and wire `check_ledger_references.py` into CI so the ledger fails loudly when it drifts from code.
 
 After the project is spec'd, every later change goes through `/colosseum-change`, which triages whether the change touches intent and walks the upstream-first revision sequence.
 

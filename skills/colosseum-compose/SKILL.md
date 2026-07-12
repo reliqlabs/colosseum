@@ -100,7 +100,7 @@ Every entry in `Depends on:` carries a `code:` annotation pointing at the file:l
 
 The annotation is load-bearing in two directions:
 
-1. **Drift detection**: when code moves, the citation breaks. A broken citation is louder than silent drift. CI runs `check_ledger_citations.py` (or equivalent) to confirm every cited line exists in the live codebase and is non-empty.
+1. **Drift detection**: when code moves, the citation breaks. A broken citation is louder than silent drift. CI runs `check_ledger_references.py` (or equivalent) to confirm every cited line exists in the live codebase and is non-empty. For load-bearing citations, bind the cited line's content with an `@sha256:<12hex>` suffix — `code: crates/contract/src/handle.rs:201@sha256:3f9a1c22b04e` — so a moved symbol, inserted lines, or a stubbed-out enforcement line fails the gate instead of silently re-pointing the citation at the wrong code. The hash is the first 12 hex chars of the SHA-256 of the cited line with trailing whitespace stripped; run the gate with `--suggest-hashes` to print the suffix for every unhashed citation.
 2. **Ledger-as-gate**: ledger entries that name the right structure are not sufficient — they must hook into code. Verified-rcv's trust-chain ledger had 9 links named pre-audit; a Major finding surfaced when link 5's "chain verifies proof" claim hit a contract that only checked envelope shape. The ledger looked complete; the code did not honor the claim. A `code:` annotation pointing at the verification function would have surfaced the gap at ledger-emission time (the citation would have resolved to a stub or a comment instead of a real check), not at audit time.
 
 **Worked example**: verified-rcv's trust-chain link "chain verifies proof". A ledger-as-gate run would have required `code: crates/contract/src/handle.rs:<line>` pointing at the proof-verification site. The contract had no such site (envelope-only verification); the only resolution was either `axiom: gnark verification deferred` (honest deferral, surfaces the gap explicitly) or to update the contract. Either way the gap surfaces at ledger time, not at audit time.
@@ -242,22 +242,35 @@ Before merging the current branch:
 - [ ] Every new `sorry` is accompanied by a follow-up issue, not silent
 - [ ] No composition theorem's dependency graph silently lost a node (compare to prior ledger)
 - [ ] Coverage delta is in the expected direction (added coverage, not regressed)
-- [ ] Every Depends-on entry carries a `code:` (or `axiom:`) annotation that resolves to a non-empty line in the current codebase
+- [ ] Every Depends-on entry carries a `code:` (or `axiom:`) annotation that resolves to a non-empty line in the current codebase; load-bearing citations carry an `@sha256:` content binding
 - [ ] Every trust-chain link has either a Kani harness or a closed-list `kani: skipped because <reason>` annotation
+- [ ] Every required claim ID has a typed evidence record under `.colosseum/evidence/` that passes `check_evidence_records.py` (Gate B)
 ```
 
-## Step 8: CI gate — ledger-as-gate enforcement
+## Step 8: CI gate — two-gate ledger enforcement
 
-The ledger is verification-relevant only when it stays in sync with code. The gate runs in CI on every revision (every PR; not just at release):
+The ledger is verification-relevant only when it stays in sync with code AND its claims are backed by typed evidence. These are different failure modes, so the gate is split in two (C1). Both run in CI on every revision (every PR; not just at release).
 
-1. **Citation-resolution check**: parse every `code: <file>:<line>` annotation from `ledger.md`. For each, confirm the file exists and the line number is within the file. If the file or line doesn't exist, the gate fails with the offending entry named.
-2. **Citation-content sanity check**: for each citation, confirm the cited line is non-empty and is not a comment-only line. (A `code:` annotation pointing at a `// TODO` line is the same shape of drift as a missing citation.)
-3. **Kani-coverage check** (paired with the Kani-catalog step above): every trust-chain link in the ledger has either a Kani harness reference OR a closed-list `kani: skipped because <reason>` annotation. Missing both fails the gate.
-4. **Axiom annotation check**: every `axiom:` annotation has a justification phrase (not just `axiom:` alone).
+### Gate A — reference integrity (`check_ledger_references.py`)
 
-Reference implementation: a Python or Bash script at `<project>/.colosseum/scripts/check_ledger_citations.py` invoked from the project's CI workflow (GitHub Actions / equivalent). The colosseum repo's reference impl lives at `scripts/check_ledger_citations.py` (see `scripts/README.md` for invocation).
+Checks that the ledger's references hook into the live codebase. Passing Gate A means nothing the ledger points at has drifted; it says nothing about whether the evidence discharges any claim.
 
-The gate is fast (<1s on a ledger of any reasonable size). The cost of running it on every revision is negligible; the cost of skipping it is silent ledger drift.
+1. **Citation-resolution check**: parse every `code: <file>:<line>` annotation from `ledger.md`. For each, confirm the file exists inside the canonical root and the line number is within the file. If the file or line doesn't exist, or the path escapes the root, the gate fails with the offending entry named.
+2. **Citation-content sanity check**: for each citation, confirm the cited line is non-empty and is not a comment-only line (Rust `#[...]` attribute lines are valid targets). A `code:` annotation pointing at a `// TODO` line is the same shape of drift as a missing citation.
+3. **Content-hash binding check**: citations carrying an `@sha256:<12hex>` suffix (Step 3) fail when the cited line's content changed — the moved-symbol / inserted-lines / stubbed-enforcement class of drift that line numbers alone cannot catch.
+4. **No vacuous pass**: an empty ledger or one with zero citations FAILS. A gate with nothing to check has checked nothing.
+5. **Kani-coverage check** (paired with the Kani-catalog step above): every trust-chain link (each `Depends on:` entry line) has either a Kani harness reference OR a closed-list `kani: skipped because <reason>` annotation. Per-link misses warn by default and fail under `--strict-kani`.
+6. **Axiom annotation check**: every `axiom:` occurrence (each one, not just the first per line) has a meaningful justification phrase — at least three words, no placeholder.
+
+### Gate B — semantic evidence (`check_evidence_records.py`)
+
+Checks the claims themselves against typed G1 records, keyed by stable claim ID (the intent's B/S/T clause IDs). Records live at `<project>/.colosseum/evidence/` as JSON. Each record carries: `claim_id`, `required`, `evidence_class` (one of code-enforced / proof-discharged / bounded-checked / test-witnessed / conformance-tested / externally-assumed / unverified), `result` (PASS / FAIL / INCOMPLETE), `scope`, the full `bindings` set (source snapshot, intent hash, obligation-manifest hash, profile, required targets, environment policy, toolchain digests, command, configuration, seeds, raw-output hash, parser schema version, run ID), and a `waiver` key (an object or null — never absent). A record missing any field is rejected.
+
+The verdict follows the G2 truth table exactly: any required claim FAIL → `FAILED`; any required claim missing, invalid, stale, INCOMPLETE, or resting on externally-assumed/unverified evidence without a waiver → `INCOMPLETE`; all required claims PASS → `VERIFIED[profile=...; waived-or-assumed=...]`, never bare `VERIFIED`. Invoke with `--require <claim-ids>` or `--manifest <obligations.json>` (the E3 manifest's invariant/witness IDs) and `--expect-snapshot <commit>` to reject stale runs.
+
+Reference implementations: `<project>/.colosseum/scripts/check_ledger_references.py` and `check_evidence_records.py`, invoked from the project's CI workflow (GitHub Actions / equivalent). The colosseum repo's reference impls live at `scripts/check_ledger_references.py` and `scripts/check_evidence_records.py` (see `scripts/README.md` for invocation).
+
+Both gates are fast (<1s on a ledger of any reasonable size). The cost of running them on every revision is negligible; the cost of skipping them is silent ledger drift and prose masquerading as evidence.
 
 **Worked example**: verified-rcv's "chain verifies proof" trust-chain link. Without the gate: ledger and code drifted across multiple revisions; audit caught it as a Major finding. With the gate: the first revision that introduced the envelope-only check would have failed the gate because no `code:` annotation resolved to a real verification site, forcing either the code fix or an explicit `axiom: gnark verification deferred` annotation.
 

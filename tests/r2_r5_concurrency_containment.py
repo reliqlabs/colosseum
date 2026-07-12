@@ -31,7 +31,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 RUN = REPO / "scripts" / "colosseum_run.py"
-LEDGER_CHECK = REPO / "scripts" / "check_ledger_citations.py"
+LEDGER_CHECK = REPO / "scripts" / "check_ledger_references.py"
 FAILURES: list[str] = []
 
 
