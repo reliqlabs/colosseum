@@ -97,6 +97,8 @@ action step = any {
 
 Run `quint typecheck` to confirm the extended spec types.
 
+When an active-phase invariant protects a freeze/write-once/monotone obligation, encode it as a ghost variable plus a state predicate, not as an action guard alone: the ghost captures the load-bearing state at the protected transition and the invariant checks the relation against it. A guard-only encoding takes the model checker out of the loop — an action-set drift that bypasses the guard violates the obligation without any invariant firing, which is exactly the attack class this skill hunts.
+
 ## Step 4: Identify active-phase invariants the new transitions might violate
 
 Walk the spec's `invariant` declarations and intent §3.2 (B-clauses) for properties that:

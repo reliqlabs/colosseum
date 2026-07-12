@@ -8,6 +8,7 @@ aggregates per G2 (any fail → FAILED exit 1; any suite that could not run
 
 | Suite | Fixture | Asserts | Item |
 |---|---|---|---|
+| `r1_r21_r27_ledger_gates.py` | R1, R21, R27 | no vacuous ledger pass; content-hash binding catches moved/stubbed citations; axiom anchoring; per-link kani; G1 records with full binding set; G2 verdict mapping, scoped VERIFIED only | C1 |
 | `r2_r5_concurrency_containment.py` | R2, R5 | citation containment (`../`, absolute, symlink, space paths); 24-writer manifest stress x3, zero losses; freshness/emptiness/reset guards | E5 |
 | `r3_r4_r15_dispatch.py` | R3, R4, R15 | missing opencode → INCOMPLETE; unmatched/duplicate/traversal selections rejected; versioned event parser (truncated, malformed, error, plaintext variants) | E4 |
 | `r6_manifest_failclosed.py` | R6 | zero-voice manifests invalid; all-errored wait nonzero; synthesize refuses partial evidence without override; retry history retained | E4 |
@@ -21,6 +22,7 @@ aggregates per G2 (any fail → FAILED exit 1; any suite that could not run
 | `r14_cli_contracts.py` | R14 | opencode/quint flag contracts and BOM version pins; flag drift fails here, not in field runs | E6 |
 | `r20_verdict_truth_table.py` | R20 | G2 aggregation truth table, all rows; headless pyramid runner end-to-end on a fixture crate | E4 |
 | `r23_adjudication_guard.py` | R23 | G4 closure rules present; vote counts never close; contested findings retained; blinded second checks | Z4 |
+| `r25_critique_loop.py` | R25 | critique loop (cross-critique/defense/re-cross-critique) under G4; blinded re-review framing; delta attack mode invocable; mandatory holistic pass; dual spec+intent citations; run-manifest phase field | C3 |
 
 Fixtures that need live model dispatch (the behavioral halves of R10, R11,
 R23) are harness runs over the mechanisms tested here; they are exercised

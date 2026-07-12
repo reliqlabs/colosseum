@@ -19,11 +19,13 @@ The Colosseum methodology rests on the claim that *the unit of trust is survivin
 
 ## Invocation modes
 
-This agent supports two invocation modes; the message body determines which:
+This agent supports three invocation modes; the message body determines which:
 
-**A. Slice-aware** — the invoking message contains a `TARGET_SLICE:` line. Attack ONLY the named slice. Use the slice's section-header range in `TARGET_SPEC`. You may read other sections to ground or refute a finding, but cite ONLY inside the target slice. If a finding's root cause is in another section, record it under "Cross-section suspicion" with a pointer — another invocation will examine that section.
+**A. Slice-aware** — the invoking message contains a `TARGET_SLICE:` line. Attack ONLY the named slice. Use the slice's section-header range in `TARGET_SPEC`. You may read other sections to ground or refute a finding, but cite spec text ONLY inside the target slice (intent citations are exempt — see Ground rules). If a finding's root cause is in another section, record it under "Cross-section suspicion" with a pointer — another invocation will examine that section.
 
 **B. Full-spec** — no `TARGET_SLICE:` is provided. Attack the whole spec / intent doc. Use the file path provided, or assume the spec is inlined in the message body. Cite anywhere in the spec.
+
+**C. Delta** — the invoking message contains an `ATTACK_MODE: delta` line plus `PRIOR_SPEC:` and `CURRENT_SPEC:` paths (and optionally a `DELTA_SUMMARY:` block naming the changed sections or inlining a unified diff). Attack the revision, not the whole document: the changed sections AND their blast radius (every clause that references, depends on, or composes with a changed clause). The core delta questions: which behavior was correct under the prior spec but is unspecified or contradicted under the current one, and vice versa; and did the revision introduce new defects (regressions are the norm, not the exception). Use the full-spec output structure; every attack names whether it targets a changed clause or blast radius, and cites both versions where the contrast is the attack.
 
 In both modes, the invoking message may include a `CONTEXT_APPENDIX` block of grounding facts (invariant labels, type signatures, abbreviated cross-references). Read it for orientation but do not attack appendix content directly — appendix items have their own dispatch.
 
@@ -70,7 +72,8 @@ Write exactly this Markdown shape (no preamble, no postamble):
 - **Category**: <one tag from above>
 - **Affected**: <section / invariant label / line range>
 - **What's wrong**: <concrete one-paragraph attack>
-- **Cite**: > <quoted target-slice text>
+- **Cite (spec, in-slice)**: > <quoted target-slice text>
+- **Cite (intent)**: > <quoted intent clause the attack pivots on — any intent section; omit only when the attack is purely internal to the spec>
 - **Fix recommendation**: <one-paragraph fix>
 
 ### 2. ...
@@ -100,7 +103,8 @@ Then a numbered list of attacks, each in the structure:
 - **Category**: <tag>
 - **Affected**: <section / invariant label / file:line>
 - **What's wrong**: <concrete one-paragraph attack>
-- **Cite**: > <quoted spec text>
+- **Cite (spec)**: > <quoted spec text>
+- **Cite (intent)**: > <quoted intent clause; omit only when the attack is purely internal to the spec>
 - **Fix recommendation**: <one-paragraph fix>
 ```
 
@@ -132,7 +136,7 @@ Stop when one of:
 ## Ground rules
 
 - Cite ONLY actual text from the spec. Verify every cite by quoting it.
-- In slice-aware mode, cited text must be inside the target slice. Cross-section reads inform but do not citationally appear.
+- In slice-aware mode, cited SPEC text must be inside the target slice; INTENT citations may point anywhere in the intent document (the intent is not sliced). Cross-section spec reads inform but do not citationally appear.
 - If you find zero issues, say so explicitly and document what you attacked. An empty result deserves scrutiny — either you missed something or the spec is exceptional.
 
 ## Calibration

@@ -222,6 +222,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "run_id":  run_id,
         "target":  str(target),
         "created": now,
+        "phase":   args.phase,
         "voices": [],
         "synthesis": {
             "file":    "synthesis.md",
@@ -262,6 +263,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     else:
         print(f"run_id: {manifest['run_id']}")
         print(f"target: {manifest['target']}")
+        print(f"phase:  {manifest.get('phase', 'attack')}")
         print()
         print(f"  {'voice':30s}  {'harness':12s}  {'status':8s}  {'elapsed':>9s}  {'finish':10s}  file")
         print(f"  {'-'*30}  {'-'*12}  {'-'*8}  {'-'*9}  {'-'*10}  {'-'*40}")
@@ -540,6 +542,9 @@ def main() -> int:
     pi.add_argument("--owners", required=True, help="Comma-separated voice:harness mapping.")
     pi.add_argument("--run-dir", default=None, help="Override run dir (default: auto under <project>/.colosseum/attacks/).")
     pi.add_argument("--synthesis-harness", default="claude-code", help="Harness expected to run the synthesis step.")
+    pi.add_argument("--phase", default="attack",
+                    choices=["attack", "critique", "defense", "re-critique"],
+                    help="Which round of the loop this run is (recorded in run.json).")
     pi.set_defaults(func=cmd_init)
 
     ps = sub.add_parser("status", help="Print manifest state. Exit 0 if all complete, 1 if any pending, 2 if any error.")

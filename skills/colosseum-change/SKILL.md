@@ -48,7 +48,7 @@ Edit `intent.md` to reflect the new behavior. Record the prior version in a revi
 
 Do not delete sections silently. If a behavior is being removed, leave its description in place with a strikethrough or a `REMOVED in revision <N>:` marker so the diff is visible.
 
-Then run `colosseum-adversarial` on the *diff*, not the new spec alone. The adversary's input is both the prior and new intent, framed as: "attack the delta — find a behavior that was correct under prior intent but is unspecified or contradicted under new intent, and vice versa."
+Then run `colosseum-adversarial` in **delta attack mode** (its `ATTACK_MODE: delta` invocation, defined in that skill's Step 4) with `PRIOR_SPEC` = the prior intent, `CURRENT_SPEC` = the revision, and an orchestrator-computed `DELTA_SUMMARY`. The delta questions are built into the mode: find a behavior that was correct under prior intent but is unspecified or contradicted under new intent, and vice versa. If the revision trips the mode's insufficiency conditions (load-bearing invariant definition changed, large or restructured delta), run a full re-attack instead.
 
 If the adversarial pass surfaces issues, revise intent and re-attack until the diff survives. Only then proceed.
 

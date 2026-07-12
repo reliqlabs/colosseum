@@ -118,6 +118,8 @@ Permissions come from the agent's own deny-first `permission` frontmatter (read-
 
 Orchestrate (voice × slice) pairs from a Python script that captures stdout per call and writes per-section files. **Canonical orchestrator: `colosseum/scripts/opencode_dispatch.py`** — copy to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a project-local config at `<project>/.colosseum/dispatch.json` (voice roster + slice plan + optional context appendix). See `colosseum/scripts/dispatch.config.example.json` for the schema. The verified-rcv project keeps a pinned variant of this script as its in-tree history; the colosseum/ copy is the one new projects should start from.
 
+**Mandatory holistic pass (C3).** Per-section slicing structurally misses cross-section contradictions: no slice-bound voice may cite across sections, so a clause that contradicts a clause in another slice is invisible to both. Every slice-dispatched run therefore includes a full-document pass alongside the slices — either a dedicated `holistic` slice whose header range spans the whole document (attack emphasis: cross-section contradictions, composition failures, global-consistency checks) dispatched to at least one voice, or at least one voice dispatched in full-spec mode. A run consisting only of per-section slices is invalid; the synthesis records its coverage as INCOMPLETE and does not aggregate slice verdicts into a document verdict.
+
 **Isolation (Z2).** The orchestrator runs every voice inside an ephemeral git worktree detached at HEAD, so untracked files (.env, credentials, local overrides) never enter the agent-visible tree; the target spec is copied in from the working tree and its sha256 recorded in the run's `preflight.json`. A mandatory preflight scan blocks dispatch on secret-named files, private-key material, or symlinks resolving outside the tree, and the child environment is cut to a small allowlist plus the config's `env_passthrough` names. `--preflight-only` exercises the gate without dispatching; `--unsafe-in-place` skips the worktree (the scan still blocks). This is filesystem and environment isolation only: the agents' tool-level network and write denials come from their permission frontmatter, and opencode's own provider API traffic is not blocked.
 
 **Per-voice voice IDs to pass to `--model`** (configured in `~/.config/opencode/opencode.jsonc`; the gateway roster drifts with operator curation, so verify against `curl <gateway-base>/models` before a milestone run):
@@ -178,6 +180,21 @@ Two discipline items:
 2. **Coordinate cross-session dispatch** when two agents work in parallel: one fan-out at a time across sessions, or accept best-effort with retries. The `colosseum_run.py` manifest protocol gives a natural coordination point — both sessions read + update the same `run.json`.
 
 Wait for all parallel dispatches to complete. Capture each response.
+
+### Delta attack mode (revision rounds)
+
+`colosseum-change` re-attacks revised specs against the *diff*, not the whole document. That invocation is a first-class mode here, not an improvised prompt. The dispatch message carries:
+
+```
+ATTACK_MODE: delta
+PRIOR_SPEC: <path or git-rev:path of the previous accepted version>
+CURRENT_SPEC: <path of the revision under attack>
+DELTA_SUMMARY: <changed-section list or unified diff — orchestrator-computed, not voice-computed>
+```
+
+Voices attack the changed sections AND their blast radius (every clause that references, depends on, or composes with a changed clause), asking in both directions: which behavior was correct under the prior version but is unspecified or contradicted now, and vice versa; and did the revision itself introduce new defects. Same report schema as a full attack; each finding names whether it targets a changed clause or blast radius. The spec-adversary agent body defines this as invocation mode C.
+
+Delta mode is insufficient — run a full re-attack instead — when any of: the delta touches the definition of a load-bearing invariant or more than roughly a third of the document's sections; restructuring or renumbering makes the blast radius uncomputable; or two consecutive delta rounds each produced findings outside the declared blast radius (the blast-radius computation is demonstrably missing coverage).
 
 ## Step 5: Quint-adversarial trace generation
 
@@ -362,6 +379,10 @@ When one voice **affirms** a property other voices **substantively critique**, t
 
 The synthesis surfaces the divergence so reviewers know the affirmation is shallow, not authoritative. It is not a revision target — the multi-voice critique stands; the single affirmation just records the depth-of-attack difference.
 
+### Section D (conditional): encoding-discipline candidates
+
+When the run compares multi-voice *generated artifacts* (fan-out specs, not just critiques), the synthesis also searches the overlap matrix for divergence-as-under-specification: the same intent clause encoded materially differently across voices. That divergence is not stochastic — re-running fan-out on the same intent reproduces it (verified-rcv: fresh-state regeneration did NOT converge; adding encoding-discipline notes to the intent DID, on exactly the noted axes). For each such axis, propose an encoding-discipline-note candidate back to the intent: what the spec MUST encode on that axis (e.g. "chain-side projection requires enclave-side state variables", "freeze obligations are snapshot-ghost invariants, not action guards"). Hand candidates to `colosseum-intent`; intent-tightening is the convergence lever, not regeneration.
+
 ### Failure-mode catalog the synthesis must process
 
 Verified-rcv calibration catalogues voice-level failure modes that synthesis must recognize:
@@ -391,6 +412,28 @@ Write the synthesis to `synthesis.md` in the multi-model directory.
 
 **Exemplar**: the verified-rcv `intent-revised` attack directory contains a reference implementation of this format (~300 lines, 7 voices, 16 themes catalogued, 5 false positives refuted, 1 depth-of-attack divergence surfaced, 17-item punch list).
 
+## Step 7.5: The critique loop (cross-critique → defense → re-cross-critique)
+
+Synthesis aggregation alone misses defects every voice falls into symmetrically (verified-rcv: two voices independently shipped tautological shadows — `val s9_shadow = true` — that synthesis did not flag; cross-voice review broke the symmetry). When a run compares multi-voice generated artifacts or a synthesis has produced a candidate canonical, run the critique loop before accepting it. All three rounds run under the Step 7 adjudication rules: **near-unanimous concession prioritizes; only evidence closes.**
+
+**Round 1 — cross-critique.** Each voice reviews ANOTHER voice's artifact (never its own) against the structured Q1/Q2/Q3 prompt: Q1 the single most material structural divergence from the reviewer's own artifact and why it matters; Q2 one apparent defect the typechecker cannot catch (tautological shadow, witness whose negation does not express reachability, guard admitting forbidden behavior, unconstrained state variable) or an explicit no-defect statement with reasoning; Q3 one change the reviewer would make to its OWN artifact after reading the target, or an explicit none. Dispatch at maximum reasoning variant — default-effort critiques reliably miss tautological shadows. Blinding: the reviewer receives the target artifact, its own artifact, and the intent; never another reviewer's critique, never the synthesis' assessment, never any prior verdict about the target.
+
+**Round 2 — defense.** When cross-critique surfaces a non-trivial defect claim, dispatch a defense round before applying fixes: the artifact's author voice, one of the original critics, and a third independent voice, each responding defend / concede / propose-third-option with reasoning. Per G4: a near-unanimous concession MANDATES the fix's place at the top of the punch list — it prioritizes. It does not close the finding; closure still requires G4 evidence (a counterexample, a failing check, a `quint verify` result, a recorded human ruling). A defense that cites intent text or attaches a mechanical check result is evidence and can close; a vote count cannot. Findings with grounded disagreement after defense are CONTESTED per Step 7 and carry forward.
+
+**Round 3 — re-cross-critique.** After fixes are applied, re-run the Q1/Q2/Q3 harness with two questions prepended: is the fix structurally sound, and did the revision introduce new defects? Revision-induced regressions are the norm, not the exception (verified-rcv: re-cross-critique caught a nondet coverage hole and a scope-overstating rename that the revision itself introduced). This round is MANDATORY whenever the revision touches a load-bearing predicate or invariant; skipping it ships regressions silently.
+
+**Blinded re-review framing (R25).** Any re-review of a specific finding — in this loop or in Step 8's second checks — frames the question independently and NEVER inlines the original finding's conclusion, verdict, severity, or attribution. Template:
+
+```
+REVIEW_QUESTION: Examine <artifact> <section/lines> against intent clause <ID>.
+What behaviors does this encoding admit that the intent forbids, or forbid
+that the intent requires? Ground every claim in quoted text.
+```
+
+Independent rediscovery corroborates and raises priority; it does not close. Inlining the suspected conclusion converts the reviewer into a confirmation oracle and voids the round.
+
+**Dispatch.** Canonical template: `colosseum/scripts/critique_dispatch.py` (promoted from the verified-rcv prototypes) — config-driven cross-critique pairs, defense triples, and re-critique rounds through `opencode run`, at max reasoning variant, with the blinding rules baked into the prompt builders. Record each round as its own run: `colosseum_run.py init --phase critique|defense|re-critique` stamps the phase into `run.json` so rounds are distinguishable in the project history.
+
 ## Step 8: Summarize for the user
 
 After persisting, report:
@@ -407,7 +450,7 @@ After persisting, report:
 
 ## Multi-round usage
 
-When a spec has been revised after a prior round, invoke this skill again. By default, no adversary sees prior reports — fresh attention each round. The invoking user may optionally include the prior synthesis as additional context if they want adversaries to verify that specific prior attacks have been resolved.
+When a spec has been revised after a prior round, invoke this skill again — in delta attack mode by default (see Step 4), falling back to a full re-attack when the delta-insufficiency conditions hit. By default, no adversary sees prior reports — fresh attention each round. Verifying that a specific prior finding is resolved goes through the blinded re-review framing (Step 7.5), never by inlining the finding; the invoking user may include the prior synthesis as context only for coverage planning, inside untrusted-content delimiters.
 
 When iterating, prefer the same `models` list across rounds — comparing round-N synthesis to round-N+1 synthesis is most informative when the panel composition is stable.
 
