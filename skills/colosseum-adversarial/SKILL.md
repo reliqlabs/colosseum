@@ -192,14 +192,18 @@ That is a separate step. It uses the Quint spec as an executable artifact, not a
 
 ### Procedure
 
+Two tools with two evidence classes (G3): `quint run` samples random traces — a violation is a real counterexample, but a clean run means only that the sampled traces held. `quint verify` model-checks exhaustively up to `--max-steps` via Apalache — a clean verify means the invariant holds for ALL behaviors within that depth. A clean `quint run` is never recorded as a bounded check.
+
 For each Quint invariant named in the spec or in intent §3.2:
 
-1. Run `quint run --invariant <inv_name> --max-steps <N> specs/<file>.qnt` (default `N=10`, escalate to 20 or 30 for invariants whose suspected violation requires longer interleavings).
-2. Record the result:
+1. Search: `quint run --invariant <inv_name> --max-steps <N> --max-samples <M> --seed <S> specs/<file>.qnt` (default `N=10`, escalate to 20 or 30 for invariants whose suspected violation requires longer interleavings; record samples and seed).
+2. Certify absence: if the search found nothing, run `quint verify --invariant <inv_name> --max-steps <N> specs/<file>.qnt` before recording any absence claim. Temporal properties go through `quint verify --temporal <prop>`, not `--invariant`.
+3. Record the result:
    - **Counterexample found**: capture the trace as a sequence of `(action, args)`. Note the step at which the invariant was first violated.
-   - **No counterexample within bound**: record the bound. This is informative — an invariant that holds under bound-10 has been mechanically checked under that bound, but a higher-bound run may produce a counterexample.
+   - **Verify clean**: record `bounded-checked (depth=N, apalache, quint <version>)`. The depth is part of the claim; a greater depth may still find a violation.
+   - **Verify unavailable or timed out**: record `simulation-only (samples=M, seed=S)` — visibly weaker, never presented as a bounded check.
    - **Tool error / spec error**: surface the error verbatim. Do not silently move on.
-3. For each counterexample, cross-reference to code:
+4. For each counterexample, cross-reference to code:
    - **Code enforces the invariant via a check the Quint spec did NOT model.** Spec is under-specified relative to code. Fix the spec (add the precondition the code actually checks); re-run. This is the common case when the code is correct but the spec is loose.
    - **Code does NOT enforce the invariant.** This is a bug — feed it as a target to `colosseum-code-adversarial` or to the standard fix loop.
    - **Code enforces via a downstream layer the Quint model does not see.** Document the cross-layer dependence in the integration ledger.
@@ -220,8 +224,8 @@ Write to `<project>/.colosseum/attacks/quint-adversarial-<ISO-date>.md`:
 
 | Invariant | Bound | Result | Trace summary | Code enforcement | Verdict |
 |---|---|---|---|---|---|
-| `inv_b1_tally_write_once` | 10 | counterexample | `[CreateElection, SubmitBallot, CreateElection]` violates at step 3 | `CreateElection` handler at `crates/contract/src/handle.rs:118` does NOT check current phase | bug |
-| `inv_s4_voter_partition` | 10 | held under bound | — | n/a | survived |
+| `inv_b1_tally_write_once` | 10 | counterexample (run) | `[CreateElection, SubmitBallot, CreateElection]` violates at step 3 | `CreateElection` handler at `crates/contract/src/handle.rs:118` does NOT check current phase | bug |
+| `inv_s4_voter_partition` | 10 | bounded-checked (verify, depth=10, apalache, quint 0.32.0) | — | n/a | held to depth 10 |
 
 ## Findings
 

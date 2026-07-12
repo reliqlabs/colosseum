@@ -1,11 +1,11 @@
 ---
 name: colosseum-lifecycle-adversary
-description: Red-team multi-tx admin lifecycle features (Propose/Finalize/Cancel patterns, timelocks, state archival, multi-block sequences). Triggered by any change that adds or modifies an admin transition combining with existing protocol transitions. Extends the Quint protocol model to encode the new transitions, then generates adversarial counterexample traces against active-phase invariants over all multi-block sequences combining new admin transitions with existing ones. Use whenever a contract revision adds multi-step admin features (any Propose/Finalize/Cancel cluster, any timelock, any state archival path).
+description: Red-team multi-tx admin lifecycle features (Propose/Finalize/Cancel patterns, timelocks, state archival, multi-block sequences). Triggered by any change that adds or modifies an admin transition combining with existing protocol transitions. Extends the Quint protocol model to encode the new transitions, then hunts adversarial counterexample traces against active-phase invariants across multi-block sequences combining new admin transitions with existing ones — simulation search via `quint run`, absence certification via exhaustive bounded checking with `quint verify`. Use whenever a contract revision adds multi-step admin features (any Propose/Finalize/Cancel cluster, any timelock, any state archival path).
 ---
 
 You are red-teaming a multi-tx admin lifecycle. A contract grew a feature with more than one admin transition (Propose + Finalize + Cancel; ProposeUpgrade + FinalizeUpgrade; ArchiveAndReset; or any multi-step admin lifecycle around state rotation). The naive flow lands the feature, updates the unit tests, and ships. The methodology's existing stages do not by themselves catch attack classes that combine the *new* admin transitions with the *existing* protocol transitions in adversarial sequences.
 
-This skill is the missing stage. You extend the Quint model to encode the new transitions, then drive Quint-adversarial trace generation against active-phase invariants over all multi-block sequences. The output is a list of admissible attack traces with a verdict per trace.
+This skill is the missing stage. You extend the Quint model to encode the new transitions, then drive Quint-adversarial trace generation against active-phase invariants across multi-block interleavings: `quint run` to search for counterexample traces, `quint verify` to certify absence exhaustively up to a recorded depth. The output is a list of admissible attack traces with a verdict per trace.
 
 ## When this skill triggers
 
@@ -61,10 +61,11 @@ Produce a transition table:
 Add each new transition as a Quint action in the spec file. The extension is mechanical when the transition table is honest:
 
 ```quint
+// Quint has no Option/Some/None — optional state is a { present, value } record.
 action propose_registry_update(new_registry) = all {
   is_admin(sender),
   not(PENDING_REGISTRY.present),
-  PENDING_REGISTRY' = Some({ new_registry: new_registry, unlock_at: now + TIMELOCK }),
+  PENDING_REGISTRY' = { present: true, value: { new_registry: new_registry, unlock_at: now + TIMELOCK } },
 }
 
 action finalize_registry_update() = all {
@@ -72,13 +73,13 @@ action finalize_registry_update() = all {
   PENDING_REGISTRY.present,
   now >= PENDING_REGISTRY.value.unlock_at,
   REGISTRY' = PENDING_REGISTRY.value.new_registry,
-  PENDING_REGISTRY' = None,
+  PENDING_REGISTRY' = { present: false, value: PENDING_REGISTRY.value },
 }
 
 action cancel_registry_update() = all {
   is_admin(sender),
   PENDING_REGISTRY.present,
-  PENDING_REGISTRY' = None,
+  PENDING_REGISTRY' = { present: false, value: PENDING_REGISTRY.value },
 }
 ```
 
@@ -116,10 +117,12 @@ The list does not need to be exhaustive across all spec invariants; focus on the
 
 ## Step 5: Generate adversarial counterexample traces
 
-For each target invariant, generate a trace using Quint's counterexample generator:
+Two tools with two evidence classes (G3). `quint run` samples random traces: a violation it finds is a real counterexample, but finding nothing means only that the sampled traces held. `quint verify` model-checks exhaustively up to `--max-steps`: no violation there means the invariant holds for ALL behaviors within that depth. Never label a clean `quint run` as a bounded check.
+
+For each target invariant, search for a counterexample first (fast):
 
 ```bash
-quint run --invariant inv_active_election_params_stable specs/<name>.qnt
+quint run --invariant inv_active_election_params_stable --max-steps 10 --max-samples 10000 --seed <seed> specs/<name>.qnt
 ```
 
 For each trace produced:
@@ -129,14 +132,20 @@ For each trace produced:
 - Note any "admin"-vs-"user" distinction in the trace's actors
 - Determine which existing transitions interleave with which new transitions to produce the violation
 
-If `quint run` cannot find a counterexample within its bound (typically 10 or 20 steps), document the absence explicitly — DO NOT silently move on. An invariant that survives a bounded check is informative; an invariant whose check timed out is differently informative.
+If `quint run` finds no counterexample, escalate to the model checker before recording any absence claim:
+
+```bash
+quint verify --invariant inv_active_election_params_stable --max-steps 10 specs/<name>.qnt
+```
+
+(temporal properties go through `--temporal` instead of `--invariant`). A clean `quint verify` is recorded as `bounded-checked (depth=N)` with the depth, backend (Apalache), and quint version. If `quint verify` cannot run (Apalache/JVM missing) or times out, record `simulation-only (samples=M, seed=S)` — DO NOT silently move on, and do not present it as a bounded check. A higher depth may still produce a counterexample; the depth is part of the claim.
 
 Produce a trace table:
 
-| Target invariant | Counterexample found? | Trace length | Violation point | Trace summary |
+| Target invariant | Counterexample found? | Trace length | Violation point | Trace summary / evidence class |
 |---|---|---|---|---|
 | `inv_active_election_params_stable` | yes | 4 | step 4 (`FinalizeRegistryUpdate`) | `[CreateElection, ProposeRegistryUpdate, AdvanceTime, FinalizeRegistryUpdate]` rotates pubkey while election is `ACTIVE` |
-| `inv_pending_registry_admin_gated` | no (bounded) | bound=10 | — | held under 10-step bound |
+| `inv_pending_registry_admin_gated` | no | — | — | bounded-checked (verify, depth=10, apalache, quint 0.32.0) |
 
 ## Step 6: Cross-reference traces to code enforcement
 
@@ -229,7 +238,7 @@ The cost of the skill at feature landing: ~30 min wall-clock (Quint extension + 
 
 - Every new admin transition appears in the extended Quint model with explicit preconditions and post-state effects
 - At least one active-phase invariant is targeted per new transition (or "no active-phase invariant interacts" is justified explicitly)
-- Every target invariant has either a counterexample trace OR a bounded-check pass with the bound recorded
+- Every target invariant has either a counterexample trace OR a `quint verify` pass recorded as `bounded-checked (depth=N)` with backend and version. A clean `quint run` alone is `simulation-only` and does not satisfy this criterion
 - Every counterexample is cross-referenced to code enforcement (Step 6 verdict)
 - The deliverable file exists at the canonical path under `<project>/.colosseum/lifecycle-adversary/`
 
@@ -240,9 +249,9 @@ The cost of the skill at feature landing: ~30 min wall-clock (Quint extension + 
 ## What you do not do
 
 - You do not edit code in this stage. Findings name the fix; you do not apply it.
-- You do not skip Step 5's bounded check. "I read the spec and it looks fine" is not a substitute for `quint run`.
+- You do not skip Step 5's mechanical checks. "I read the spec and it looks fine" is not a substitute for `quint run` counterexample search plus `quint verify` absence certification.
 - You do not extend the Quint model in a way that bakes the contract's bugs into the model (Step 3 must mirror the contract's *intended* preconditions, not the buggy code's actual preconditions). If the contract is buggy and the Quint extension mirrors the bug, the counterexample disappears, and the skill defeats its own purpose.
-- You do not declare an invariant "survived" because `quint run` hit a step-bound. Document the bound explicitly; a higher-bound run may produce a counterexample.
+- You do not declare an invariant "survived" on the strength of `quint run` finding nothing — that is simulation evidence, not a bounded check. Absence claims come from `quint verify` with the depth recorded, and a greater depth may still produce a counterexample.
 
 ## Spirit
 

@@ -17,8 +17,8 @@ The invoking message contains:
 - `OUTPUT_DIR`: absolute path where you write files.
 - `SPEC_FILENAME`: filename for the main module (e.g. `rcv.qnt`).
 - `CANONICAL_EXAMPLES`: absolute paths to canonical Quint examples by Informal Systems and production teams.
-- `WITNESS_SPECS`: reachability witness names that must be VIOLATED on `quint run`.
-- `SAFETY_INVARIANT`: composite invariant name that must HOLD on `quint run`.
+- `WITNESS_SPECS`: reachability witness names that must be VIOLATED on `quint run` (the violation trace is the witness).
+- `SAFETY_INVARIANT`: composite invariant name that must HOLD under `quint verify` (exhaustive bounded model checking). A clean `quint run` on this invariant is simulation evidence only and does not discharge the obligation.
 
 ## Workflow
 
@@ -26,10 +26,11 @@ The invoking message contains:
 2. **Read** one or two `CANONICAL_EXAMPLES` for idiom. Don't read all of them; pick the smallest one (`reactor.qnt`) plus a multi-module instantiation example (`main_n6f1b1.qnt` if present) and skim.
 3. **Write** `OUTPUT_DIR/rcv.qnt` and `OUTPUT_DIR/main.qnt`. Don't try to be complete on first pass; write something reasonable and let the typechecker validate.
 4. **Run** `quint typecheck OUTPUT_DIR/main.qnt`. If it fails, the stderr tells you exactly what to fix. Use `edit` (preferred) or `write` to make the change. Re-run typecheck. Repeat.
-5. **Run** `quint run --invariant=$SAFETY_INVARIANT --max-steps=30 --max-samples=100 OUTPUT_DIR/main.qnt`. It must output `No violation found`. If it finds a violation, the trace shows what state violates the invariant — decide whether the spec or the invariant is wrong, and fix.
-6. **Run** `quint run --invariant=<witness> --max-steps=30 --max-samples=100 OUTPUT_DIR/main.qnt` for each `WITNESS_SPECS` entry. Each must output `Invariant violated` (the system reaches the state the witness denies). If a witness holds, your spec can't reach the named state — figure out why and fix.
-7. **Write** `OUTPUT_DIR/design-notes.md` (under 600 words): which §2.5 blocks map to which actions; how you encoded each §3.1 + §3.2 invariant; what you omitted and why; non-obvious choices.
-8. **Stop** when all checks pass. Emit a final one-line `STATUS: ok` (or `STATUS: error: <reason>` if you hit a budget limit and gave up).
+5. **Run** `quint run --invariant=$SAFETY_INVARIANT --max-steps=30 --max-samples=100 OUTPUT_DIR/main.qnt` as a fast pre-check while iterating. A violation here is real — the trace shows what state violates the invariant; decide whether the spec or the invariant is wrong, and fix. `No violation found` here is simulation evidence only: random traces were sampled, the state space was not covered.
+6. **Run** `quint verify --invariant=$SAFETY_INVARIANT --max-steps=30 OUTPUT_DIR/main.qnt`. This is the safety gate: it must report no violation, and the result means "bounded-checked to depth 30", never unqualified "verified". If `quint verify` cannot execute (Apalache or JVM missing), emit `STATUS: error: quint-verify-unavailable` — a passing `quint run` is not a substitute.
+7. **Run** `quint run --invariant=<witness> --max-steps=30 --max-samples=100 OUTPUT_DIR/main.qnt` for each `WITNESS_SPECS` entry. Each must report an invariant violation (the system reaches the state the witness denies; the violation trace is the witness). If a witness holds, your spec can't reach the named state — figure out why and fix.
+8. **Write** `OUTPUT_DIR/design-notes.md` (under 600 words): which §2.5 blocks map to which actions; how you encoded each §3.1 + §3.2 invariant; what you omitted and why; non-obvious choices. End with a `## Checks run` section recording `quint --version`, the exact commands from steps 4-7, the verify backend and depth, and the run seeds/samples — the evidence record that makes the checks citable.
+9. **Stop** when all checks pass. Emit a final one-line `STATUS: ok` (or `STATUS: error: <reason>` if you hit a budget limit and gave up).
 
 ## Quint language gotchas — these will bite
 
@@ -48,8 +49,8 @@ These have all come up in prior failed runs. The typechecker will tell you about
 A working spec passes all three:
 
 - `quint typecheck OUTPUT_DIR/main.qnt` exits 0.
-- `quint run --invariant=$SAFETY_INVARIANT ... OUTPUT_DIR/main.qnt` reports `No violation found`.
-- Each `WITNESS_SPECS` invariant exits with `Invariant violated` (counterexample exhibited).
+- `quint verify --invariant=$SAFETY_INVARIANT --max-steps=30 OUTPUT_DIR/main.qnt` reports no violation (evidence class: bounded-checked to depth 30, not unbounded verification).
+- Each `WITNESS_SPECS` invariant is violated under `quint run` (evidence class: witnessed reachability — the counterexample trace is the witness).
 
 If you can't get all three after substantial iteration, emit `STATUS: error: <what's left broken>` and stop. The dispatcher records what you wrote regardless.
 

@@ -53,6 +53,7 @@ build/
 # --- Runtime / cache directories ---
 .crucible/
 .colosseum/
+_apalache-out/
 
 # NOTE: the historical archive/ directory is INTENTIONALLY tracked.
 # It contains a one-time snapshot of the Claude Code transcripts and
