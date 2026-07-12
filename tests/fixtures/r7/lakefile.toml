@@ -1,0 +1,6 @@
+name = "r7fixture"
+version = "0.1.0"
+defaultTargets = ["R7"]
+
+[[lean_lib]]
+name = "R7"

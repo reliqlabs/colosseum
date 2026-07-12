@@ -50,7 +50,15 @@ Invoke aeneas-mcp's `extract_rust_to_lean(crate_path, output_dir)`. Extraction f
 
 ### Layer 8 — Lean theorem proving
 
-For the extracted Lean output: invoke `lean-lsp-mcp`'s `lean_build` against the output directory's Lake project (or scan for `sorry` markers if no Lake project exists). For each unproven theorem, the orchestrating agent — not this skill — is responsible for tactic-proposal loops with goedel-mcp. This skill's role is reporting the proven/unproven count and surfacing what remains.
+Lean's build is proof-insensitive: a `sorry`-admitted theorem elaborates with exit 0 and only a warning, so a green build is NOT evidence that anything is proven. The gate is the axiom audit, run by the canonical tool `colosseum/scripts/lean_axiom_gate.py`:
+
+1. **Build inside the Z2 environment.** Lean elaboration executes arbitrary metacode; building extracted or generated Lean output is code execution. Run this layer in the ephemeral worktree, never against a live tree with secrets in reach.
+2. **Audit every in-scope theorem** (`#print axioms <name>`, via the gate script or `lean-lsp-mcp`'s `lean_verify`). Per-theorem outcome: proven only when the axiom set stays within the standard base (`Classical.choice`, `propext`, `Quot.sound`); any `sorryAx` means the theorem is admitted, not proven; axioms outside the base set count as visible assumptions and must be admitted explicitly (`--allow-axiom`) or the theorem is not proven.
+3. **Layer verdict per G2**: `VERIFIED[axiom-clean]` only when the build succeeds AND every in-scope theorem audits clean; any sorry-admitted theorem makes the layer exactly `INCOMPLETE` (recorded as `failed` in the layer schema, never `passed`); build or audit errors are `FAILED`.
+
+There is no text-scan fallback. Grepping source for `sorry` proves nothing (macros can hide admits, and absence of the string is not completeness); if there is no Lake project to build and audit, the layer is `failed` with reason `not-auditable`, not `passed`.
+
+For each unproven theorem, the orchestrating agent — not this skill — is responsible for tactic-proposal loops with goedel-mcp. This skill's role is reporting the per-theorem audit table (the gate's JSON record goes in `structured_summary`) and surfacing what remains.
 
 ## Per-layer result schema
 
@@ -151,7 +159,7 @@ Before running the pyramid, check that the tools each layer needs are available:
 - Layer 5: kani-mcp's `check_kani_health()` → `ok: true`
 - Layer 6: verus-mcp's `check_verus_health()` → `ok: true`
 - Layer 7: aeneas-mcp's `check_aeneas_health()` → `ok: true`
-- Layer 8: `lean-lsp-mcp` registered and available
+- Layer 8: `lean` and `lake` on PATH (the axiom gate shells out to them); `lean-lsp-mcp` registered for interactive proof work
 
 If a tool needed by a non-excluded layer is unavailable, mark the layer `skipped` with reason "tool unavailable" and proceed. Surface this in the summary as a coverage gap.
 
