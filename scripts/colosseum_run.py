@@ -73,10 +73,14 @@ MANIFEST SCHEMA
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
+import os
 import re
 import sys
+import tempfile
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -109,14 +113,39 @@ def load_manifest(run_dir: Path) -> dict[str, Any]:
 
 
 def save_manifest(run_dir: Path, manifest: dict[str, Any]) -> None:
-    # Round-trip via temp file → atomic rename so concurrent readers never
-    # observe a half-written manifest.
+    # Unique temp file per writer (a shared fixed .tmp name crashes
+    # concurrent writers) → atomic rename so readers never observe a
+    # half-written manifest.
     p = manifest_path(run_dir)
-    tmp = p.with_suffix(p.suffix + ".tmp")
-    with tmp.open("w") as f:
-        json.dump(manifest, f, indent=2)
-        f.write("\n")
-    tmp.replace(p)
+    fd, tmp_name = tempfile.mkstemp(dir=run_dir, prefix="run.json.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(manifest, f, indent=2)
+            f.write("\n")
+        os.replace(tmp_name, p)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
+@contextmanager
+def manifest_lock(run_dir: Path):
+    """Exclusive advisory lock serializing read-modify-write cycles.
+    Atomic rename alone protects readers, not concurrent writers: two
+    unlocked `complete` calls interleave load/save and one update is lost
+    (reproduced 4-7 losses per 24 writers before this lock)."""
+    lock_path = run_dir / "run.json.lock"
+    with lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def _parse_run_ts(ts: str) -> float:
+    return datetime.strptime(ts, "%Y-%m-%dT%H%M%SZ").replace(
+        tzinfo=timezone.utc).timestamp()
 
 
 def find_voice(manifest: dict[str, Any], voice_id: str) -> dict[str, Any]:
@@ -259,55 +288,77 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_complete(args: argparse.Namespace) -> int:
     run_dir = Path(args.run_dir).resolve()
-    manifest = load_manifest(run_dir)
-    voice = find_voice(manifest, args.voice)
+    with manifest_lock(run_dir):
+        manifest = load_manifest(run_dir)
+        voice = find_voice(manifest, args.voice)
 
-    file_path = run_dir / voice["file"]
-    if not file_path.exists():
-        sys.exit(f"error: voice file {file_path} does not exist; write it before marking complete")
+        file_path = run_dir / voice["file"]
+        if not file_path.exists():
+            sys.exit(f"error: voice file {file_path} does not exist; write it before marking complete")
+        # Freshness + non-emptiness: an empty or leftover file from before
+        # this run (or before this voice's last reset) is not evidence.
+        if file_path.stat().st_size == 0:
+            sys.exit(f"error: voice file {file_path} is empty; refusing to mark complete")
+        floor_ts = _parse_run_ts(manifest["created"])
+        for attempt in voice.get("history", []):
+            if "reset_at" in attempt:
+                floor_ts = max(floor_ts, _parse_run_ts(attempt["reset_at"]))
+        if file_path.stat().st_mtime < floor_ts - 1.0:
+            sys.exit(f"error: voice file {file_path} predates this run/attempt "
+                     f"(stale output); rewrite it before marking complete")
 
-    voice["status"] = "complete"
-    if args.elapsed is not None:
-        voice["elapsed_s"] = args.elapsed
-    if args.finish_reason:
-        voice["finish_reason"] = args.finish_reason
-    voice.pop("error_detail", None)
-    save_manifest(run_dir, manifest)
+        voice["status"] = "complete"
+        if args.elapsed is not None:
+            voice["elapsed_s"] = args.elapsed
+        if args.finish_reason:
+            voice["finish_reason"] = args.finish_reason
+        voice.pop("error_detail", None)
+        save_manifest(run_dir, manifest)
     print(f"marked {args.voice} complete ({file_path})")
     return 0
 
 
 def cmd_error(args: argparse.Namespace) -> int:
     run_dir = Path(args.run_dir).resolve()
-    manifest = load_manifest(run_dir)
-    voice = find_voice(manifest, args.voice)
+    with manifest_lock(run_dir):
+        manifest = load_manifest(run_dir)
+        voice = find_voice(manifest, args.voice)
 
-    voice["status"] = "error"
-    voice["error_detail"] = args.detail
-    if args.elapsed is not None:
-        voice["elapsed_s"] = args.elapsed
-    save_manifest(run_dir, manifest)
+        voice["status"] = "error"
+        voice["error_detail"] = args.detail
+        if args.elapsed is not None:
+            voice["elapsed_s"] = args.elapsed
+        save_manifest(run_dir, manifest)
     print(f"marked {args.voice} error: {args.detail}")
     return 0
 
 
 def cmd_reset(args: argparse.Namespace) -> int:
     run_dir = Path(args.run_dir).resolve()
-    manifest = load_manifest(run_dir)
-    voice = find_voice(manifest, args.voice)
+    with manifest_lock(run_dir):
+        manifest = load_manifest(run_dir)
+        voice = find_voice(manifest, args.voice)
 
-    # Retain the retry history: the prior attempt's outcome stays in the
-    # record instead of being silently erased.
-    attempt = {k: voice[k] for k in ("status", "elapsed_s", "finish_reason", "error_detail")
-               if k in voice}
-    attempt["reset_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
-    voice.setdefault("history", []).append(attempt)
+        # Retain the retry history: the prior attempt's outcome stays in the
+        # record instead of being silently erased.
+        attempt = {k: voice[k] for k in ("status", "elapsed_s", "finish_reason", "error_detail")
+                   if k in voice}
+        attempt["reset_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+        voice.setdefault("history", []).append(attempt)
 
-    voice["status"] = "pending"
-    voice.pop("elapsed_s", None)
-    voice.pop("finish_reason", None)
-    voice.pop("error_detail", None)
-    save_manifest(run_dir, manifest)
+        # Move any stale output aside so the next attempt cannot silently
+        # claim the previous attempt's file.
+        file_path = run_dir / voice["file"]
+        if file_path.exists():
+            aside = run_dir / f"{voice['file']}.attempt{len(voice['history'])}"
+            file_path.rename(aside)
+            attempt["output_moved_to"] = aside.name
+
+        voice["status"] = "pending"
+        voice.pop("elapsed_s", None)
+        voice.pop("finish_reason", None)
+        voice.pop("error_detail", None)
+        save_manifest(run_dir, manifest)
     print(f"reset {args.voice} to pending (attempt {len(voice['history'])} retained in history)")
     return 0
 

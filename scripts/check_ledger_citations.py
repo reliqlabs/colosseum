@@ -42,10 +42,16 @@ from pathlib import Path
 
 # `path:line` citations: backtick-quoted or after a `code:` annotation.
 # Path must contain a dot-extension to avoid matching prose ratios ("5:1").
+# Backtick-quoted paths may contain spaces (the backticks delimit them);
+# bare `code:` paths cannot, and a space-path there fails loudly below.
 CITATION_RE = re.compile(
-    r"`(?P<path>[A-Za-z0-9_./\-]+\.[A-Za-z0-9]+):(?P<line>\d+)`"
-    r"|code:\s*(?P<path2>[A-Za-z0-9_./\-]+\.[A-Za-z0-9]+):(?P<line2>\d+)"
+    r"`(?P<path>[^`\n]+?\.[A-Za-z0-9]+):(?P<line>\d+)`"
+    r"|code:\s*(?P<path2>[^\s`]+\.[A-Za-z0-9]+):(?P<line2>\d+)"
 )
+# A `code:` annotation whose value looks like a citation but did not parse
+# (spaces in an unquoted path, stray characters): fail loudly instead of
+# silently skipping the check.
+UNPARSED_CODE_RE = re.compile(r"code:\s*(?P<rest>[^\n]*\.[A-Za-z0-9]+:\d+)")
 # Bare `axiom:` with nothing meaningful after it on the same line.
 AXIOM_RE = re.compile(r"axiom:\s*(?P<just>.*)$")
 KANI_RE = re.compile(r"kani:\s*(?P<body>.*)$")
@@ -92,11 +98,28 @@ def main() -> int:
         return file_cache[p]
 
     for lineno, text in enumerate(ledger_lines, start=1):
+        matched_spans: list[tuple[int, int]] = []
         for m in CITATION_RE.finditer(text):
+            matched_spans.append(m.span())
             rel = m.group("path") or m.group("path2")
             cited_line = int(m.group("line") or m.group("line2"))
             n_citations += 1
+            # Containment: citations resolve inside the canonical root only.
+            # `..` segments are rejected textually; resolve() then also
+            # catches absolute paths and symlink escapes.
+            if ".." in Path(rel).parts or Path(rel).is_absolute():
+                failures.append(
+                    f"ledger:{lineno}: citation `{rel}:{cited_line}` — path escapes the "
+                    f"canonical root (`..` or absolute path)"
+                )
+                continue
             target = (root / rel).resolve()
+            if not target.is_relative_to(root):
+                failures.append(
+                    f"ledger:{lineno}: citation `{rel}:{cited_line}` — resolves outside "
+                    f"the canonical root ({target}); symlink escape?"
+                )
+                continue
             contents = load(target)
             if contents is None:
                 failures.append(
@@ -112,6 +135,16 @@ def main() -> int:
             if is_comment_only(cited):
                 failures.append(
                     f"ledger:{lineno}: citation `{rel}:{cited_line}` — cited line is empty or comment-only: {cited.strip()!r}"
+                )
+
+        for um in UNPARSED_CODE_RE.finditer(text):
+            overlaps = any(s <= um.start() < e or s < um.end() <= e
+                           for s, e in matched_spans)
+            if not overlaps:
+                failures.append(
+                    f"ledger:{lineno}: unparseable `code:` citation "
+                    f"{um.group('rest')!r} — spaces in an unquoted path? "
+                    f"Quote the whole path:line in backticks."
                 )
 
         am = AXIOM_RE.search(text)
