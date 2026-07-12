@@ -4,7 +4,7 @@
 
 A methodology for building dependable software in a world of fast, unreliable LLM workers.
 
-This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The methodology is dogfooded against real projects (Quartz, verified-rcv, bidboard — see the table below); each produces concrete evidence that drives the next iteration. Prospective validation — measured defect recall against simpler baselines — has not yet been run.
+This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The methodology is dogfooded against real projects (Quartz, verified-rcv, bidboard — see the table below). These are dogfood observations that drive the next iteration; a project becomes citable methodology evidence only once it has a status:manifested evidence manifest (schema and rule in `docs/dogfood-evidence.md`). Prospective validation — measured defect recall against simpler baselines — has not yet been run.
 
 ## Starting a new project
 
@@ -135,9 +135,9 @@ This methodology builds on existing work and stays current with adjacent publish
 - **ArkLib** (Verified-zkEVM, 2025–). Modular SNARK / IOR formalization on top of VCV-io. Active targets: sum-check, Spartan, Merkle trees, FRI, STIR, WHIR, Binius. Not yet covering Groth16 / PLONK / STARKs. Track for projects using FRI-style proof systems.
 - **Aeneas (Charon + Aeneas)** vs **[hax](https://github.com/hacspec/hax)** as Rust-extraction paths. Aeneas targets Lean 4 / Coq / F\* / HOL4; hax targets F\* primarily, with experimental Coq/Lean. Colosseum defaults to Aeneas → Lean for the theorem-proving layer; hax + F\* is a legitimate alternative for users whose toolchain is already F\*-anchored (e.g. HACL\*, miTLS). Tradeoff: Aeneas's Lean targeting composes naturally with mathlib and VCV-io; hax has stronger production-scale adoption in HACL\* and Bertie. ArkLib's roadmap mentions hax as its Rust-extraction path of choice.
 
-## Dogfood projects
+## Dogfood observations
 
-Methodology validation runs against real projects. Each one produces concrete evidence — adversarial reports, ledger entries, methodology improvement proposals — that drives the next iteration.
+The methodology is exercised against real projects. Each run is a dogfood observation — adversarial reports, ledger entries, methodology improvement proposals — that drives the next iteration. A project is described as a dogfood observation until an immutable evidence manifest exists for it (schema and rule in `docs/dogfood-evidence.md`); only a status:manifested project may be cited as methodology evidence.
 
 | Project | Scope | Status |
 |---|---|---|
@@ -145,7 +145,7 @@ Methodology validation runs against real projects. Each one produces concrete ev
 | verified-rcv | Instant-runoff voting CosmWasm contract + TDX enclave tabulation; greenfield methodology dogfood | Spec layer complete (intent → Quint → Lean); contract deployed to testnet and enclave exercised as uncommitted spike work; integration ledger stale (generated at intent v0.3.5, intent now v0.3.15) pending regeneration |
 | bidboard | Sponsorship-auction contract with anti-sniping; first multi-component dogfood | Planned — brownfield: a contract and an unattacked Quint spec predate Colosseum; entry path is `colosseum-reverse-intent` |
 
-Each project's evidence base lives under its own `.colosseum/` directory (`attacks/`, `changes/`, `ledger.md` — presence varies by project stage). Improvements that surface flow into the relevant SKILLs / docs once they've been exercised in anger; proposals awaiting validation are tracked in `methodology-improvements.md`. External literature backing them is catalogued in `references.md`.
+Each project's evidence base lives under its own `.colosseum/` directory (`attacks/`, `changes/`, `ledger.md` — presence varies by project stage). Its dogfood evidence manifest, when one exists, lives at `.colosseum/dogfood-evidence.json` (see `docs/dogfood-evidence.md` and `templates/dogfood-evidence.example.json`). Improvements that surface flow into the relevant SKILLs / docs once they've been exercised in anger; proposals awaiting validation are tracked in `methodology-improvements.md`. External literature backing them is catalogued in `references.md`.
 
 ## Status
 
