@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "intent_path": "intent.md",
+  "intent_sha256": null,
+  "spec_dir": "specs",
+  "main_file": "flow.qnt",
+  "module": "flow",
+  "init": "init",
+  "step": "step",
+  "invariants": [
+    { "id": "B1", "name": "inv_positive", "definition_sha256": null },
+    { "id": "B2", "name": "inv_vacuous", "definition_sha256": null }
+  ],
+  "witnesses": [
+    { "id": "W1", "name": "witness_reach_16" },
+    { "id": "W2", "name": "witness_unreachable" }
+  ],
+  "transitions": ["inc", "dbl", "never", "stay"],
+  "bounds": { "max_steps": 15, "max_samples": 200, "seed": "0x1" }
+}
