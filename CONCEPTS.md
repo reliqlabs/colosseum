@@ -62,9 +62,13 @@ Canonical locations within a Colosseum-managed project. Skills cite these; do no
 
 - `<project>/.colosseum/intent.md` — the intent document (canonical). `<project>/intent.md` at the root is the recognized alternative for projects that want the intent visible at top level; a skill that needs the intent checks `.colosseum/intent.md` first, then `intent.md`, then asks.
 - `<project>/.colosseum/ledger.md` — the trust ledger
-- `<project>/.colosseum/attacks/` — adversarial reports, verbatim
-- `<project>/.colosseum/changes/` — change impact reports
-- `<project>/.colosseum/verify/` — pyramid run reports
+- `<project>/.colosseum/attacks/` — spec adversarial reports, verbatim (`colosseum-adversarial`)
+- `<project>/.colosseum/code-adversarial/` — code adversarial review reports (`colosseum-code-adversarial`)
+- `<project>/.colosseum/lifecycle-adversary/` — lifecycle red-team reports (`colosseum-lifecycle-adversary`)
+- `<project>/.colosseum/changes/` — change impact reports (`colosseum-change`)
+- `<project>/.colosseum/verify/` — pyramid run reports (`colosseum-verify`)
+- `<project>/.colosseum/classifications/` — failure-classifier reports (`colosseum-verify`)
+- `<project>/.colosseum/evidence/` — typed G1 evidence records, one JSON per claim ID (`colosseum-compose`, Gate B)
 - `<project>/.colosseum/scripts/` — project-local copies of dispatch + CI-gate scripts
 - `<project>/.opencode/agent/` — per-project OpenCode agents, built from `colosseum/agents/*-body.md` (never hand-edited)
 
@@ -120,6 +124,6 @@ Three rules to keep the namespace cheap to learn.
 
 For traceability only — never load-bearing for new work.
 
-- `archive/` — old MEMORY snapshots, retired skill versions
+- `archive/` — old MEMORY snapshots
 - `methodology-improvements.md` — current improvements; previous "Ask X" labels appear in a single archive table at the end mapping old label → current practice name
 - Per-project `.colosseum/ledger.md` — frozen historical artifacts (e.g., Quartz's `Cycle 7.x` ledger entries) — stay as-is; they are the audit trail

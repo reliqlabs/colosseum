@@ -54,37 +54,35 @@ Read both artifacts to confirm they exist and are non-empty. If the intent descr
 
 ## Step 3: Construct the attack prompt
 
-For non-Claude providers, you must inline everything into a single prompt — they don't have file access. The prompt body is the same for every provider; only the dispatch mechanism differs.
+Every voice runs the `spec-adversary` agent, which has file access, so the attack methodology lives in the agent's system prompt (its body) and is NOT inlined into each call. The per-call message is small: it names the target and, for per-section dispatch, the slice; the agent reads the spec and intent itself via its Read tool. This is what `opencode_dispatch.py` builds; you only construct a message by hand for a one-off call.
 
-The prompt structure:
+The message structure:
 
 ```
-<system role>
-You are a hostile spec reviewer for the Colosseum methodology. Your job is
-to find ways the specification under review is wrong, weak, or misleading.
+VOICE_ID: <voice-id>
 
-[full body of agents/colosseum-spec-adversary.md system prompt, inlined]
-</system role>
+TARGET_SPEC: <absolute path to the spec/intent under review>
 
-<user prompt>
-Attack the specification at <SPEC_PATH> against the intent document at <INTENT_PATH>.
+TARGET_SLICE: <slice-name> — <slice-label>    # omit for a whole-document pass
 
-=== INTENT DOCUMENT (<INTENT_PATH>) ===
-<full text of intent.md>
-=== END INTENT DOCUMENT ===
+Read these headers from TARGET_SPEC (use the Read tool):
+  - <header range 1>
+  - <header range 2>
 
-=== SPECIFICATION UNDER REVIEW (<SPEC_PATH>) ===
-<full text of spec>
-=== END SPECIFICATION ===
+Attack only what is INSIDE these header ranges (omit this line for a holistic pass).
 
-[optional: additional context blocks for tests, related specs, prior attack reports]
+Attack-category emphasis for this slice:
+<per-slice emphasis>
 
-Report per your system prompt. Severity must be conservative — do not invent
-attacks.
-</user prompt>
+[optional: a read-only CONTEXT APPENDIX of type signatures / invariant labels /
+prior-round synthesis, clearly marked not-to-be-attacked and, for untrusted
+prior reports, kept inside the UNTRUSTED-REPORT delimiters of Step 7]
+
+Begin by reading TARGET_SPEC at the named ranges, then produce your attack
+report per the Output structure in your system prompt.
 ```
 
-The system-prompt portion is read from `agents/colosseum-spec-adversary.md` (strip the YAML frontmatter; use the body text). This ensures every provider operates under identical instructions.
+The methodology every voice operates under is the shared agent body at `agents/spec-adversary-body.md` (the canonical source that `install-agents.py` compiles into each harness wrapper), so all voices attack under identical instructions without any per-call inlining. The Claude voice (Mode 2) receives the same message shape through the Agent tool.
 
 ## Step 4: Dispatch the intent-adversarial voices
 
@@ -104,7 +102,7 @@ Dispatch happens in parallel — every requested voice attacks concurrently.
 
 ### Mode 1: OpenCode + spec-adversary agent (ReAct) — every non-Claude voice
 
-Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adversary.md` (canonical source) → installed via `colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/` into the project's `.opencode/agent/` directory. The agent reads the target spec on demand via OpenCode's Read tool (`permission.read: allow`); the invocation message names a `TARGET_SPEC` path plus an optional `TARGET_SLICE` for per-section dispatch.
+Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adversary.md` (a generated wrapper; the canonical body is `colosseum/agents/spec-adversary-body.md`, compiled by `install-agents.py build` — never hand-edit the wrapper) → installed via `colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/` into the project's `.opencode/agent/` directory. The agent reads the target spec on demand via OpenCode's Read tool (`permission.read: allow`); the invocation message names a `TARGET_SPEC` path plus an optional `TARGET_SLICE` for per-section dispatch.
 
 **Invocation shape**:
 
@@ -162,7 +160,7 @@ This is the canonical Claude voice for multi-model ensembles. Run it via the Age
 
 ### There is no Mode 3 (no MCP single-shot fallback)
 
-Single-shot MCP dispatch was removed from the methodology. External models are called only through OpenCode, so every voice gets an agentic ReAct loop with file access. If you find yourself searching the deferred-tool list for `query_gateway`, `query_openai`, `query_google`, `fan_out_query`, or `fan_out_local`-style tools, **stop** — those MCP paths no longer exist. The only dispatch paths are Mode 1 (OpenCode) and Mode 2 (the Claude Agent subagent).
+Single-shot MCP dispatch was removed from the methodology. External models are called only through OpenCode, so every voice gets an agentic ReAct loop with file access. The gateway/provider MCP dispatch tools (`query_gateway`, `query_openai`, `query_google`, `fan_out_query`) no longer exist — if you find yourself searching the deferred-tool list for them, **stop**. The lm-studio server's `fan_out_local`/`query_local` tools DO still exist, but they are a local-model query helper, never an adversarial-dispatch path: do not use them to run a voice in this skill. The only dispatch paths are Mode 1 (OpenCode) and Mode 2 (the Claude Agent subagent).
 
 If OpenCode is not installed on the host, install it (INSTALL §7) before running a multi-voice pass. There is no degraded single-shot mode to fall back to.
 
@@ -456,7 +454,7 @@ After persisting, report:
 
 When a spec has been revised after a prior round, invoke this skill again — in delta attack mode by default (see Step 4), falling back to a full re-attack when the delta-insufficiency conditions hit. By default, no adversary sees prior reports — fresh attention each round. Verifying that a specific prior finding is resolved goes through the blinded re-review framing (Step 7.5), never by inlining the finding; the invoking user may include the prior synthesis as context only for coverage planning, inside untrusted-content delimiters.
 
-When iterating, prefer the same `models` list across rounds — comparing round-N synthesis to round-N+1 synthesis is most informative when the panel composition is stable.
+When iterating, prefer the same `voices` list across rounds — comparing round-N synthesis to round-N+1 synthesis is most informative when the panel composition is stable.
 
 ## What you do not do
 

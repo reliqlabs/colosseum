@@ -6,28 +6,33 @@
 """
 install-agents — manage Colosseum agent distribution across harnesses.
 
-Single source of truth: `colosseum/agents/spec-adversary-body.md` (canonical body, no frontmatter).
-Per-harness wrappers in `colosseum/agents/` and `colosseum/agents/opencode/` prepend their
-frontmatter to the canonical body.
+Each agent in the AGENTS table below names its own canonical body (a
+frontmatter-free `*-body.md` under `colosseum/agents/`) and, per harness, the
+frontmatter and dist path for its wrapper. A dist (wrapper) file is built by
+stripping the body's leading editor-instruction comment and prepending that
+harness's frontmatter. Current agents: `spec-adversary` (spec-adversary-body.md)
+and `quint-spec-generator` (quint-spec-generator-body.md), each with a
+Claude Code and an OpenCode wrapper.
 
 USAGE
 
     install-agents.py build
-        Regenerate dist files from canonical body + per-harness frontmatter.
-        Run after editing the canonical body.
+        Regenerate dist files from each agent's canonical body + per-harness
+        frontmatter. Run after editing a canonical body.
 
     install-agents.py lint
-        Check that every dist file's body matches the canonical body.
+        Check that every dist file matches its rebuilt content.
         Exits non-zero on drift.
 
-    install-agents.py install --harness opencode --target /path/to/.opencode/agent/
-        Copy the OpenCode dist file into a project's .opencode/agent/ directory.
+    install-agents.py install --harness opencode --target /path/to/.opencode/agent/ [--agent <name>]
+        Copy an agent's OpenCode dist file into a project's .opencode/agent/
+        directory. --agent defaults to spec-adversary.
 
-    install-agents.py install --harness claude-code --target ~/.claude/agents/
-        Copy the Claude Code dist file into a Claude Code agents directory.
+    install-agents.py install --harness claude-code --target ~/.claude/agents/ [--agent <name>]
+        Copy an agent's Claude Code dist file into a Claude Code agents directory.
 
-Each agent's frontmatter is defined inline in this script as a Python dict.
-To add an agent, extend AGENTS below.
+To add an agent, extend AGENTS below with its canonical_body and per-harness
+frontmatter + dist_path.
 """
 from __future__ import annotations
 
@@ -38,7 +43,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 AGENTS_DIR = REPO / "agents"
-CANONICAL_BODY = AGENTS_DIR / "spec-adversary-body.md"
 
 
 # Per-agent, per-harness frontmatter.
@@ -218,9 +222,13 @@ def cmd_lint() -> int:
 
 def cmd_install(harness: str, target: Path, agent_name: str = "spec-adversary") -> int:
     """Copy the dist file for the given harness into a target directory."""
-    hspec = AGENTS[agent_name]["harnesses"].get(harness)
+    agent_spec = AGENTS.get(agent_name)
+    if agent_spec is None:
+        print(f"unknown agent: {agent_name}. options: {sorted(AGENTS)}", file=sys.stderr)
+        return 2
+    hspec = agent_spec["harnesses"].get(harness)
     if hspec is None:
-        print(f"unknown harness: {harness}. options: {sorted(AGENTS[agent_name]['harnesses'])}", file=sys.stderr)
+        print(f"unknown harness: {harness}. options: {sorted(agent_spec['harnesses'])}", file=sys.stderr)
         return 2
     dist_path = AGENTS_DIR / hspec["dist_path"]
     if not dist_path.exists():

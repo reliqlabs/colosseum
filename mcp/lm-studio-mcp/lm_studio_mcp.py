@@ -10,11 +10,13 @@
 lm-studio-mcp: General-purpose wrapper for local models served via LM Studio's
 OpenAI-compatible endpoint.
 
-Separate from `goedel-mcp` (which is specialized for Lean tactic proposal).
-This MCP is the **adversarial floor** of Colosseum's multi-model story: local
-models on the user's hardware give genuine architectural diversity (different
-training data, different RLHF lineage) at zero marginal cost. Useful as the
-always-on cheap voice in adversarial spec review.
+Separate from `goedel-mcp` (which is specialized for Lean tactic proposal). This
+MCP is a convenience helper for ad-hoc local-model queries and parallel fan-out
+(quick sanity checks, one-off comparisons) — nothing more. It is NOT part of the
+adversarial dispatch path: adversarial review of local voices runs through
+OpenCode's `lmstudio/` provider so each voice gets an agentic ReAct loop with
+file access. External- and local-model dispatch for review goes through
+OpenCode, never a single-shot MCP completion.
 
 Exposes:
   - list_loaded_models — what's available in the LM Studio session

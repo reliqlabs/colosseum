@@ -399,7 +399,7 @@ mcp__lm-studio__check_lmstudio_health()
 
 ## 9. Optional: load the skills and agents into Claude Code
 
-The MCPs cover the verification tools. The Colosseum **skills** (`colosseum-intent`, `colosseum-adversarial`, `colosseum-verify`, `colosseum-compose`, `colosseum-change`, `colosseum-reverse-intent`) and **agents** (`colosseum-spec-adversary`, `colosseum-failure-classifier`) need to be made discoverable to Claude Code by symlinking into your user config:
+The MCPs cover the verification tools. The Colosseum **skills** (`colosseum-intent`, `colosseum-reverse-intent`, `colosseum-adversarial`, `colosseum-lifecycle-adversary`, `colosseum-code-adversarial`, `colosseum-compose`, `colosseum-verify`, `colosseum-change`) and **agents** (`colosseum-spec-adversary`, `colosseum-quint-spec-generator`, `colosseum-failure-classifier`) need to be made discoverable to Claude Code by symlinking into your user config:
 
 ```bash
 mkdir -p ~/.claude/skills ~/.claude/agents

@@ -1,6 +1,6 @@
 ---
 name: colosseum-code-adversarial
-description: Run a structured code-adversarial pass against an implementation against its intent document, using six named lenses (commitment-coverage, clause-to-line, deferred-is-panic, who-controls, field-name fidelity, deferral-justification audit). The stage runs AFTER code-implementation lands and BEFORE external audit. The operator MUST be a different agent than the code-implementation author. Use whenever a Colosseum project produces a non-trivial code commit whose verification surface includes contracts, runtime, or any other code that an external audit would scrutinize.
+description: Run a structured code-adversarial pass against an implementation against its intent document, using six named lenses (commitment-coverage, clause-to-line, deferred-cannot-silently-succeed, who-controls, field-name fidelity, deferral-justification audit). The stage runs AFTER code-implementation lands and BEFORE external audit. The operator MUST be a different agent than the code-implementation author. Use whenever a Colosseum project produces a non-trivial code commit whose verification surface includes contracts, runtime, or any other code that an external audit would scrutinize.
 ---
 
 You are running an internal code-adversarial pass. The Colosseum methodology has stages for intent-elicitation, intent-adversarial, Quint/Lean spec construction, Aeneas extraction, code-implementation, and Kani-harness construction — and this stage, which *reads the implementation against the intent's clauses*. Without it, defects of the shape "intent says X must hold; code does not enforce X" go uncaught until external audit.
@@ -11,7 +11,16 @@ You are the red team. You do not write code. You do not fix defects. You produce
 
 ## Lens-catalog scope (read before applying)
 
-The six lenses were distilled from crypto/enclave-contract dogfood (verified-rcv: commitments, attestation, serialized trust surfaces). They do not cover authorization/access-control, concurrency, arithmetic overflow, reentrancy, resource exhaustion, migration/upgrade paths, error-atomicity, or supply-chain risks. For implementations where those dominate, this pass is necessary but not sufficient: say so explicitly in the deliverable and add threat-model-specific lenses rather than stretching these six.
+These six lenses are the **crypto/enclave lens pack**, distilled from crypto/enclave-contract dogfood (verified-rcv: commitments, attestation, serialized trust surfaces). They are one pack, not a universal checklist. They do not cover authorization/access-control, concurrency, arithmetic overflow, reentrancy, resource exhaustion, migration/upgrade paths, error-atomicity, or supply-chain risks.
+
+Pick the pack from the implementation's threat model. When the crypto/enclave pack does not fit the dominant risks, this pass is necessary but not sufficient: say so explicitly in the deliverable, name the uncovered classes, and assemble a threat-model-specific pack rather than stretching these six. Sketch packs to draw from (extend as new dogfood surfaces them):
+
+- **Access-control pack**: caller-authority-to-effect, privilege-escalation paths, missing-authorization on state-mutating entry points, ownership-transfer atomicity.
+- **Arithmetic/economic pack**: overflow/underflow on value math, rounding-direction bias, fee/precision leaks, invariant-breaking on partial fills.
+- **Concurrency/reentrancy pack**: reentrant call surfaces, check-then-act races, state read after external call, idempotency of retried effects.
+- **Upgrade/migration pack**: storage-layout compatibility, migration completeness, initialization-once, downgrade safety.
+
+Each pack keeps this skill's structure (one table per lens, code-line citations, gap/partial/discharged status); only the lens set changes. Name which pack you applied in the deliverable header.
 
 ## Agent-isolation discipline (load-bearing)
 
@@ -88,9 +97,9 @@ For every named intent clause (B-clauses in the invariants section, ledger links
 
 **Worked example**: verified-rcv `C2` (envelope-only verification) and `C3` (enclave_pubkey provenance missing) and `N1` (gnark verification deferred) were all lens-2 misses. The intent clearly stated each obligation; the code did not discharge it. Lens 2 applied internally would have produced all three as `gap` rows.
 
-### Lens 3 — Deferred-is-panic
+### Lens 3 — Deferred-cannot-silently-succeed
 
-For every branch labeled deferred/stub/mock/TODO in the production build (default features), confirm the branch panics. A deferred branch that returns `Ok` silently is a security hole; a deferred branch that returns `Err` is a feature.
+For every branch labeled deferred/stub/mock/TODO in the production build (default features), confirm the branch cannot return success without doing the work. A deferred branch that returns `Ok` silently is a security hole; a deferred branch that panics OR returns `Err` is acceptable. (The lens is named for its invariant — no silent success — not for panicking specifically; an explicit `Err` satisfies it just as a panic does.)
 
 1. Grep production code (default-features compilation) for: `deferred`, `stub`, `mock`, `TODO`, `not yet implemented`, `unimplemented!()`, `panic!()`, `unreachable!()`, `return Ok(())`.
 2. For each match, locate the surrounding function. Determine whether the function is reachable from a production entry point.
@@ -99,7 +108,7 @@ For every branch labeled deferred/stub/mock/TODO in the production build (defaul
 | Branch | Reachable from | Behavior | Status |
 |---|---|---|---|
 | `Mock` variant in `enclave_attestation` | `instantiate(msg)` accepts `Mock { .. }` | returns Ok silently | gap |
-| `real_zkdcap_verify` stub | `verify_dcap_proof` | returns Err | acceptable (deferred-is-panic met) |
+| `real_zkdcap_verify` stub | `verify_dcap_proof` | returns Err | acceptable (no silent success) |
 
 **Worked example**: verified-rcv `C1` (Mock variant accepted as Ok) and `N11` (real-zkdcap stub returning Err) are both lens-3 surface. C1 was the unacceptable case (silently Ok); N11 was the acceptable case (explicit Err). The lens distinguishes the two.
 
@@ -151,7 +160,7 @@ For every deferred finding from a prior audit round, decompose the deferral just
 Aggregate the six lens tables into a finding list. Each finding gets:
 
 - **ID** — `CA-<NN>` (CA for code-adversarial)
-- **Lens** — commitment-coverage / clause-to-line / deferred-is-panic / who-controls / field-name / deferral-justification
+- **Lens** — commitment-coverage / clause-to-line / deferred-cannot-silently-succeed / who-controls / field-name / deferral-justification
 - **Severity** — Critical / Major / Minor / Informational
 - **Surface** — contract / runtime / cross-layer / spec / build-pipeline
 - **Intent reference** — the §X.Y clause this discharges or violates
@@ -213,7 +222,7 @@ Write to `<project>/.colosseum/code-adversarial/<ISO-date>-<operator>.md`. Forma
 
 - Total findings: <N>
 - By severity: Critical=<C> Major=<M> Minor=<m> Informational=<i>
-- By lens: commitment-coverage=<n1> clause-to-line=<n2> deferred-is-panic=<n3> who-controls=<n4> field-name=<n5> deferral-justification=<n6>
+- By lens: commitment-coverage=<n1> clause-to-line=<n2> deferred-cannot-silently-succeed=<n3> who-controls=<n4> field-name=<n5> deferral-justification=<n6>
 - Recommended next step: <patch list ordered by severity, then by intent-cited > code-only>
 ```
 

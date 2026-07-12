@@ -20,7 +20,7 @@ The change loop is the methodology's answer to "what does it look like to mainta
 
 ## Your operating mode
 
-You operate in seven steps. Step 1 (triage) is mandatory and short; it routes between the cheap path (implementation-only) and the full path (intent-touching). Subsequent steps are only run on the full path.
+You operate in eight steps. Step 1 (triage) is mandatory and short; it routes between the cheap path (implementation-only) and the full path (intent-touching). Steps 2, 4, and 5 (intent revision, spec revisions, code revisions) are only run on the full path — there is no intent/spec diff for them to act on otherwise. Steps 3, 6, 7, and 8 (impact analysis, re-verify, composition re-check, and the change record) run on both paths: the change record is always the artifact this skill produces, and Step 3's checklist is what tells Step 6's re-verify what it should have caught.
 
 You guide; you do not auto-apply. The user is the decision-maker at each gate.
 
@@ -28,7 +28,7 @@ You guide; you do not auto-apply. The user is the decision-maker at each gate.
 
 Ask the user to describe the change in one paragraph. Read the description and the surrounding artifacts. Decide:
 
-**Implementation-only change** — the spec still holds, the change is a refactor, performance improvement, dependency upgrade, or internal restructuring that preserves observable behavior. Cheap path: skip to Step 6 (re-verify pyramid). The trust claims are unchanged; the proofs should still go through. If any proof fails after an implementation-only change, the change was *not* implementation-only — return to Step 1 with the new information.
+**Implementation-only change** — the spec still holds, the change is a refactor, performance improvement, dependency upgrade, or internal restructuring that preserves observable behavior. Cheap path: skip Steps 2, 4, and 5 (no intent/spec diff exists to revise or defend adversarially) but still run Step 3 (impact analysis) before Step 6 (re-verify pyramid) — the checklist is what tells you whether the touched surface actually has verification coverage to re-run; without it, a clean pyramid run is indistinguishable from "nothing here was ever covered." The trust claims are unchanged; the proofs should still go through. If any proof fails after an implementation-only change, the change was *not* implementation-only — return to Step 1 with the new information.
 
 **Intent-touching change** — the change alters observable behavior, error semantics, performance contract, trust boundaries, or invariants. Full path: continue to Step 2.
 
@@ -148,7 +148,7 @@ Write a change record to `<project>/.colosseum/changes/<ISO-timestamp>-<short-na
 - Date: <ISO timestamp>
 - Classification: implementation-only | intent-touching
 - Intent revision: <none | new version <N>>
-- Cycle-outcome intent: <one of the four enum values below — REQUIRED for any cycle that produces a `_negl` lift, optional otherwise>
+- Change-outcome intent: <one of the four enum values below — REQUIRED for any cycle that produces a `_negl` lift, optional otherwise>
 
 ## Description
 
@@ -160,7 +160,7 @@ Write a change record to `<project>/.colosseum/changes/<ISO-timestamp>-<short-na
 
 ## Adversarial review
 
-<paths to adversarial reports against intent diff and each spec tier>
+<paths to adversarial reports against intent diff and each spec tier — mark `N/A — implementation-only change, no intent/spec diff` when Step 1's classification is implementation-only>
 
 ## Ledger delta
 

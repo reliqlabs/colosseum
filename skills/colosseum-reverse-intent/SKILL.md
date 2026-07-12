@@ -64,7 +64,7 @@ Draft each intent section based on what the artifacts say:
 - **Structured behavior blocks (Section 2.5)** — for state-machine systems, distil every observable transition. The implementation embodies a set of transitions whether the team has explicitly named them or not; surfacing each as a `From → Trigger → Requires → Produces → To` block makes them auditable. Source these by walking handler functions, state machines, and the `match` arms over enum states.
 - **Invariants** — every constructor-enforced property, every `// INVARIANT:` comment, every property test predicate. Tag each behavioral invariant as `state` or `temporal` — the same discipline the elicitation skill enforces, applied retroactively. If the code embodies a temporal property encoded only as a state check, surface it as a `TENSION:` block in Step 3: that is the `temporal_state_mismatch` waiting to be acknowledged.
 - **Failure Modes** — every error type, every panic, every `return Err(...)` path; classify recoverable vs. terminal
-- **Non-Goals** — inferred from absence: things the code clearly does not do, often documented as "we don't handle X" in comments or README
+- **Non-Goals** — inferred from absence: things the code clearly does not do, often documented as "we don't handle X" in comments or README. **Mark every inferred non-goal `PROVISIONAL:`** — absence of code is evidence the team never got to something, not evidence they decided to exclude it. A provisional non-goal is not a committed claim until Step 3 confirms it with the user.
 - **Trust Boundaries** — every `unsafe` block, every external call, every `&dyn Trait` boundary; what the code trusts the caller / runtime to provide
 - **Performance Bounds** — only if surfaced by tests, benchmarks, or comments
 - **Concrete Scenarios** — derived from integration tests if present; otherwise narrative walkthroughs of the most common code paths
@@ -79,7 +79,7 @@ Walk the user through the draft, section by section. For each section:
 2. Ask: *is this what the system should do, or is this what the code currently does?* These are different questions; the answer matters.
 3. For every inference where the answer is "the code does this but I'm not sure it should," mark it as a `TENSION:` block in the document. These are the highest-value findings — places where the code embodies a default the team has never explicitly endorsed.
 4. For ambiguous behavior (e.g., the code panics on empty input but no test pins this down), ask the user whether the intended behavior is panic, error, or graceful default. Update the draft accordingly.
-5. For Non-Goals: ask whether each inferred exclusion is intentional or accidental. Accidental exclusions are bugs-in-waiting; intentional ones are valuable spec boundaries.
+5. For Non-Goals: ask whether each inferred exclusion is intentional or accidental. Accidental exclusions are bugs-in-waiting; intentional ones are valuable spec boundaries. **A `PROVISIONAL:` non-goal is a gate, not a formality**: it converts to a committed Non-Goal only on the user's explicit confirmation in this pass. If the user cannot decide, it stays `PROVISIONAL:` and also gets a `TBD:` marker (Step 4) naming what's unresolved — it does not silently become a committed claim by default, and this is on the critical path for any system (e.g. bidboard) that enters the methodology through this skill: a spec writer downstream must not encode an unconfirmed absence as a hard boundary.
 
 The revision pass is conversational. Resist the urge to power through it — surfacing one real tension per session is worth more than producing a clean-looking document.
 
@@ -95,6 +95,8 @@ These become work items for the team's review, separate from the methodology. Do
 
 ## Step 5: Save and surface the surprises
 
+Before saving, sweep the Non-Goals section: no entry may remain tagged `PROVISIONAL:` in the committed document. Every one must be either confirmed (tag removed, now a committed Non-Goal) or converted to a `TBD:` marker in Open Questions if the user could not decide. Do not save a document with an unresolved `PROVISIONAL:` non-goal silently standing in as a committed claim.
+
 Write the document to the chosen path. Confirm the save succeeded by reading the file back.
 
 Then summarize for the user:
@@ -107,6 +109,14 @@ Then summarize for the user:
   - If many tensions surfaced: resolve them before any spec writing; spec'ing tension is wasted work
   - If TBDs dominate: a focused team discussion to resolve them, then re-run this skill
   - If the document is clean: proceed to `colosseum-adversarial` against the intent itself before drafting specs
+
+## Acceptance criteria
+
+- Every claim in the document traces to a `(from: <file>:<line>)` citation, a user statement, or an `(inferred from: <evidence>)` marker.
+- **No Non-Goal in the saved document is tagged `PROVISIONAL:`.** Every inferred exclusion was either explicitly confirmed by the user in Step 3 (and the tag removed) or demoted to a `TBD:` marker in Open Questions. This is a hard gate, not a style preference — it is on the critical path for any brownfield system (e.g. bidboard) entering the methodology through this skill, where an unconfirmed absence must not be encoded downstream as a hard spec boundary.
+- The revision pass (Step 3) ran section by section; extraction alone was not treated as sufficient.
+- At least one `TENSION:` block exists, or its absence is justified (the code and claimed intent genuinely agreed everywhere — rare, and worth double-checking before accepting).
+- Every `TBD:` marker states the specific question, why it matters downstream, and the user's current best guess if any.
 
 ## What you do not do
 
