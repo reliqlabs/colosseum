@@ -12,11 +12,11 @@ Confirm cargo-kani is installed and reachable. Returns version output. Use as a 
 
 ### `list_kani_harnesses(crate_path)`
 
-Walk a crate's source tree and discover every `#[kani::proof]`-annotated function. Returns `{name, file, line}` per harness.
+Walk a crate's source tree and discover every proof harness. Covers `#[kani::proof]`, the cfg-gated `#[cfg_attr(kani, kani::proof)]` form, and contract harnesses `#[kani::proof_for_contract(...)]`. Returns `{name, file, line, attr}` per harness.
 
 ### `run_kani_harness(crate_path, harness_name?, unwind?, extra_args?, timeout_s?)`
 
-Run cargo-kani against a crate, optionally targeting a specific harness. Returns full stdout/stderr plus a best-effort structured `summary` (verdict, per-check status, counterexample lines).
+Run cargo-kani against a crate, optionally targeting a specific harness. Returns full stdout/stderr plus a best-effort structured `summary` (verdict, per-check status, counterexample lines) parsed from both streams (some kani versions print the summary to stderr), and a `reconciliation` field. A `successful` verdict is downgraded to `inconsistent` when the process exited nonzero or timed out.
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
@@ -86,7 +86,7 @@ Kani's role in the pyramid: fast, bounded, exhaustive within bounds. Cheap layer
 
 ## Status
 
-**v0.1** — Initial implementation, untested end-to-end against a real Kani run. Known gaps:
+**v0.2** — Subprocess execution goes through the shared `mcp/_shared/runproc.py` helper: a timeout kills the whole process group (`start_new_session` + `killpg`, so CBMC/cargo children are not orphaned), partial output is retained and flagged `timed_out`, and long output is capped head+tail with the truncation summary line first. Discovery and one trivial harness are exercised end-to-end by `tests/r16_r17_r18_mcp.py` (R17). Known gaps:
 
 - Output parsing is best-effort regex; cargo-kani's textual format varies across versions and a structured parser is future work
 - No structured counterexample extraction (only the "Failed Checks:" line is captured); future work to parse the full trace

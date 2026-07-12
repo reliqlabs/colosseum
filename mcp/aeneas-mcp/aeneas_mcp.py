@@ -30,14 +30,20 @@ Or register with Claude Code via .mcp.json (see README.md).
 
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+
+# Shared subprocess helper (process-group kill, partial-output capture,
+# head+tail capping, status reconciliation). Imported by path so this file
+# stays runnable standalone as a `uv run --script` entry point.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
+from runproc import run as _run  # noqa: E402
 
 CHARON_BIN = os.environ.get("CHARON_BIN", "charon")
 AENEAS_BIN = os.environ.get("AENEAS_BIN", "aeneas")
@@ -47,30 +53,24 @@ DEFAULT_BACKEND = os.environ.get("AENEAS_BACKEND", "lean")
 mcp = FastMCP("aeneas-mcp")
 
 
-async def _run(cmd: list[str], cwd: str, timeout: float) -> dict[str, Any]:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+def _workspace_root_error(cargo_toml: Path) -> str | None:
+    """Return an error string if `cargo_toml` is a pure Cargo workspace root.
+
+    charon must run against a specific member crate; a virtual workspace root
+    (a `[workspace]` manifest with no `[package]`) has no crate to extract.
+    """
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        return {
-            "timed_out": True,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": f"timed out after {timeout}s",
-        }
-    return {
-        "timed_out": False,
-        "returncode": proc.returncode,
-        "stdout": stdout.decode("utf-8", errors="replace"),
-        "stderr": stderr.decode("utf-8", errors="replace"),
-    }
+        text = cargo_toml.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    has_workspace = re.search(r"(?m)^\s*\[workspace\]", text) is not None
+    has_package = re.search(r"(?m)^\s*\[package\]", text) is not None
+    if has_workspace and not has_package:
+        return (
+            "crate_path is a Cargo workspace root (has [workspace], no [package]); "
+            "pass the specific member crate's path instead"
+        )
+    return None
 
 
 @mcp.tool()
@@ -85,7 +85,9 @@ async def check_aeneas_health() -> dict[str, Any]:
         "aeneas": {"present": False},
     }
 
-    # charon uses subcommand syntax (`charon version`); aeneas takes `--version`.
+    # charon uses subcommand syntax (`charon version`); aeneas uses single-dash
+    # long options throughout (`-backend`, `-dest`), so its version flag is
+    # `-version`, not `--version`.
     probes = (
         ("charon", CHARON_BIN, ["version"]),
         ("aeneas", AENEAS_BIN, ["-version"]),
@@ -133,6 +135,9 @@ async def run_charon(
     root = Path(crate_path)
     if not (root / "Cargo.toml").exists():
         return {"error": f"no Cargo.toml at {crate_path}"}
+    ws_err = _workspace_root_error(root / "Cargo.toml")
+    if ws_err:
+        return {"error": ws_err}
 
     cmd = [CHARON_BIN, "cargo"]
     if output_path:
@@ -169,6 +174,9 @@ async def extract_rust_to_lean(
     root = Path(crate_path)
     if not (root / "Cargo.toml").exists():
         return {"error": f"no Cargo.toml at {crate_path}"}
+    ws_err = _workspace_root_error(root / "Cargo.toml")
+    if ws_err:
+        return {"error": ws_err}
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -20,6 +20,7 @@ aggregates per G2 (any fail → FAILED exit 1; any suite that could not run
 | `r12_preflight_scan.py` | R12 | seeded secret + escaping symlink block dispatch; worktree sheds untracked secrets; in-place mode still blocks | Z2 |
 | `r13_frontmatter_validator.py` | R13 | validator green over all skills/agents/wrappers, plus known-bad self-tests | E6 |
 | `r14_cli_contracts.py` | R14 | opencode/quint flag contracts and BOM version pins; flag drift fails here, not in field runs | E6 |
+| `r16_r17_r18_mcp.py` | R16, R17, R18 | quint verdict parsers (Apalache-gated `unknown`, verdict/violation consistency); kani discovery of `cfg_attr`/`proof_for_contract` forms + verus library-crate command; shared `runproc` reaps the process group on timeout, retains partial output, and is used by all four CLI-backed servers; per-server smoke against fixtures | C5 |
 | `r20_verdict_truth_table.py` | R20 | G2 aggregation truth table, all rows; headless pyramid runner end-to-end on a fixture crate | E4 |
 | `r23_adjudication_guard.py` | R23 | G4 closure rules present; vote counts never close; contested findings retained; blinded second checks | Z4 |
 | `r24_r26_conformance.py` | R24, R26 | seeded spec/code divergence caught by ITF-trace replay at the exact step; conformance-tested label carries trace scope through Gate B aggregation; REFINEMENT_VERIFIED emitted nowhere; script VERIFIEDs always scoped | C2 |

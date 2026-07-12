@@ -21,14 +21,21 @@ Or register with Claude Code via .mcp.json (see README.md).
 
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+
+# Shared subprocess helper (process-group kill, partial-output capture,
+# head+tail capping, status reconciliation). Imported by path so this file
+# stays runnable standalone as a `uv run --script` entry point.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
+from runproc import reconcile_status  # noqa: E402
+from runproc import run as _run  # noqa: E402
 
 KANI_BIN = os.environ.get("KANI_BIN", "cargo")
 DEFAULT_UNWIND = int(os.environ.get("KANI_DEFAULT_UNWIND", "10"))
@@ -36,31 +43,12 @@ DEFAULT_TIMEOUT_S = float(os.environ.get("KANI_TIMEOUT_S", "300"))
 
 mcp = FastMCP("kani-mcp")
 
-
-async def _run(cmd: list[str], cwd: str, timeout: float) -> dict[str, Any]:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        return {
-            "timed_out": True,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": f"timed out after {timeout}s",
-        }
-    return {
-        "timed_out": False,
-        "returncode": proc.returncode,
-        "stdout": stdout.decode("utf-8", errors="replace"),
-        "stderr": stderr.decode("utf-8", errors="replace"),
-    }
+# Kani harness attributes: plain `#[kani::proof]`, the cfg-gated
+# `#[cfg_attr(kani, kani::proof)]` form, and contract harnesses
+# `#[kani::proof_for_contract(...)]`.
+PROOF_ATTR_RE = re.compile(
+    r"#\[\s*(?:cfg_attr\s*\(\s*kani\s*,\s*)?kani::proof(?:_for_contract)?\b"
+)
 
 
 @mcp.tool()
@@ -82,10 +70,12 @@ async def check_kani_health() -> dict[str, Any]:
 
 @mcp.tool()
 async def list_kani_harnesses(crate_path: str) -> dict[str, Any]:
-    """Discover #[kani::proof] harnesses in a Rust crate.
+    """Discover Kani proof harnesses in a Rust crate.
 
     Walks the crate's source tree (excluding target/) and reports every
-    function annotated with #[kani::proof], including file and line.
+    function annotated as a proof harness, including file and line. Covers
+    `#[kani::proof]`, the cfg-gated `#[cfg_attr(kani, kani::proof)]` form, and
+    contract harnesses `#[kani::proof_for_contract(...)]`.
 
     Args:
         crate_path: Absolute path to the crate root (directory containing Cargo.toml).
@@ -104,7 +94,8 @@ async def list_kani_harnesses(crate_path: str) -> dict[str, Any]:
             continue
 
         for i, line in enumerate(lines):
-            if "#[kani::proof]" in line:
+            attr = PROOF_ATTR_RE.search(line)
+            if attr:
                 for j in range(i + 1, min(i + 6, len(lines))):
                     m = re.search(r"\bfn\s+(\w+)", lines[j])
                     if m:
@@ -113,6 +104,7 @@ async def list_kani_harnesses(crate_path: str) -> dict[str, Any]:
                                 "name": m.group(1),
                                 "file": str(rs_file.relative_to(root)),
                                 "line": j + 1,
+                                "attr": line.strip(),
                             }
                         )
                         break
@@ -159,25 +151,38 @@ async def run_kani_harness(
         cmd.extend(extra_args)
 
     result = await _run(cmd, cwd=str(root), timeout=timeout_s or DEFAULT_TIMEOUT_S)
-    summary = _parse_kani_summary(result["stdout"])
+    summary = _parse_kani_summary(result["stdout"], result["stderr"])
 
-    return {**result, "command": cmd, "summary": summary}
+    rec = reconcile_status(
+        summary.get("verdict") == "successful",
+        result["returncode"],
+        result["timed_out"],
+    )
+    if not rec["consistent"]:
+        summary["verdict"] = "inconsistent"
+        summary["inconsistent_reason"] = rec["reason"]
+
+    return {**result, "command": cmd, "summary": summary, "reconciliation": rec}
 
 
-def _parse_kani_summary(stdout: str) -> dict[str, Any]:
-    """Best-effort parse of cargo-kani stdout into structured form.
+def _parse_kani_summary(stdout: str, stderr: str = "") -> dict[str, Any]:
+    """Best-effort parse of cargo-kani output into structured form.
 
-    cargo-kani's textual output format varies across versions; this parser
-    matches common idioms and falls back to raw output otherwise.
+    cargo-kani's textual output format varies across versions; some print the
+    verification summary to stderr, so both streams are scanned. Matches common
+    idioms and falls back to raw output otherwise.
     """
+    text = stdout + "\n" + stderr
     summary: dict[str, Any] = {"verdict": None, "checks": [], "counterexamples": []}
 
-    if re.search(r"VERIFICATION:?-? SUCCESSFUL", stdout):
+    if re.search(r"VERIFICATION:?-? SUCCESSFUL", text):
         summary["verdict"] = "successful"
-    elif re.search(r"VERIFICATION:?-? FAILED", stdout):
+    if re.search(r"VERIFICATION:?-? FAILED", text):
+        # A failure anywhere in either stream dominates a success line from
+        # another harness in the same run.
         summary["verdict"] = "failed"
 
-    for line in stdout.splitlines():
+    for line in text.splitlines():
         if "Check " in line and re.search(r":\s*(SUCCESS|FAILURE|UNDETERMINED)", line):
             summary["checks"].append(line.strip())
         if "Failed Checks:" in line:

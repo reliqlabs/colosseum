@@ -1,0 +1,13 @@
+[package]
+name = "libcrate"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+# Off by default so `cargo kani` does not compile the contract harness (which
+# would need -Zfunction-contracts). Harness discovery is a text scan, so the
+# occurrence is still found for R17.
+[features]
+kani_contracts = []

@@ -25,14 +25,21 @@ Or register with Claude Code via .mcp.json (see README.md).
 
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+
+# Shared subprocess helper (process-group kill, partial-output capture,
+# head+tail capping, status reconciliation). Imported by path so this file
+# stays runnable standalone as a `uv run --script` entry point.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
+from runproc import reconcile_status  # noqa: E402
+from runproc import run as _run  # noqa: E402
 
 VERUS_BIN = os.environ.get("VERUS_BIN", "verus")
 DEFAULT_TIMEOUT_S = float(os.environ.get("VERUS_TIMEOUT_S", "300"))
@@ -53,30 +60,35 @@ VERUS_MARKERS = (
 )
 
 
-async def _run(cmd: list[str], cwd: str, timeout: float) -> dict[str, Any]:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+def _verus_direct_command(entry: Path, extra_args: list[str] | None = None) -> list[str]:
+    """Build a direct `verus <entry>` command.
+
+    A library entry point (`lib.rs`) needs `--crate-type=lib`, otherwise verus
+    compiles it as a binary and rejects a crate with no `main`. This is the
+    only working path for library crates when `cargo verus` is unavailable.
+    """
+    cmd = [VERUS_BIN, str(entry)]
+    if entry.name == "lib.rs":
+        cmd.append("--crate-type=lib")
+    if extra_args:
+        cmd.extend(extra_args)
+    return cmd
+
+
+def _cargo_subcommand_missing(result: dict[str, Any]) -> bool:
+    """True when `cargo verus` failed because the subcommand is not installed.
+
+    Cargo reports a missing external subcommand as `error: no such command:
+    'verus'` and exits 101 (127 if the shim itself is absent). The old check
+    matched `no such subcommand`, which cargo never emits, so the fallback was
+    dead code and a failed `cargo verus` was reported as a successful run.
+    """
+    text = (result["stdout"] + result["stderr"]).lower()
+    return (
+        result["returncode"] == 127
+        or "no such command" in text
+        or "no such subcommand" in text
     )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        return {
-            "timed_out": True,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": f"timed out after {timeout}s",
-        }
-    return {
-        "timed_out": False,
-        "returncode": proc.returncode,
-        "stdout": stdout.decode("utf-8", errors="replace"),
-        "stderr": stderr.decode("utf-8", errors="replace"),
-    }
 
 
 @mcp.tool()
@@ -168,14 +180,13 @@ async def verify_verus_file(
     if p.suffix != ".rs":
         return {"error": f"expected .rs file, got: {file_path}"}
 
-    cmd = [VERUS_BIN, str(p)]
-    if extra_args:
-        cmd.extend(extra_args)
+    cmd = _verus_direct_command(p, extra_args)
 
     result = await _run(
         cmd, cwd=str(p.parent), timeout=timeout_s or DEFAULT_TIMEOUT_S
     )
     summary = _parse_verus_summary(result["stdout"] + "\n" + result["stderr"])
+    summary = _reconcile_verus(summary, result)
 
     return {**result, "command": cmd, "summary": summary}
 
@@ -208,11 +219,15 @@ async def verify_verus_crate(
         result = await _run(
             cmd, cwd=str(root), timeout=timeout_s or DEFAULT_TIMEOUT_S
         )
-        if result["returncode"] != 127 and "no such subcommand" not in result["stderr"].lower():
+        # Only accept cargo-verus when the subcommand actually ran (pass or
+        # verification failure); a missing subcommand falls through to direct.
+        if not _cargo_subcommand_missing(result):
             summary = _parse_verus_summary(result["stdout"] + "\n" + result["stderr"])
+            summary = _reconcile_verus(summary, result)
             return {**result, "command": cmd, "summary": summary, "mode": "cargo-verus"}
 
-    # Fall back: invoke verus on src/lib.rs or src/main.rs
+    # Fall back: invoke verus on src/lib.rs or src/main.rs. Library crates get
+    # --crate-type=lib via _verus_direct_command so they have a working path.
     entry: Path | None = None
     for candidate in ("src/lib.rs", "src/main.rs"):
         if (root / candidate).exists():
@@ -221,14 +236,26 @@ async def verify_verus_crate(
     if entry is None:
         return {"error": f"no src/lib.rs or src/main.rs in {crate_path}"}
 
-    cmd = [VERUS_BIN, str(entry)]
-    if extra_args:
-        cmd.extend(extra_args)
+    cmd = _verus_direct_command(entry, extra_args)
     result = await _run(
         cmd, cwd=str(root), timeout=timeout_s or DEFAULT_TIMEOUT_S
     )
     summary = _parse_verus_summary(result["stdout"] + "\n" + result["stderr"])
+    summary = _reconcile_verus(summary, result)
     return {**result, "command": cmd, "summary": summary, "mode": "verus-direct"}
+
+
+def _reconcile_verus(summary: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    """Downgrade a `successful` verdict that contradicts the process outcome."""
+    rec = reconcile_status(
+        summary.get("verdict") == "successful",
+        result["returncode"],
+        result["timed_out"],
+    )
+    if not rec["consistent"]:
+        summary["verdict"] = "inconsistent"
+        summary["inconsistent_reason"] = rec["reason"]
+    return summary
 
 
 def _parse_verus_summary(text: str) -> dict[str, Any]:

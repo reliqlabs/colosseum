@@ -58,7 +58,7 @@ Run `quint verify` (Apalache). Symbolic exhaustive checking. Apalache requires J
 | `max_steps` | int? | (quint default 10) | Symbolic depth |
 | `timeout_s` | float? | 600 | Apalache can be slow |
 
-Returns raw output plus a parsed `summary` (verdict ∈ {ok, violation, unknown}, list of violated invariants, counterexample file path if produced).
+Returns raw output plus a parsed `summary` (verdict ∈ {ok, violation, unknown, inconsistent}, list of violated invariants, counterexample file path if produced) and a `reconciliation` field. The `unknown` verdict is gated on Apalache's own result phrasing (`The outcome is: Unknown`, `SMT solver returned 'unknown'`), not a bare `unknown` substring that would also fire on invariant names or warnings. A non-empty violation list never coexists with `ok` — the verdict resolves to `violation`. An `ok` verdict that contradicts the returncode or a timeout is downgraded to `inconsistent`.
 
 ## Setup
 
@@ -137,7 +137,7 @@ Quint's role in the pyramid: it catches protocol bugs at the architecture stage,
 
 ## Status
 
-**v0.1** — Discovery + typecheck + run + verify wrappers. Validated on Quartz's existing `attestation.qnt` and `handshake.qnt` specs (2 specs with 20+ invariants).
+**v0.2** — Discovery + typecheck + run + verify wrappers. Subprocess execution goes through the shared `mcp/_shared/runproc.py` helper: a timeout kills the whole process group (`start_new_session` + `killpg`, so an orphaned Apalache/JVM is not left running), partial output is retained and flagged `timed_out`, and output is capped head+tail with the truncation summary first. The verdict parsers are unit-tested in `tests/r16_r17_r18_mcp.py` (R16); typecheck + run are exercised end-to-end against a fixture spec there. Validated on Quartz's existing `attestation.qnt` and `handshake.qnt` specs (2 specs with 20+ invariants).
 
 Known gaps:
 

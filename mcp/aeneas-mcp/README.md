@@ -16,7 +16,7 @@ Aeneas works on a *functional subset* of Rust — no raw pointers, restricted un
 
 ### `check_aeneas_health`
 
-Verify both `charon` and `aeneas` binaries are installed and runnable. Reports presence + version for each.
+Verify both `charon` and `aeneas` binaries are installed and runnable. Reports presence + version for each. Probes with `charon version` (subcommand syntax) and `aeneas -version` (aeneas uses single-dash long options throughout).
 
 ### `run_charon(crate_path, output_path?, extra_args?, timeout_s?)`
 
@@ -30,7 +30,7 @@ Run the full pipeline. Produces `.lean` files (or `.v` / `.fst` / `.sml` dependi
 |-------|------|---------|-------|
 | `crate_path` | string | — | Absolute path to a single crate root (the directory holding that crate's `Cargo.toml`). A Cargo workspace root is rejected — pass the specific member crate's path instead |
 | `output_dir` | string | — | Where extraction outputs go (created if absent) |
-| `backend` | string? | `lean` | One of `lean`, `coq`, `fstar`, `hol4` |
+| `backend` | string? | `lean` | One of `lean`, `coq`, `rocq`, `fstar`, `hol4` |
 | `extra_charon_args` | list? | null | Verbatim charon flags |
 | `extra_aeneas_args` | list? | null | Verbatim aeneas flags |
 | `timeout_s` | float? | 600 | Per-stage timeout |
@@ -56,11 +56,11 @@ git clone https://github.com/AeneasVerif/aeneas.git
 cd aeneas && make && export PATH="$PWD/bin:$PATH"
 ```
 
-Confirm both are on PATH:
+Confirm both are on PATH (the same probes `check_aeneas_health` uses):
 
 ```bash
-charon --version
-aeneas --version
+charon version
+aeneas -version
 ```
 
 ### 2. Register with Claude Code
@@ -122,11 +122,11 @@ Aeneas's role in the pyramid: the only path from real Rust code to deep theorem-
 
 ## Status
 
-**v0.1** — Initial implementation, untested end-to-end (Aeneas install not verified on this machine).
+**v0.2** — Subprocess execution goes through the shared `mcp/_shared/runproc.py` helper: a timeout kills the whole process group (`start_new_session` + `killpg`, so an orphaned charon/rustc is not left running), partial output is retained and flagged `timed_out`, and output is capped head+tail with the truncation summary first. `run_charon` and `extract_rust_to_lean` reject a Cargo workspace root (a `[workspace]` manifest with no `[package]`) as documented above. Live charon/aeneas extraction is still unexercised here (neither binary is installed); `list_extracted_definitions` is exercised against a fixture by `tests/r16_r17_r18_mcp.py`.
 
 Known gaps:
 
-- Aeneas's CLI shape has evolved across versions; the exact flags this wrapper uses (`-lean`, `-dest`) match recent releases. Older versions may differ — raw command and output are always exposed for debugging.
+- Aeneas's CLI shape has evolved across versions; the exact flags this wrapper uses (`-backend`, `-dest`) match recent releases. Older versions may differ — raw command and output are always exposed for debugging.
 - No incremental extraction caching. Each `extract_rust_to_lean` call re-runs the full pipeline.
 - No structured error parsing for charon/aeneas failures. Raw stderr is returned; failure-classifier subagent handles interpretation.
 - The `list_extracted_definitions` regex is conservative — heavily-attributed declarations (`@[simp, …]`) and multi-line declarations may be missed.

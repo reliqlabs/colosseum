@@ -20,7 +20,7 @@ Run Verus against a single `.rs` file. Returns full stdout/stderr plus a parsed 
 
 ### `verify_verus_crate(crate_path, extra_args?, timeout_s?)`
 
-Run Verus against a Rust crate. Prefers `cargo verus` integration; falls back to running `verus` directly against `src/lib.rs` or `src/main.rs` when the cargo subcommand is unavailable.
+Run Verus against a Rust crate. Prefers `cargo verus` integration; falls back to running `verus` directly against `src/lib.rs` or `src/main.rs` when the cargo subcommand is unavailable. The fallback adds `--crate-type=lib` for a `lib.rs` entry, so library crates have a working path (without it verus compiles the entry as a binary and rejects a crate with no `main`). Missing-subcommand detection matches cargo's actual `no such command` signature; a failed `cargo verus` correctly falls through to the direct path instead of being reported as a successful run.
 
 | Param | Type | Default | Notes |
 |-------|------|---------|-------|
@@ -106,7 +106,7 @@ Verus's role in the pyramid: SMT-tractable properties get answered in seconds-to
 
 ## Status
 
-**v0.1** — Initial implementation, untested end-to-end (Verus install not verified on this machine).
+**v0.2** — Subprocess execution goes through the shared `mcp/_shared/runproc.py` helper: a timeout kills the whole process group (`start_new_session` + `killpg`), partial output is retained and flagged `timed_out`, output is capped head+tail with the truncation summary first, and a `successful` verdict is downgraded to `inconsistent` when it contradicts the returncode/timeout. The library-crate command construction and cargo-verus fallback detection are unit-tested in `tests/r16_r17_r18_mcp.py` (R17); the live half is skipped until Verus is installed (pin its version in `bom.json` first).
 
 Known gaps:
 

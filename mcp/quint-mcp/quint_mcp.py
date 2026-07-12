@@ -26,14 +26,21 @@ Or register with Claude Code via .mcp.json (see README.md).
 
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+
+# Shared subprocess helper (process-group kill, partial-output capture,
+# head+tail capping, status reconciliation). Imported by path so this file
+# stays runnable standalone as a `uv run --script` entry point.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
+from runproc import reconcile_status  # noqa: E402
+from runproc import run as _run  # noqa: E402
 
 QUINT_BIN = os.environ.get("QUINT_BIN", "quint")
 DEFAULT_TIMEOUT_S = float(os.environ.get("QUINT_TIMEOUT_S", "600"))
@@ -42,31 +49,16 @@ DEFAULT_MAX_SAMPLES = int(os.environ.get("QUINT_MAX_SAMPLES", "10000"))
 
 mcp = FastMCP("quint-mcp")
 
-
-async def _run(cmd: list[str], cwd: str, timeout: float) -> dict[str, Any]:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        return {
-            "timed_out": True,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": f"timed out after {timeout}s",
-        }
-    return {
-        "timed_out": False,
-        "returncode": proc.returncode,
-        "stdout": stdout.decode("utf-8", errors="replace"),
-        "stderr": stderr.decode("utf-8", errors="replace"),
-    }
+# Apalache-specific "unknown" outcomes. A bare `unknown` substring match also
+# fires on invariant names, comments, and warnings; gate on the model checker's
+# own result phrasing instead.
+APALACHE_UNKNOWN_RE = re.compile(
+    r"(?:the\s+outcome\s+is:\s*unknown"
+    r"|smt\s+solver\s+(?:returned|reports?)\s*['\"]?unknown"
+    r"|(?:checker\s+)?result:\s*unknown"
+    r"|verification\s+result:\s*unknown)",
+    re.IGNORECASE,
+)
 
 
 @mcp.tool()
@@ -257,7 +249,8 @@ async def run_quint(
 
     result = await _run(cmd, cwd=str(p.parent), timeout=timeout_s or DEFAULT_TIMEOUT_S)
     summary = _parse_run_summary(result["stdout"], result["stderr"])
-    return {**result, "command": cmd, "summary": summary}
+    rec = _reconcile_quint(summary, result)
+    return {**result, "command": cmd, "summary": summary, "reconciliation": rec}
 
 
 @mcp.tool()
@@ -311,7 +304,8 @@ async def verify_quint(
 
     result = await _run(cmd, cwd=str(p.parent), timeout=timeout_s or DEFAULT_TIMEOUT_S)
     summary = _parse_verify_summary(result["stdout"], result["stderr"])
-    return {**result, "command": cmd, "summary": summary}
+    rec = _reconcile_quint(summary, result)
+    return {**result, "command": cmd, "summary": summary, "reconciliation": rec}
 
 
 def _parse_run_summary(stdout: str, stderr: str) -> dict[str, Any]:
@@ -321,15 +315,18 @@ def _parse_run_summary(stdout: str, stderr: str) -> dict[str, Any]:
         summary["verdict"] = "ok"
     elif re.search(r"\[violation\]", text, re.IGNORECASE) or "violation" in text.lower():
         summary["verdict"] = "violation"
-        m = re.search(r"invariant\s+(\w+)\s+(?:is\s+)?violated", text, re.IGNORECASE)
-        if m:
-            summary["violation"] = m.group(1)
+    m = re.search(r"invariant\s+(\w+)\s+(?:is\s+)?violated", text, re.IGNORECASE)
+    if m:
+        summary["violation"] = m.group(1)
     m = re.search(r"(\d+)\s+samples?", text)
     if m:
         summary["samples"] = int(m.group(1))
     m = re.search(r"(\d+)\s+steps?", text)
     if m:
         summary["steps"] = int(m.group(1))
+    # A named violation cannot coexist with an `ok` verdict; resolve toward it.
+    if summary["violation"] and summary["verdict"] != "violation":
+        summary["verdict"] = "violation"
     return summary
 
 
@@ -340,7 +337,7 @@ def _parse_verify_summary(stdout: str, stderr: str) -> dict[str, Any]:
         summary["verdict"] = "ok"
     elif re.search(r"\[violation\]", text, re.IGNORECASE):
         summary["verdict"] = "violation"
-    elif re.search(r"unknown", text, re.IGNORECASE):
+    elif APALACHE_UNKNOWN_RE.search(text):
         summary["verdict"] = "unknown"
 
     for m in re.finditer(r"(?:Invariant|invariant)\s+(\w+)\s+(?:is\s+)?violated", text):
@@ -350,7 +347,25 @@ def _parse_verify_summary(stdout: str, stderr: str) -> dict[str, Any]:
     if m:
         summary["counterexample_file"] = m.group(1)
 
+    # A non-empty violation list cannot coexist with an `ok`/`unknown` verdict;
+    # resolve toward the violation (the reproduced ok-plus-violation case).
+    if summary["violated"] and summary["verdict"] != "violation":
+        summary["verdict"] = "violation"
+
     return summary
+
+
+def _reconcile_quint(summary: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    """Downgrade an `ok` verdict that contradicts the process outcome."""
+    rec = reconcile_status(
+        summary.get("verdict") == "ok",
+        result["returncode"],
+        result["timed_out"],
+    )
+    if not rec["consistent"]:
+        summary["verdict"] = "inconsistent"
+        summary["inconsistent_reason"] = rec["reason"]
+    return rec
 
 
 def main() -> None:
