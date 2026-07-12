@@ -268,6 +268,10 @@ Checks the claims themselves against typed G1 records, keyed by stable claim ID 
 
 The verdict follows the G2 truth table exactly: any required claim FAIL → `FAILED`; any required claim missing, invalid, stale, INCOMPLETE, or resting on externally-assumed/unverified evidence without a waiver → `INCOMPLETE`; all required claims PASS → `VERIFIED[profile=...; waived-or-assumed=...]`, never bare `VERIFIED`. Invoke with `--require <claim-ids>` or `--manifest <obligations.json>` (the E3 manifest's invariant/witness IDs) and `--expect-snapshot <commit>` to reject stale runs.
 
+### Cross-axis label rule (C2, contract G3)
+
+Any claim that bridges the spec axis and the exec axis — "the code does what the Quint model says" in any phrasing — is labeled **`conformance-tested[<trace scope>]`** and nothing stronger, on every surface: CLI output, run manifests, this ledger, dashboards, reports. The evidence behind the label comes from the conformance bridge, `colosseum/scripts/itf_replay.py`: seeded ITF traces from the spec replayed step-by-step through the project's adapter executable, with the trace scope (trace count, depth, seed, adapter) recorded in the label and in the G1 record (`--record` emits a Gate-B-ready record with `evidence_class: conformance-tested`). This is mandatory for any project claiming cross-axis assurance. A refinement-style label requires a mechanized refinement argument, which is a separate later upgrade (M7); until one exists, no surface emits one, and a conformance label never silently upgrades in aggregation — Gate B carries the scope string through to its verdict output.
+
 Reference implementations: `<project>/.colosseum/scripts/check_ledger_references.py` and `check_evidence_records.py`, invoked from the project's CI workflow (GitHub Actions / equivalent). The colosseum repo's reference impls live at `scripts/check_ledger_references.py` and `scripts/check_evidence_records.py` (see `scripts/README.md` for invocation).
 
 Both gates are fast (<1s on a ledger of any reasonable size). The cost of running them on every revision is negligible; the cost of skipping them is silent ledger drift and prose masquerading as evidence.

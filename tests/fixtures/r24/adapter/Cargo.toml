@@ -1,0 +1,8 @@
+[package]
+name = "r24-adapter"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "r24-adapter"
+path = "src/main.rs"

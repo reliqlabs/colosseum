@@ -50,7 +50,7 @@ Most agent systems being built today default to cooperative multi-agent patterns
 
 ## The verification pyramid
 
-Each property a program must hold is routed to the cheapest tool that can verify it. Two axes, not one: a **spec axis** that runs upstream of code, and an **exec axis** that runs against real Rust. The two are designed to compose — system-level specs from the spec axis become refinement targets for the exec axis. No mechanical refinement or conformance gate exists yet between the axes; until one lands, cross-axis composition claims are design intent, not verified evidence.
+Each property a program must hold is routed to the cheapest tool that can verify it. Two axes, not one: a **spec axis** that runs upstream of code, and an **exec axis** that runs against real Rust. The two are designed to compose — system-level specs from the spec axis become refinement targets for the exec axis. The conformance bridge (`scripts/itf_replay.py`: seeded Quint ITF traces replayed step-by-step through a project adapter) backs cross-axis claims labeled `conformance-tested` with the trace scope recorded; anything stronger than that label — mechanical refinement — does not exist yet, and until it lands, refinement-level composition claims remain design intent, not verified evidence.
 
 **Exec axis** (against real Rust, cheap → expensive):
 
