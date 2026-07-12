@@ -1,6 +1,35 @@
+---
+version: 0.1.0   # SemVer MAJOR.MINOR.PATCH — see "SemVer convention" under Version History
+status: draft    # draft | active | superseded
+---
+
 # Intent: <System Name>
 
-> Colosseum intent document. The human-anchored source of truth for what this system should do. Every downstream spec, proof, and test is bounded by the quality of this document. Last revised: <date>.
+> Colosseum intent document. The human-anchored source of truth for what this system should do. Every downstream spec, proof, and test is bounded by the quality of this document. `status` above is `draft` until the first adversarial pass, `active` once it is the current source of truth for downstream specs, `superseded` once a later intent document replaces it. See Version History below for what changed and why.
+
+## Version History
+
+Every revision gets an entry here, newest first. This section is the append-only record of what changed and why — it supersedes any earlier practice of marking a removed clause in place with `~~strikethrough~~` or an inline `REMOVED`/`RESERVED` placeholder left in the document body. **The document above carries current truth only.** When a clause is removed or superseded, retire its ID here explicitly (see below) rather than leaving a marker at its old location; downstream tools resolve an ID via this history, not via a slot number in the live text.
+
+**SemVer convention** (applied to the `version` frontmatter field above; aligned with the SemVer proposal in `methodology-improvements.md` §"Intent doc + boundary doc + spec versioning via SemVer", refined against dogfood revision practice across multiple projects):
+
+- **MAJOR** — a `B*`/`S*`/`T*`/`K*` clause's meaning changes, is weakened, or is removed; a trust assumption (`K*`) is widened; a behavior previously specified becomes unspecified; or a clause is rewritten because the prior statement was discovered to be provably false or vacuous.
+- **MINOR** — a new `B*`/`S*`/`T*`/`K*` clause is added; an existing clause's scope is narrowed (a strictly stronger guarantee, e.g. a trust boundary tightened); a new failure mode, scenario, defined symbol/predicate, or encoding-discipline note (`A*`) is added.
+- **PATCH** — wording, notation, cross-reference, or status-block changes only — no clause's semantic content changes.
+
+**ID retirement discipline**: once assigned, a clause ID (`S*`/`B*`/`T*`/`K*`/`A*`) is never reused, even after its clause is removed — downstream artifacts (obligation manifests, the compose ledger, adversarial attack reports, Quint/Lean spec citations) key on these IDs across versions, and a reused ID silently corrupts that history. When a version entry below removes a clause, list its ID under **Retired** so the next author doesn't reassign it.
+
+### <version> — <date> — <MAJOR | MINOR | PATCH>
+
+<One paragraph: what changed and why. Cite the adversarial report, finding, or prototype gap that drove it, if any.>
+
+- **Added:** <new clause IDs, one line each>
+- **Changed:** <existing clause IDs and what changed about them>
+- **Retired:** <clause IDs removed this revision — never reassign these> (omit this line if none)
+
+### v0.1.0 — <date> — initial draft
+
+Initial elicitation pass via `colosseum-intent`.
 
 ## 1. System Identity
 
@@ -70,23 +99,60 @@ Before moving on, eyeball the block list:
 - For any state that appears as **To state**: does at least one block reaching it have an obvious entry path?
 - For any state name introduced: is it defined? Implicit states are the most common source of downstream spec ambiguity.
 
+### 2.6 Field specifications
+
+For every piece of protocol-visible state or message payload introduced above (state variables, message/transaction payloads, published outputs): a per-field table. This is the structure that most reliably catches byte-level bugs (wrong width, wrong nullability, wrong ownership) before they survive into a formal spec — dogfooding this methodology found under-specified field shape to be a recurring root cause once specs went byte-precise (canonical serialization layouts, attestation report-data layouts, and similar).
+
+| Field | Type | Units | Range | Nullable | Written by |
+|---|---|---|---|---|---|
+| `<name>` | `<e.g. u64, Vec<Addr>, [u8; 32]>` | `<e.g. seconds since epoch, bytes, n/a>` | `<e.g. 1 ≤ x ≤ candidates.len()>` | `<yes/no — and what absence means>` | `<the handler/component that writes it, and whether it's write-once or mutable>` |
+
+For pure-functional systems with no structured field-level state or message schema, mark `N/A — no structured field-level state` and explain (mirrors the 2.5 pure-computation escape hatch).
+
 ## 3. Invariants
 
-Properties that are always true. If any of these is violated, the system is broken regardless of input.
+Properties that are always true. If any of these is violated, the system is broken regardless of input. Every invariant clause below carries a **stable ID**, assigned once and never reused even after the clause is removed (see Version History). Downstream artifacts — obligation manifests, the compose ledger, adversarial attack reports, Quint/Lean spec citations — key on these IDs, not on section numbers or prose position: §-numbering may shift as the document grows; the ID does not.
 
-### 3.1 Structural invariants
+### 3.1 Structural invariants — `S*`
 
-Properties of the data the system manipulates. Each invariant should be a single clause that can be evaluated against the data alone — no quantification over operations or time.
+Properties of the data the system manipulates, evaluable against the data alone — no quantification over operations or time.
 
-- <invariant 1>: <statement>
-- <invariant 2>: <statement>
+- **S1** — <statement>
+- **S2** — <statement>
 
-### 3.2 Behavioral invariants
+### 3.2 Behavioral invariants — `B*`
 
-Relationships between operations or over time. State explicitly whether each is a **state invariant** (true at every point in any reachable state) or a **temporal property** (a claim about the *sequence* of states, e.g., "if X is ever observed, Y must have been observed earlier"). The distinction is load-bearing: state invariants can be discharged by Apalache / Kani at every state; temporal properties require explicit temporal-formula formulation. Conflating the two produces the `temporal_state_mismatch` attack category — a spec that looks green but doesn't capture what was intended.
+Properties evaluable at a single reachable state: relationships between operations, or between state variables, that hold pointwise without needing the trajectory of how that state was reached. **Temporal claims — those requiring a sequence of states — do not belong here; see Section 3.3.** Tag each clause with its discharge shape; the four-tag vocabulary below is what dogfooding this methodology surfaced as necessary, not a suggestion to invent your own taxonomy:
 
-- <invariant 1> [**state** | **temporal**]: <statement>
-- <invariant 2> [**state** | **temporal**]: <statement>
+- **state** — a plain relationship between state variables, or between an operation's pre/post state, checkable by Kani- / Apalache-style state predicates.
+- **cross-layer** — the witness spans components (on-chain + off-chain, protocol + circuit, chain + enclave); no single-layer tool discharges it alone (see `colosseum-compose`).
+- **off-chain** — the claim is about a component outside the tool's model (an external service, a build/deploy pipeline, an operator process).
+- **meta-security** — a probabilistic / negligibility-bound claim (an adversary-advantage bound), not a deterministic predicate.
+
+- **B1** [state]: <statement>
+- **B2** [cross-layer]: <statement>
+
+### 3.3 Temporal properties — `T*`
+
+Claims about a *sequence* of states — "if X is ever observed, Y must have been observed earlier," "once true, stays true," "eventually reaches." These require an explicit temporal-formula formulation downstream (Quint temporal operators, TLA+, or a Lean trajectory relation), not a single-state predicate.
+
+**Do not fold a temporal claim into Section 3.2, and do not state a `B*` clause as if it needed history when it doesn't.** The distinction is load-bearing: conflating the two is exactly the `temporal_state_mismatch` failure mode the `colosseum-spec-adversary` (see `colosseum-adversarial`) is tuned to find. For every `T*` clause, make sure at least one Concrete Scenario (Section 8) exercises a sequence where the property could plausibly be violated — a temporal property with no scenario-level witness is vacuous in practice.
+
+- **T1** — <statement, e.g. `always (P → always Q)`>
+- **T2** — <statement>
+
+> *Compatibility note:* earlier Colosseum dogfood documents (predating this template revision) numbered temporal claims inside the `B*` series with an inline `[temporal]` tag rather than a separate `T*` series (alongside `[state]`, `[cross-layer]`, `[off-chain]`, `[meta-security]` tags on the same series). Both forms are readable, and this template does not require retroactively renumbering an existing document's `B*` series to match — that renumbering is itself a MAJOR-classified change for no semantic gain. New documents authored against this template use the `T*` split, since it lets downstream tooling (e.g. the compose ledger's `claim_id` filtering) select temporal claims without parsing prose tags.
+
+### 3.4 Encoding-discipline notes — `A*`
+
+Constraints on **how** a clause above must be encoded by downstream formal specs — not new invariant content, a constraint on its formal encoding. These typically originate from a `colosseum-adversarial` Section D finding (a multi-voice fan-out generated materially different encodings of the same clause — divergence that re-running fan-out reproduces, so it isn't stochastic noise) and are consumed directly by the `quint-spec-generator` agent (`agents/quint-spec-generator-body.md`, which is instructed to honor any encoding-discipline note the intent carries), and by any Lean / Verus / Kani spec author encoding the same clause. Adding one is a MINOR version bump — it constrains an encoding, it does not change invariant content.
+
+| ID | Constrains | Discipline |
+|----|-----------|------------|
+| A1 | <clause ID, e.g. B2> | <e.g. "MUST be encoded as a checkable state invariant over a snapshot variable; an action-guard-only encoding is insufficient — nothing flags an action-set drift that bypasses the guard."> |
+| A2 | <clause ID, e.g. S6> | <e.g. "Downstream Lean specs MUST carry `1 ≤ cs.length` as an explicit hypothesis; the weaker `cs.Nodup` alone does not preclude the empty set."> |
+
+Leave this table empty (`None yet — will accumulate as adversarial fan-out surfaces encoding divergence.`) on first authoring; it is expected to grow over the document's life, not be filled in up front.
 
 ## 4. Failure Modes
 
@@ -116,10 +182,21 @@ Things this system explicitly does NOT do. Prevents over-specification and clari
 
 What the system assumes about its environment. Where input validation begins and ends.
 
+### 6.1 Boundary contract
+
 - **Caller contract:** <what callers must guarantee>
 - **External systems:** <what's assumed about OS / network / dependencies>
 - **Input domain:** <expected input shape; what's validated and what's trusted>
 - **Output contract:** <what callers can rely on from outputs>
+
+### 6.2 Trust assumptions — `K*`
+
+Out-of-model assumptions this document's guarantees rest on: things no layer of this system's own verification checks, taken as axioms — off-chain honesty, cryptographic hardness, external-component correctness. Each gets a stable ID so a waiver, an axiom annotation in a downstream Lean/Verus spec, or a compose-ledger entry can cite it directly. (These correspond to the compose ledger's `externally-assumed` evidence class — see `colosseum-compose`.) The letter is `K*`, not `A*`: `A*` is reserved for encoding-discipline notes (Section 3.4), which is a separate ID space in already-dogfooded practice.
+
+- **K1** — <e.g. "the off-chain component X behaves honestly">: <statement, and what would break if false>
+- **K2** — <e.g. "SHA-256 is collision-resistant">: <statement>
+
+Removing or weakening a `K*` assumption without discharging it (turning it from an axiom into a theorem some layer proves) is a MAJOR version bump; narrowing one (e.g. an assumption moves to a proven guarantee, shrinking what's left assumed) is MINOR.
 
 ## 7. Performance Bounds
 
@@ -157,8 +234,3 @@ Detailed step-by-step:
 
 - TBD: <question>
 - TBD: <question>
-
-## Revision Log
-
-- <date> — initial draft
-- <date> — revised after tracer-bullet prototype (Section 2 expanded with three new edge cases)
