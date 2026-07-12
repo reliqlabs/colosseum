@@ -23,6 +23,7 @@ aggregates per G2 (any fail → FAILED exit 1; any suite that could not run
 | `r20_verdict_truth_table.py` | R20 | G2 aggregation truth table, all rows; headless pyramid runner end-to-end on a fixture crate | E4 |
 | `r23_adjudication_guard.py` | R23 | G4 closure rules present; vote counts never close; contested findings retained; blinded second checks | Z4 |
 | `r25_critique_loop.py` | R25 | critique loop (cross-critique/defense/re-cross-critique) under G4; blinded re-review framing; delta attack mode invocable; mandatory holistic pass; dual spec+intent citations; run-manifest phase field | C3 |
+| `r28_baseline_floors.py` | R28 | floors is a required layer under `tested`; below-floors crate (zero-test public module + missing fuzz surface) → FAILED; compliant → VERIFIED[tested]; feature-matrix combo that fails cargo check → FAILED; absent floors.json → defaults pass; cargo-fuzz absent → fuzz-time floor unmeasurable → INCOMPLETE | C8 |
 
 Fixtures that need live model dispatch (the behavioral halves of R10, R11,
 R23) are harness runs over the mechanisms tested here; they are exercised

@@ -11,13 +11,50 @@ You do not verify properties yourself. You run tools, capture results, and route
 
 Every run names its **assurance profile** up front; the profile decides which layers are required and what the run-level verdict means:
 
-- **`tested`** — types + lints + property tests (+ fuzz when harnesses exist)
+- **`tested`** — types + lints + property tests + engineering baseline floors (C8) (+ fuzz when harnesses exist)
 - **`bounded`** — `tested` + Kani (bounded proofs; bounds are part of the claim)
 - **`proved`** — `bounded` + Verus + Aeneas/Lean (axiom-clean per the Layer 8 gate)
 
 The run-level verdict follows the G2 truth table exactly: any required layer **failed** → run `FAILED`; otherwise any required layer skipped, not run, or without applicable evidence (e.g. zero Kani harnesses under `bounded`) → run `INCOMPLETE`; only when every required layer passed → `VERIFIED[<profile>]`. A skipped required layer is a gating gap, never a footnote — there is no "passed with gaps". `skipped` remains a visible bucket in the report; under the named profile it is also a gating one.
 
 The deterministic layers (types, lints, property tests, fuzz, Kani, Verus) can run without an agent via the headless runner **`colosseum/scripts/pyramid_run.py --crate <path> --profile <name>`** (CI-friendly; exit 0 verified / 1 failed / 2 error / 3 incomplete). The agent flow remains responsible for failure classification and for the Aeneas/Lean layers.
+
+## Engineering baseline floors (C8)
+
+Under `tested` (and therefore `bounded`/`proved`) the headless runner enforces a required **`floors`** layer: mechanical engineering-baseline checks so periphery coverage is visible rather than assumed. Floors are read from `<crate>/.colosseum/floors.json`; an absent or partial file falls back to documented defaults. The layer status rolls up per G2 (any failed sub-check gives `failed`; else any unmeasurable sub-check gives `skipped`/INCOMPLETE; else `passed`) and is written into the runner's JSON report (`layers.floors` plus a top-level `floors` summary) so ledger tooling can cite it.
+
+`floors.json` (schema `colosseum-floors/v1`):
+
+```json
+{
+  "schema": "colosseum-floors/v1",
+  "features": {
+    "matrix": [
+      { "name": "default", "features": [], "no_default_features": false, "release": false },
+      { "name": "no-std",  "features": ["alloc"], "no_default_features": true }
+    ]
+  },
+  "property_tests": { "min_per_module": 1, "require_property_tests": false },
+  "fuzz": { "surfaces": ["parse_header", "decode_frame"], "min_seconds": 30 }
+}
+```
+
+Three mechanical sub-checks, with their defaults:
+
+- **Feature matrix / workspace coverage.** Each declared combo runs `cargo check` with its `--features`, `--no-default-features`, and `--release` flags; `--workspace` is added when the crate root declares `[workspace]`. Any combo that fails to compile fails the layer. With no declared matrix the single default combo is already the `types` layer, so this sub-check is `not_applicable`, except that a workspace root still gets `cargo check --workspace`.
+- **Property-test bar.** Every `src/**.rs` file exposing public API (`pub fn`/`struct`/`enum`/`trait`; `pub(crate)` is not public surface) must carry at least `min_per_module` in-file test functions. A test function is `#[test]`, or (when `require_property_tests` is true) only `proptest!`/`#[proptest]`/`quickcheck!`/`#[quickcheck]`. Files below the bar are listed by name. Per-file is a documented proxy for per-public-module: idiomatic Rust unit tests sit in an inline `#[cfg(test)] mod`, and attributing crate-wide tests to a specific module is not mechanically decidable. Defaults: `min_per_module` 1, `require_property_tests` false.
+- **Fuzz-time floor.** Each parsing or deserialization surface named in `fuzz.surfaces` must have a `fuzz/fuzz_targets/<name>.rs` target (missing gives `failed`, a structural fact needing no cargo-fuzz), and the fuzz layer's recorded run duration must meet `min_seconds`. When cargo-fuzz is not installed the duration is unmeasurable, so this sub-check is `skipped` (INCOMPLETE), never a silent pass. Defaults: `surfaces` empty (`not_applicable`), `min_seconds` 30.
+
+### Named higher tiers (documentation contracts, not yet mechanical)
+
+Only the `floors` layer is enforced today. The tiers below are contracts a profile may claim; until each has a mechanical gate it must appear in the trust ledger as an explicit named assumption, never silently satisfied.
+
+- **Sanitizers**: ASan/UBSan/TSan/MSan over the test and fuzz surfaces on a nightly toolchain, named per sanitizer with the covered target set.
+- **Mutation testing**: `cargo-mutants` (or equivalent) with a minimum caught-mutant ratio per crate; the ratio and the surviving mutants are the evidence, not a single pass bit.
+- **Unsafe / FFI review**: every `unsafe` block and FFI boundary carries a reviewed safety comment; the tier names the reviewer and the reviewed commit.
+- **Non-Rust per-surface tiers**: each non-Rust component is an explicitly named axiom/tier with its own assurance, never silent trust. The Go gnark verifier and the frontends are the current examples; name the component, its tooling, and its evidence class (e.g. `externally-assumed` until a bridge exists) so no pyramid layer vouches for code it never touched.
+- **CI self-test**: the regression suite plus the floors layer run in CI on every change, so the gate that enforces the floors is itself exercised.
+- **Commit reconciliation**: each verified commit reconciles its recorded floors and evidence against the working tree, so a green run cannot drift from the code it claims to cover.
 
 ## Inputs
 
