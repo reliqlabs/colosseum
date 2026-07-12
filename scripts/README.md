@@ -22,6 +22,28 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 **Required OpenCode configuration.** `~/.config/opencode/opencode.jsonc` must define the `burnt` and `lmstudio` providers and set `limit.output ≥ 65536` (recommend `131072`) per gateway model so the analysis response budget never hits a cap mid-report.
 
+### Voice roster (authoritative source: `registry/voices.json`)
+
+The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). Only `claude-agent` and `kimi-k2.6` carry non-pending calibration today; the other doc-pinned panel voices are dispatch-verified candidates awaiting a fitness run.
+
+<!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
+| Voice id | Model | Family | Harness | Status | Calibration |
+|---|---|---|---|---|---|
+| `claude-agent` | `in-harness` | Anthropic | claude-code | canonical-panel | cited |
+| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | canonical-panel | cited |
+| `gpt-5.6-sol-pro` | `openai/gpt-5.6-sol-pro` | OpenAI | opencode | candidate | pending |
+| `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | DeepSeek | opencode | candidate | pending |
+| `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | Google | opencode | candidate | pending |
+| `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | OpenAI-OSS | opencode | candidate | cited |
+| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | NVIDIA | opencode | candidate | pending |
+| `glm-5.2` | `burnt/cloudflare-100/@cf/zai-org/glm-5.2` | Zhipu | opencode | candidate | pending |
+| `leanstral-2603` | `lmstudio/leanstral-2603` | Mistral | opencode | local-specialist | n/a |
+| `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | Zhipu | opencode | excluded | cited |
+| `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | theorem-prover-specialist | opencode | excluded | cited |
+
+Calibration `cited` = a fitness run is referenced in the voice's `calibration` field; `pending` = only dispatchability is known (not yet panel-eligible); `n/a` = local specialist / excluded. Full evidence and caveats live in `registry/voices.json`.
+<!-- END GENERATED: voice-roster -->
+
 ## `check_ledger_references.py` — reference-integrity gate (Gate A)
 
 Reference implementation of Gate A of the two-gate Step 8 CI check in `skills/colosseum-compose/SKILL.md`. Parses every `<file>:<line>` citation in a project's `.colosseum/ledger.md` (backtick-quoted or `code:`-annotated), confirms the file exists inside the canonical root and the cited line is in range, non-empty, and not comment-only (Rust `#[...]` attribute lines are valid targets). Citations may bind content with an `@sha256:<12hex>` suffix; bound citations fail when the line's content changes (`--suggest-hashes` prints the suffixes). Empty or zero-citation ledgers fail — no vacuous pass. Every `axiom:` occurrence needs a meaningful justification phrase. Per-link Kani coverage warns by default; `--strict-kani` upgrades to failures.
@@ -73,7 +95,7 @@ colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bo
   "created": "<ISO-UTC-timestamp>",
   "voices": [
     {
-      "id":            "<voice-id, e.g. 'kimi-k2-6' or 'claude'>",
+      "id":            "<voice-id from registry/voices.json, e.g. 'kimi-k2.6' or 'claude-agent'>",
       "harness":       "<which harness owns dispatch: 'claude-code' | 'opencode' | 'shell' | ...>",
       "file":          "<filename relative to run dir, e.g. 'opencode-kimi-k2-6.md'>",
       "status":        "pending | complete | error | skipped",
@@ -134,22 +156,24 @@ colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bo
 
 ```bash
 # Phase 1 — orchestrator creates the manifest. Owner mapping is required.
+# Voice ids come from registry/voices.json (canonical-5 profile shown here;
+# glm-4.7-flash and the goedel class are excluded — see the roster table above).
 colosseum_run.py init \
     /path/to/.colosseum/intent.md \
-    --voices=claude,kimi-k2-6,glm-4-7-flash,gpt-oss-120b,mistral-119b,qwen3.6,gemma-26b \
-    --owners=claude:claude-code,kimi-k2-6:opencode,glm-4-7-flash:opencode,gpt-oss-120b:opencode,mistral-119b:opencode,qwen3.6:opencode,gemma-26b:opencode
+    --voices=claude-agent,gpt-5.6-sol-pro,kimi-k2.6,deepseek-v4-flash,gemini-3.1-pro-preview \
+    --owners=claude-agent:claude-code,gpt-5.6-sol-pro:opencode,kimi-k2.6:opencode,deepseek-v4-flash:opencode,gemini-3.1-pro-preview:opencode
 
 # Phase 2a — Claude Code harness dispatches its assigned voice(s):
 #   • spawns the Agent subagent with full tool access
-#   • subagent writes to <run-dir>/claude.md
+#   • subagent writes to <run-dir>/claude-agent.md
 #   • harness marks the voice complete
-colosseum_run.py complete <run-dir> --voice=claude --elapsed=339 --finish-reason=stop
+colosseum_run.py complete <run-dir> --voice=claude-agent --elapsed=339 --finish-reason=stop
 
 # Phase 2b — OpenCode harness dispatches its assigned voice(s) in parallel.
 # Each non-Claude voice is an OpenCode subagent with file-access tools + step
 # budget. OpenCode marks each complete as it lands.
-colosseum_run.py complete <run-dir> --voice=kimi-k2-6 --elapsed=520 --finish-reason=stop
-colosseum_run.py error    <run-dir> --voice=goedel-32b --detail="degenerated into tautology loops" --elapsed=852
+colosseum_run.py complete <run-dir> --voice=kimi-k2.6 --elapsed=520 --finish-reason=stop
+colosseum_run.py error    <run-dir> --voice=goedel-prover-v2-32b --detail="degenerated into tautology loops" --elapsed=852
 
 # Phase 3 — anyone (CI, human, agent) blocks until all voices terminal:
 colosseum_run.py wait <run-dir> --timeout=3600

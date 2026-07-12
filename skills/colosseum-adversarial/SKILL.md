@@ -124,14 +124,18 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 
 **Per-voice voice IDs to pass to `--model`** (configured in `~/.config/opencode/opencode.jsonc`; the gateway roster drifts with operator curation, so verify against `curl <gateway-base>/models` before a milestone run):
 
-- `openai/gpt-5.6-sol-pro` — OpenAI frontier, direct provider (canonical panel voice; verified under ChatGPT-account auth 2026-07-11)
-- `google/gemini-3.1-pro-preview` — current Gemini Pro, direct provider (canonical panel voice; requires `GOOGLE_GENERATIVE_AI_API_KEY`)
-- `ds4/deepseek-v4-flash` — DeepSeek V4 Flash, local DwarfStar4 runner (canonical panel voice)
-- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot via gateway (canonical panel voice)
-- `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA Nemotron 3 120B-A12B MoE via gateway; reasoning-on
-- `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS via gateway
-- `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` — Zhipu (~30B "flash" tier) — **EXCLUDED from gateway adversarial dispatch** per verified-rcv calibration. Exhibited degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent-dispatch parallel runs (enumerated fake attacks #4-75+ on a single slice). At its size class it is local-model-tier, not gateway-frontier-tier. If a Zhipu voice is wanted, use a full (non-flash) glm tier (`@cf/zai-org/glm-5.2` is live on Workers AI but not yet exposed on the operator gateway; calibrate before adding it to any panel) or pull a comparable model into LM Studio
-- `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`)
+<!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
+- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated)
+- `openai/gpt-5.6-sol-pro` — OpenAI, direct openai provider. candidate (calibration pending) — requires `OPENAI_API_KEY`.
+- `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending) — endpoint `http://127.0.0.1:8000`.
+- `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending) — requires `GOOGLE_GENERATIVE_AI_API_KEY`.
+- `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS, Burnt gateway. candidate (partial calibration)
+- `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA, Burnt gateway. candidate (calibration pending)
+- `burnt/cloudflare-100/@cf/zai-org/glm-5.2` — Zhipu, Burnt gateway. candidate (calibration pending)
+- `lmstudio/leanstral-2603` — Mistral, local. local-specialist (Lean-only; substitute for one general voice only when the spec IS a Lean theorem).
+- `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`).
+- **Excluded** (do NOT dispatch): `glm-4.7-flash`, `goedel-prover-v2-32b` — see `registry/voices.json` for the calibration evidence behind each exclusion.
+<!-- END GENERATED: voice-roster -->
 
 The gateway no longer exposes Anthropic routes; the Claude voice always runs in-harness via Mode 2.
 

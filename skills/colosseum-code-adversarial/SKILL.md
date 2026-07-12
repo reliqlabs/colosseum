@@ -20,7 +20,13 @@ The operator of this stage **MUST be a different agent than the code-implementat
 Two practical shapes:
 
 - **Cross-session in the same harness** — the code author runs in session A; a fresh Claude Code session B runs this skill with no transcript of A's work loaded. Session B reads the commit, the intent, the ledger, and nothing else.
-- **Cross-harness** — code author runs in Claude Code; code-adversarial runs in OpenCode with a different model (frontier-tier preferred: `openai/gpt-5.6-sol-pro`, `google/gemini-3.1-pro-preview`, `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `ds4/deepseek-v4-flash` — verify pins per the adversarial skill's drift note). The OpenCode agent reads files via its native tool.
+- **Cross-harness** — code author runs in Claude Code; code-adversarial runs in OpenCode with a different model (frontier-tier preferred — verify pins per the adversarial skill's drift note). Frontier voices, generated from the registry:
+
+<!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
+`openai/gpt-5.6-sol-pro` (OpenAI, candidate), `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` (Moonshot, canonical-panel), `ds4/deepseek-v4-flash` (DeepSeek, candidate), `google/gemini-3.1-pro-preview` (Google, candidate)
+<!-- END GENERATED: voice-roster -->
+
+  The OpenCode agent reads files via its native tool.
 
 Before starting, confirm with the user which shape applies. If the user is asking the SAME agent that authored the code to run this skill, stop and explain the isolation requirement. The user may override (with awareness of the drift cost), but the override must be explicit.
 

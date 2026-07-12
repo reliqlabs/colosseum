@@ -1,0 +1,219 @@
+{
+  "_comment_purpose": "Colosseum voice registry (C4). THIS FILE, not the prose docs, is the authoritative roster of adversarial voices. Every hand-maintained roster site (README, INSTALL, the adversarial/code-adversarial SKILLs, scripts/README, dispatch.config.example.json) is generated from here by scripts/gen_roster_docs.py between explicit markers. Edit a voice here, run `gen_roster_docs.py`, and the doc blocks follow. `gen_roster_docs.py --check` fails CI on drift.",
+
+  "_comment_registry_rule": "REGISTRY RULE — calibration is the gate. A voice may hold status 'canonical-panel' only if its `calibration` field is non-pending: it cites a run that actually demonstrated the voice's adversarial fitness. Calibration evidence is required to ENTER the canonical panel AND to LEAVE it (demotion/retirement records the evidence too). A voice that is doc-pinned but has only a dispatchability probe (`opencode run ... \"Reply with exactly: ok\"`) or a config note is NOT calibrated — it is a 'candidate' with `calibration: pending`. Dispatchability is not fitness. See scripts/colosseum_doctor.py (registry-integrity check) and tests/r0_registry_docs.py (enforced invariant).",
+
+  "_comment_schema": {
+    "version": "1",
+    "voice_fields": {
+      "id": "slug used everywhere as the voice identifier and the `--model` suffix's short name (matches opencode_dispatch.py SLUG_RE). Also the per-section output dir name.",
+      "model": "full provider/model string OpenCode dispatches, e.g. 'burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6'. For the in-harness Claude voice this is the sentinel 'in-harness' (no OpenCode model string exists).",
+      "family": "provider/model family for diversity accounting at synthesis time (Anthropic / OpenAI / Google / Moonshot / DeepSeek / NVIDIA / Zhipu / Mistral / Alibaba / ...).",
+      "harness": "opencode | claude-code. 'claude-code' is the in-harness Agent-subagent path (claude-agent only); everything else is 'opencode'.",
+      "provider": "OpenCode provider key the model routes through (burnt | openai | google | ds4 | lmstudio | null for in-harness). doctor greps ~/.config/opencode/opencode.jsonc for this.",
+      "default_variant": "variant passed as --variant when this voice lacks an explicit per-call variant. 'max' is canonical. null means omit the flag.",
+      "status": "canonical-panel | candidate | local-specialist | excluded. See _comment_status_values.",
+      "calibration": "evidence reference: the run that demonstrated fitness (or the failure that excluded it), cited to where the repo documents it. The literal string 'pending' means no fitness run is documented yet — allowed ONLY for non-canonical status.",
+      "requires_env": "list of env var names that MUST be set for dispatch to succeed (provider auth). doctor checks these are present. [] when none.",
+      "endpoint": "local base URL to TCP/HTTP-probe for reachability (ds4, lmstudio), or null for hosted/in-harness voices.",
+      "added": "ISO date the voice entered the registry.",
+      "retired": "ISO date + reason when status became 'excluded' or the voice left service; null otherwise.",
+      "notes": "auth caveats, gateway quirks, latency, successor models, anything a runner needs before pinning."
+    },
+    "status_values": {
+      "canonical-panel": "in the default milestone panel; REQUIRES non-pending calibration.",
+      "candidate": "dispatchable and rostered, but calibration is pending or only partial — eligible to be promoted once a fitness run exists. Doc-pinned voices without a fitness run land here.",
+      "local-specialist": "narrow-use local voice (e.g. Lean-only) never in the general adversarial panel.",
+      "excluded": "calibration demonstrated unfitness for adversarial spec review; kept here with the reason so it is not re-added by mistake."
+    },
+    "profile_fields": {
+      "name": "profile label; a run pins 'panel <name>@<content_hash>'.",
+      "description": "what the profile is for.",
+      "voices": "ordered list of {id, variant} referencing voice ids above.",
+      "content_hash": "sha256:<16hex> over the normalized profile (voice id+variant set only; label excluded), computed by scripts/gen_roster_docs.py:profile_content_hash. Recomputed and verified by doctor and tests/r0. A membership or variant change moves the hash, so a pinned 'canonical-5@<hash>' is a frozen, content-addressed panel."
+    }
+  },
+
+  "voices": [
+    {
+      "id": "claude-agent",
+      "model": "in-harness",
+      "family": "Anthropic",
+      "harness": "claude-code",
+      "provider": null,
+      "default_variant": "max",
+      "status": "canonical-panel",
+      "calibration": "verified-rcv intent-revised multi-voice run (7 voices, 16 themes) — Claude-via-Agent contributed file-access findings text-only voices missed (skills/colosseum-adversarial/SKILL.md Step 7 exemplar). Corroborated by the colosseum self-review round1 (claude-fable-5 reviewers, 60/60 confirmed defects — scratchpad/evidence/MANIFEST.txt).",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "The one voice that does NOT route through OpenCode: dispatched in-harness via the colosseum-spec-adversary Agent subagent (Mode 2). Always the strongest Claude available to the session. No opencode.jsonc entry."
+    },
+    {
+      "id": "kimi-k2.6",
+      "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "family": "Moonshot",
+      "harness": "opencode",
+      "provider": "burnt",
+      "default_variant": "max",
+      "status": "canonical-panel",
+      "calibration": "verified-rcv single-voice ReAct calibration: caught 5 state-invariant attacks (S5/S6/S9/S10 + Block 6 set-relations) where the inlined single-shot variant found 1 hedged mention; 6.8-15.0K chars/slice, 143-371s, ~10% retry at output cap 131072 (skills/colosseum-adversarial/SKILL.md Step 4 empirical-results table).",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
+    },
+    {
+      "id": "gpt-5.6-sol-pro",
+      "model": "openai/gpt-5.6-sol-pro",
+      "family": "OpenAI",
+      "harness": "opencode",
+      "provider": "openai",
+      "default_variant": "max",
+      "status": "candidate",
+      "calibration": "pending",
+      "requires_env": ["OPENAI_API_KEY"],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "Doc-pinned into the canonical-5 profile but only dispatchability was verified (2026-07-11, ChatGPT-account/Codex auth, which rejects gpt-5.6-pro and the retired gpt-5.1-thinking; API-key installs may prefer openai/gpt-5.6-pro). No adversarial-fitness run is documented, so status is 'candidate' pending calibration. ChatGPT-account auth needs no OPENAI_API_KEY; API-key installs do — doctor treats the env var as advisory. Pro-tier reasoning latency is high; budget per_call_timeout generously."
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "model": "ds4/deepseek-v4-flash",
+      "family": "DeepSeek",
+      "harness": "opencode",
+      "provider": "ds4",
+      "default_variant": "max",
+      "status": "candidate",
+      "calibration": "pending",
+      "requires_env": [],
+      "endpoint": "http://127.0.0.1:8000",
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "DeepSeek V4 Flash via the local ds4 provider (DwarfStar4 at http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant, invoked at --variant max. Doc-pinned into canonical-5 but no fitness run is documented — candidate pending calibration. Local endpoint must be up for dispatch."
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
+      "family": "Google",
+      "harness": "opencode",
+      "provider": "google",
+      "default_variant": "max",
+      "status": "candidate",
+      "calibration": "pending",
+      "requires_env": ["GOOGLE_GENERATIVE_AI_API_KEY"],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "Current Gemini Pro (gemini-3-pro-preview retired 2026-03, now aliases 3.1; bare gemini-3-pro was never a valid API id). Doc-pinned into canonical-5 but only auth/config documented, no fitness run — candidate pending calibration. Requires GOOGLE_GENERATIVE_AI_API_KEY; unset means every dispatch fails with an unregistered-caller error."
+    },
+    {
+      "id": "gpt-oss-120b",
+      "model": "burnt/cloudflare-100/@cf/openai/gpt-oss-120b",
+      "family": "OpenAI-OSS",
+      "harness": "opencode",
+      "provider": "burnt",
+      "default_variant": "max",
+      "status": "candidate",
+      "calibration": "partial: verified-rcv exercised it and characterized a cross-block/cross-section confusion failure mode (flagged 'Block 6 self-contradicts' by conflating Block 5's idempotent self-loop with Block 6's transitional rejection — skills/colosseum-adversarial/SKILL.md Section B). Useful supplementary voice; not yet a clean canonical-panel fitness run.",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "OpenAI-OSS 120B via the Burnt gateway; reasoning off. Gateway roster drifts — verify against `curl <gateway-base>/models` before milestone runs."
+    },
+    {
+      "id": "nemotron-3-120b-a12b",
+      "model": "burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b",
+      "family": "NVIDIA",
+      "harness": "opencode",
+      "provider": "burnt",
+      "default_variant": "max",
+      "status": "candidate",
+      "calibration": "pending",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "NVIDIA Nemotron 3 120B-A12B MoE via the Burnt gateway; reasoning on (variants.max -> reasoningEffort high). Rostered candidate, no fitness run documented yet."
+    },
+    {
+      "id": "glm-5.2",
+      "model": "burnt/cloudflare-100/@cf/zai-org/glm-5.2",
+      "family": "Zhipu",
+      "harness": "opencode",
+      "provider": "burnt",
+      "default_variant": "max",
+      "status": "candidate",
+      "calibration": "pending",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "Zhipu GLM 5.2 — the full (non-flash) tier proposed as the Zhipu voice after glm-4.7-flash was excluded. Live on Cloudflare Workers AI but not yet exposed on the operator gateway at pin time; calibrate before adding to any panel. Distinct from the excluded glm-4.7-flash."
+    },
+    {
+      "id": "leanstral-2603",
+      "model": "lmstudio/leanstral-2603",
+      "family": "Mistral",
+      "harness": "opencode",
+      "provider": "lmstudio",
+      "default_variant": "max",
+      "status": "local-specialist",
+      "calibration": "n/a — Lean-specialist, deliberately outside the general adversarial panel. Substitute for one general voice only when the spec under review IS a Lean theorem.",
+      "requires_env": [],
+      "endpoint": "http://127.0.0.1:1234",
+      "added": "2026-07-11",
+      "retired": null,
+      "notes": "Local LM Studio Leanstral 26.03. Upstream discontinued 2026-06-30; already-downloaded weights still run, but new installs should load the successor Leanstral 1.5 (add it as a separate registry entry when it enters service). Do NOT include in general adversarial spec review."
+    },
+    {
+      "id": "glm-4.7-flash",
+      "model": "burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash",
+      "family": "Zhipu",
+      "harness": "opencode",
+      "provider": "burnt",
+      "default_variant": "max",
+      "status": "excluded",
+      "calibration": "verified-rcv calibration (negative): degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent parallel runs (enumerated fake attacks #4-75+ on a single slice). At its ~30B 'flash' size class it is local-model tier, not gateway-frontier tier.",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-11",
+      "retired": "2026-07-11 — excluded from adversarial dispatch per verified-rcv calibration; use full-tier glm-5.2 instead if a Zhipu voice is wanted.",
+      "notes": "EXCLUDED. Present here only so it is not silently re-added. This is the glm-4-7-flash the dispatch config's excluded-voices note names."
+    },
+    {
+      "id": "goedel-prover-v2-32b",
+      "model": "lmstudio/goedel-prover-v2-32b",
+      "family": "theorem-prover-specialist",
+      "harness": "opencode",
+      "provider": "lmstudio",
+      "default_variant": "max",
+      "status": "excluded",
+      "calibration": "verified-rcv calibration (negative): included in an 8-voice fan-out and produced ~8K tokens of degenerate tautology loops with abstract variable lists, 852s wall, output unusable. Theorem-prover specialists pattern-match a spec as a proof GOAL and attempt Lean/Coq tactics instead of attacking it.",
+      "requires_env": [],
+      "endpoint": "http://127.0.0.1:1234",
+      "added": "2026-07-11",
+      "retired": "2026-07-11 — excluded from adversarial spec review (whole class: ProofGPT-class, math-tactic-tuned models). Use at the verify-pyramid layer instead (mcp__goedel__propose_lean_tactic).",
+      "notes": "EXCLUDED representative of the theorem-prover-specialist class. Kept as the canonical example so the class exclusion is documented."
+    }
+  ],
+
+  "profiles": [
+    {
+      "name": "canonical-5",
+      "description": "The default milestone panel doc-pinned at 2026-07-11: five family-diverse voices at --variant max. NOTE the honesty gap the registry surfaces: only claude-agent and kimi-k2.6 carry non-pending calibration (status canonical-panel); gpt-5.6-sol-pro, deepseek-v4-flash, and gemini-3.1-pro-preview are dispatch-verified candidates whose adversarial-fitness calibration is still pending. The profile stays pinned (it is what a runner reproduces), but a run should record that 3/5 members are candidate-status. Pin a run as 'panel canonical-5@<content_hash>'.",
+      "voices": [
+        {"id": "claude-agent", "variant": "max"},
+        {"id": "gpt-5.6-sol-pro", "variant": "max"},
+        {"id": "kimi-k2.6", "variant": "max"},
+        {"id": "deepseek-v4-flash", "variant": "max"},
+        {"id": "gemini-3.1-pro-preview", "variant": "max"}
+      ],
+      "content_hash": "sha256:19595e6530eb6331"
+    }
+  ]
+}

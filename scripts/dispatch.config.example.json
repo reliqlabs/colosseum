@@ -1,43 +1,35 @@
 {
   "_comment_top": "Example dispatch config for opencode_dispatch.py. Copy to <project>/.colosseum/dispatch.json and edit. Schema described in colosseum/scripts/opencode_dispatch.py.",
-
   "project_root": "/absolute/path/to/your/project",
   "target_spec": "/absolute/path/to/your/project/intent.md",
   "run_tag_prefix": "intent-v1",
-
   "_comment_canonical_panel": "CANONICAL 5-VOICE PANEL for adversarial spec review. Each voice is pinned to the strongest variant of its family verified dispatchable at pin time (2026-07-11) with max thinking enabled. Pins drift, and `opencode models` lists catalog entries the provider may reject — probe with `opencode run --model <id> \"Reply with exactly: ok\"` before milestone runs. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent (NOT through this script) — dispatch claude-agent separately alongside opencode_dispatch.py. The four voices below are the OpenCode-dispatched roster. For Lean-specific tasks substitute the local Leanstral voice (lmstudio/leanstral-2603; upstream discontinued 2026-06-30, Leanstral 1.5 is the successor for new installs).",
-
   "voices": [
     {
       "id": "gpt-5.6-sol-pro",
       "model": "openai/gpt-5.6-sol-pro",
-      "note": "OpenAI frontier tier via OpenCode direct openai provider. Invoked at --variant max. Verified dispatchable under ChatGPT-account (Codex) auth, which rejects gpt-5.6-pro and the retired gpt-5.1-thinking; API-key installs may prefer openai/gpt-5.6-pro. Pro-tier reasoning latency is high — keep per_call_timeout generous."
+      "note": "OpenAI via direct openai provider. status=candidate. Doc-pinned into the canonical-5 profile but only dispatchability was verified (2026-07-11, ChatGPT-account/Codex auth, which rejects gpt-5.6-pro and the retired gpt-5.1-thinking; API-key installs may prefer openai/gpt-5.6-pro). No adversarial-fitness run is documented, so status is 'candidate' pending calibration. ChatGPT-account auth needs no OPENAI_API_KEY; API-key installs do — doctor treats the env var as advisory. Pro-tier reasoning latency is high; budget per_call_timeout generously."
     },
     {
       "id": "kimi-k2.6",
       "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
-      "note": "Moonshot Kimi K2.6 via Burnt gateway (Cloudflare AI Workers). ReAct loop produces 6.8-15K-char per-slice reports. Reasoning is currently off on this route (gateway-controlled); if the gateway gains a kimi-thinking route, update this entry."
+      "note": "Moonshot via Burnt gateway. status=canonical-panel. Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
     },
     {
       "id": "deepseek-v4-flash",
       "model": "ds4/deepseek-v4-flash",
-      "note": "DeepSeek V4 Flash via local ds4 provider (DwarfStar4, http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant. Invoked at --variant max."
+      "note": "DeepSeek via local ds4 runner. status=candidate. DeepSeek V4 Flash via the local ds4 provider (DwarfStar4 at http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant, invoked at --variant max. Doc-pinned into canonical-5 but no fitness run is documented — candidate pending calibration. Local endpoint must be up for dispatch."
     },
     {
       "id": "gemini-3.1-pro-preview",
       "model": "google/gemini-3.1-pro-preview",
-      "note": "Gemini 3.1 Pro (current Gemini Pro; gemini-3-pro-preview was retired 2026-03 and bare gemini-3-pro was never a valid API id) via OpenCode direct google provider. Invoked at --variant max. Requires GOOGLE_GENERATIVE_AI_API_KEY — without it every Gemini dispatch fails with an unregistered-caller error."
+      "note": "Google via direct google provider. status=candidate. Current Gemini Pro (gemini-3-pro-preview retired 2026-03, now aliases 3.1; bare gemini-3-pro was never a valid API id). Doc-pinned into canonical-5 but only auth/config documented, no fitness run — candidate pending calibration. Requires GOOGLE_GENERATIVE_AI_API_KEY; unset means every dispatch fails with an unregistered-caller error."
     }
   ],
-
   "_comment_claude_voice": "The fifth voice in the canonical panel is the strongest Claude available to the harness session, dispatched in-harness as `claude-agent` via the colosseum-spec-adversary Agent subagent. That voice does NOT run through opencode_dispatch.py — the Agent tool invocation happens from the Claude Code session that owns the adversarial pass. See SKILL Step 4 Mode 2.",
-
-  "_comment_excluded_voices": "Voices known to fail adversarial spec review: glm-4-7-flash (degenerate loops at 30B 'flash' tier); goedel-prover-v2-32b and other theorem-prover specialists (treat prompts as proof goals instead of attack targets — use at verify-pyramid layer instead). leanstral-2603 belongs in Lean-specific verification work, not general adversarial spec review — substitute only when the spec is a Lean theorem.",
-
+  "_comment_excluded_voices": "Voices known to fail adversarial spec review (see registry/voices.json for calibration evidence): glm-4.7-flash — degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent parallel runs (enumerated fake attacks #4-75+ on a single slice). At its ~30B 'flash' size class it is local-model tier, not gateway-frontier tier. goedel-prover-v2-32b — included in an 8-voice fan-out and produced ~8K tokens of degenerate tautology loops with abstract variable lists, 852s wall, output unusable. Theorem-prover specialists pattern-match a spec as a proof GOAL and attempt Lean/Coq tactics instead of attacking it. leanstral-2603 belongs in Lean-specific verification work, not general adversarial spec review — substitute only when the spec is a Lean theorem.",
   "_comment_dispatch_invocation": "opencode_dispatch.py passes --format json to each `opencode run` call and appends --variant automatically: the per-voice `variant` field if set, else `default_variant` below. The raw event stream is preserved per (voice, slice) as <slice>.events.jsonl; the extracted assistant text (never the JSON) feeds truncation detection and aggregation, with finish_reason and token usage recorded. No script modification needed.",
-
   "_comment_slices": "Slice plan. Each slice is one (voice, slice) call. headers[] are the markdown header ranges the agent should read from the target spec. attack_emphasis is the per-slice attack-category hint. Replace this example with your project's actual sections.",
-
   "slices": [
     {
       "name": "scope",
@@ -70,18 +62,16 @@
       "attack_emphasis": "Pointwise evaluability of state invariants; temporal-tag correctness; coverage gaps; derived-flag soundness."
     }
   ],
-
   "_comment_context_appendix": "Optional shared-context block prepended to every call. Use for type signatures, invariant labels, or cross-section glossary entries that are load-bearing but not under attack. Mark clearly as read-only / not-to-be-attacked.",
   "context_appendix": "=== CONTEXT APPENDIX (read-only — DO NOT ATTACK; these sections are attacked in their own invocations) ===\n\nSystem under review: <your system name and one-line description>.\nIntent doc: version <X.Y.Z>.\n\n=== END CONTEXT APPENDIX ===",
-
   "_comment_variant": "default_variant is passed as `--variant` to every voice that lacks its own `variant` field. Canonical setting is max (maximum thinking budget on every voice that supports it). A per-voice `variant` field overrides; set it to an empty string to omit the flag for that voice.",
   "default_variant": "max",
-
   "_comment_timeouts": "per_call_timeout: seconds budget per (voice, slice) call. Local reasoning models on consumer hardware can take 10-25 min per slice. max_retries: per-call retry budget on truncated stubs or HTTP errors.",
   "per_call_timeout": 1800,
   "max_retries": 2,
-
   "_comment_isolation": "Z2 isolation. Agents run in an ephemeral git worktree (detached at HEAD) with a preflight secret/symlink scan that blocks dispatch on violations; see opencode_dispatch.py ISOLATION. The child environment is reduced to a small allowlist; name any provider API keys the voices need in env_passthrough (they are read from the orchestrator's environment, never from a .env in the tree). opencode_version_pin, if set, blocks dispatch when `opencode --version` differs.",
-  "env_passthrough": ["GOOGLE_GENERATIVE_AI_API_KEY"],
+  "env_passthrough": [
+    "GOOGLE_GENERATIVE_AI_API_KEY"
+  ],
   "opencode_version_pin": null
 }

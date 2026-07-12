@@ -366,6 +366,18 @@ Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environmen
 
 Verify with `opencode run --model openai/gpt-5.6-sol-pro "Reply with exactly: ok"` and similar one-shot probes per provider before relying on the dispatch script. A missing `GOOGLE_GENERATIVE_AI_API_KEY` fails every Gemini dispatch with an unregistered-caller error.
 
+<!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
+**Canonical panel (`canonical-5@sha256:19595e6530eb6331`).** The milestone panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); the rest dispatch through OpenCode:
+
+- `claude-agent` — in-harness Claude Agent subagent (Mode 2); no opencode.jsonc entry. **canonical-panel** (calibrated)
+- `openai/gpt-5.6-sol-pro` — OpenAI, direct openai provider. candidate (calibration pending). Set `OPENAI_API_KEY`.
+- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated).
+- `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending). Local endpoint `http://127.0.0.1:8000` must be reachable.
+- `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending). Set `GOOGLE_GENERATIVE_AI_API_KEY`.
+
+Roster generated from `registry/voices.json`; verify pins with a one-shot probe (`opencode run --model <id> "Reply with exactly: ok"`) before milestone runs — a catalog listing is not confirmation.
+<!-- END GENERATED: voice-roster -->
+
 > **No external-model MCP.** External models are called only through OpenCode (Section 7), so every adversarial voice gets an agentic ReAct loop with file access. There is no single-shot MCP dispatch channel: a `query_gateway` / `query_openai` / `query_google`-style MCP would do no agentic work and is intentionally absent. If OpenCode can't be installed on a host, that host can't run multi-voice adversarial passes — there is no degraded fallback.
 
 ---

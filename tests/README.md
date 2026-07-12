@@ -1,13 +1,14 @@
 # Regression suite
 
-Executable fixtures from Part IV of the remediation plan of record. Each
-suite is a standalone `uv run --script` file: exit 0 pass, 1 fail, 2 when
-a required toolchain is absent. `./tests/run_all.py` runs everything and
-aggregates per G2 (any fail → FAILED exit 1; any suite that could not run
-→ INCOMPLETE exit 3).
+Executable fixtures from Part IV of the remediation plan of record, plus a
+small number of infra checks (r0) that are not Part IV fixtures. Each suite
+is a standalone `uv run --script` file: exit 0 pass, 1 fail, 2 when a required
+toolchain is absent. `./tests/run_all.py` runs everything and aggregates per
+G2 (any fail → FAILED exit 1; any suite that could not run → INCOMPLETE exit 3).
 
 | Suite | Fixture | Asserts | Item |
 |---|---|---|---|
+| `r0_registry_docs.py` | infra (not Part IV) | registry parses + calibration invariant (canonical-panel ⇒ non-pending calibration); profile content_hash recomputes; `gen_roster_docs --check` green (SKILLs/README/INSTALL/dispatch-config generated from registry); `colosseum_init` scaffolds + idempotence + `--force`; `colosseum_doctor --json` runs offline, BOM-consistent versions | C4 |
 | `r1_r21_r27_ledger_gates.py` | R1, R21, R27 | no vacuous ledger pass; content-hash binding catches moved/stubbed citations; axiom anchoring; per-link kani; G1 records with full binding set; G2 verdict mapping, scoped VERIFIED only | C1 |
 | `r2_r5_concurrency_containment.py` | R2, R5 | citation containment (`../`, absolute, symlink, space paths); 24-writer manifest stress x3, zero losses; freshness/emptiness/reset guards | E5 |
 | `r3_r4_r15_dispatch.py` | R3, R4, R15 | missing opencode → INCOMPLETE; unmatched/duplicate/traversal selections rejected; versioned event parser (truncated, malformed, error, plaintext variants) | E4 |
