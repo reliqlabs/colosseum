@@ -2,8 +2,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "mcp>=1.2.0",
-#     "httpx>=0.27.0",
+#     "mcp>=1.2.0,<2",
+#     "httpx>=0.27.0,<1",
 # ]
 # ///
 """

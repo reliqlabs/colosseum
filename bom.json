@@ -1,0 +1,26 @@
+{
+  "_comment": "Locked compatibility BOM (E6). These are the versions the repo is dogfooded against. tests/r14_cli_contracts.py fails when a live tool drifts from these pins or when a CLI flag the pipeline depends on disappears: update a pin deliberately, re-run the suite, and record the bump in the commit message. Do not point installs at latest/stable; pin here first.",
+  "tools": {
+    "opencode": "1.17.18",
+    "quint": "0.32.0",
+    "apalache": "0.56.1",
+    "lean": "4.29.0",
+    "cargo-kani": "0.67.0",
+    "verus": null,
+    "uv": "0.11.6"
+  },
+  "_verus_note": "verus is not installed in the dogfood environment; pin the exact release here on first install (see INSTALL.md) before treating Verus layers as required.",
+  "python": {
+    "requires": ">=3.11",
+    "inline_deps": {
+      "mcp": ">=1.2.0,<2",
+      "httpx": ">=0.27.0,<1",
+      "pyyaml": ">=6,<7"
+    }
+  },
+  "cli_contracts": {
+    "opencode run": ["--agent", "--model", "--format", "--variant"],
+    "quint run": ["--invariant", "--max-steps", "--max-samples", "--seed", "--init", "--step", "--out-itf"],
+    "quint verify": ["--invariant", "--temporal", "--max-steps", "--init", "--step"]
+  }
+}

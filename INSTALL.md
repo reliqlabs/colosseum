@@ -106,8 +106,9 @@ Use the prebuilt release on macOS arm64; source builds are also supported but sl
 ```bash
 mkdir -p /Users/you/path/to/tools
 cd /Users/you/path/to/tools
-curl -fLO https://github.com/verus-lang/verus/releases/latest/download/verus-arm64-macos.zip
-# (or pick a specific tagged release from https://github.com/verus-lang/verus/releases)
+# Pick a specific tagged release from https://github.com/verus-lang/verus/releases
+# and record it in colosseum/bom.json before first use; do not track "latest".
+curl -fLO https://github.com/verus-lang/verus/releases/download/<pinned-release>/verus-arm64-macos.zip
 unzip verus-arm64-macos.zip
 mv verus-arm64-macos verus-bin
 bash verus-bin/macos_allow_gatekeeper.sh   # clears Gatekeeper quarantine
@@ -147,7 +148,7 @@ Required if you want to actually prove Aeneas-extracted theorems (not just gener
 
 ```bash
 curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh
-elan default leanprover/lean4:stable
+elan default leanprover/lean4:v4.29.0   # pinned in colosseum/bom.json; bump there first
 lake --version
 ```
 

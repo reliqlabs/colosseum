@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml"]
+# dependencies = ["pyyaml>=6,<7"]
 # ///
 """
 R11 (static half) — deny-first agent permission profiles (Z1, contract G5).
