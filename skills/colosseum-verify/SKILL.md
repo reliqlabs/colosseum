@@ -7,6 +7,18 @@ You are orchestrating a full pyramid run of the Colosseum verification pipeline.
 
 You do not verify properties yourself. You run tools, capture results, and route failures. The verdict at each layer comes from the tool, not your interpretation.
 
+## Assurance profiles and the run-level verdict (G2)
+
+Every run names its **assurance profile** up front; the profile decides which layers are required and what the run-level verdict means:
+
+- **`tested`** — types + lints + property tests (+ fuzz when harnesses exist)
+- **`bounded`** — `tested` + Kani (bounded proofs; bounds are part of the claim)
+- **`proved`** — `bounded` + Verus + Aeneas/Lean (axiom-clean per the Layer 8 gate)
+
+The run-level verdict follows the G2 truth table exactly: any required layer **failed** → run `FAILED`; otherwise any required layer skipped, not run, or without applicable evidence (e.g. zero Kani harnesses under `bounded`) → run `INCOMPLETE`; only when every required layer passed → `VERIFIED[<profile>]`. A skipped required layer is a gating gap, never a footnote — there is no "passed with gaps". `skipped` remains a visible bucket in the report; under the named profile it is also a gating one.
+
+The deterministic layers (types, lints, property tests, fuzz, Kani, Verus) can run without an agent via the headless runner **`colosseum/scripts/pyramid_run.py --crate <path> --profile <name>`** (CI-friendly; exit 0 verified / 1 failed / 2 error / 3 incomplete). The agent flow remains responsible for failure classification and for the Aeneas/Lean layers.
+
 ## Inputs
 
 Ask the user for, or determine from context:

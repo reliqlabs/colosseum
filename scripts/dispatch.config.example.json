@@ -34,7 +34,7 @@
 
   "_comment_excluded_voices": "Voices known to fail adversarial spec review: glm-4-7-flash (degenerate loops at 30B 'flash' tier); goedel-prover-v2-32b and other theorem-prover specialists (treat prompts as proof goals instead of attack targets — use at verify-pyramid layer instead). leanstral-2603 belongs in Lean-specific verification work, not general adversarial spec review — substitute only when the spec is a Lean theorem.",
 
-  "_comment_dispatch_invocation": "opencode_dispatch.py passes --format default to each `opencode run` call and appends --variant automatically: the per-voice `variant` field if set, else `default_variant` below. No script modification needed.",
+  "_comment_dispatch_invocation": "opencode_dispatch.py passes --format json to each `opencode run` call and appends --variant automatically: the per-voice `variant` field if set, else `default_variant` below. The raw event stream is preserved per (voice, slice) as <slice>.events.jsonl; the extracted assistant text (never the JSON) feeds truncation detection and aggregation, with finish_reason and token usage recorded. No script modification needed.",
 
   "_comment_slices": "Slice plan. Each slice is one (voice, slice) call. headers[] are the markdown header ranges the agent should read from the target spec. attack_emphasis is the per-slice attack-category hint. Replace this example with your project's actual sections.",
 

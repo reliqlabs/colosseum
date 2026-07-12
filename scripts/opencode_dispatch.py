@@ -8,9 +8,13 @@ OpenCode per-section adversarial dispatch — canonical Colosseum orchestrator.
 
 This script is project-agnostic. Each project supplies a JSON config naming
 the target spec, the voice roster, and the slice plan. The script invokes
-`opencode run --agent spec-adversary --model <voice> ...` once per
-(voice, slice) pair, captures stdout, runs a truncation-detection pass,
-retries on failure, and aggregates per-voice files plus a summary.
+`opencode run --agent spec-adversary --model <voice> --format json` once per
+(voice, slice) pair, preserves the raw event stream, extracts the final
+assistant text with a versioned parser (finish_reason and token usage
+recorded; the JSON is never fed to the Markdown stub detector), runs a
+truncation-detection pass on the extracted text, retries on failure, and
+aggregates per-voice files plus a summary with a G2 verdict: COMPLETE,
+PARTIAL, or INCOMPLETE. Zero successful slices exits nonzero.
 
 This is the dispatch path described in
 `colosseum/skills/colosseum-adversarial/SKILL.md`. It is the only way
@@ -100,6 +104,18 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────
 
 
+# User-derived path components (voice ids, slice names, run tags) must be
+# plain slugs: no separators, no traversal, nothing the filesystem interprets.
+SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]*$")
+
+
+def validate_slug(kind: str, value: str) -> str:
+    if not isinstance(value, str) or not SLUG_RE.match(value) or ".." in value:
+        sys.exit(f"FATAL: invalid {kind} {value!r} — must match "
+                 f"[A-Za-z0-9][A-Za-z0-9._@-]* with no '..'")
+    return value
+
+
 def load_config(config_path: Path) -> dict:
     if not config_path.exists():
         sys.exit(f"FATAL: config not found at {config_path}")
@@ -109,6 +125,21 @@ def load_config(config_path: Path) -> dict:
             sys.exit(f"FATAL: config missing required field '{required}'")
     cfg["project_root"] = Path(cfg["project_root"]).resolve()
     cfg["target_spec"] = Path(cfg["target_spec"]).resolve()
+    if not cfg["target_spec"].is_file():
+        sys.exit(f"FATAL: target_spec does not exist: {cfg['target_spec']}")
+    if not cfg["voices"]:
+        sys.exit("FATAL: config has zero voices — an empty panel is an invalid run")
+    if not cfg["slices"]:
+        sys.exit("FATAL: config has zero slices — nothing to dispatch is an invalid run")
+
+    validate_slug("run_tag_prefix", cfg["run_tag_prefix"])
+    voice_ids = [validate_slug("voice id", v["id"]) for v in cfg["voices"]]
+    slice_names = [validate_slug("slice name", s["name"]) for s in cfg["slices"]]
+    for kind, names in (("voice id", voice_ids), ("slice name", slice_names)):
+        if len(names) != len(set(names)):
+            dupes = sorted({n for n in names if names.count(n) > 1})
+            sys.exit(f"FATAL: duplicate {kind}(s) in config: {dupes}")
+
     cfg.setdefault("context_appendix", "")
     cfg.setdefault("per_call_timeout", 1800)
     cfg.setdefault("max_retries", 2)
@@ -237,8 +268,14 @@ def run_preflight(cfg: dict, agent_root: Path, meta: dict, outdir: Path) -> None
     any violation. Nothing is dispatched past a failing preflight."""
     violations = preflight_scan(agent_root)
 
-    ver = subprocess.run(["opencode", "--version"], capture_output=True, text=True)
-    opencode_version = ver.stdout.strip() if ver.returncode == 0 else "unknown"
+    # R3: a missing dispatch binary is INCOMPLETE, never a quiet no-op.
+    if shutil.which("opencode") is None:
+        violations.append("opencode binary not found on PATH — verdict: INCOMPLETE, "
+                          "no dispatch executed")
+        opencode_version = "absent"
+    else:
+        ver = subprocess.run(["opencode", "--version"], capture_output=True, text=True)
+        opencode_version = ver.stdout.strip() if ver.returncode == 0 else "unknown"
     pin = cfg.get("opencode_version_pin")
     if pin and opencode_version != pin:
         violations.append(f"opencode version {opencode_version} != pinned {pin}")
@@ -287,6 +324,72 @@ your attack report per the Output structure in your system prompt."""
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Event-stream parsing (E4, contract G1)
+# ─────────────────────────────────────────────────────────────────────────
+
+# Versioned against the stream shape observed on OpenCode 1.17.18:
+# JSONL envelopes {"type", "timestamp", "sessionID", "part"|"error"};
+# text parts carry part.id + part.text (latest event per id wins);
+# step_finish carries part.reason and part.tokens; error carries
+# error.name + error.data.message.
+PARSER_SCHEMA = "opencode-events-v1"
+
+
+def parse_event_stream(raw: str) -> dict:
+    """Parse an `opencode run --format json` event stream. Tolerant by
+    design: malformed or truncated lines are counted and skipped, never
+    fatal. Returns the assembled final assistant text plus finish_reason,
+    token usage, and any error events. The raw stream is preserved by the
+    caller; this extraction is what downstream text consumers (stub
+    detector, aggregation) see — they never see the JSON itself."""
+    text_parts: dict[str, str] = {}
+    finish_reason = None
+    usage = {"input": 0, "output": 0, "reasoning": 0, "total": 0}
+    errors: list[str] = []
+    parsed_events = 0
+    malformed = 0
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            malformed += 1
+            continue
+        if not isinstance(event, dict) or "type" not in event:
+            malformed += 1
+            continue
+        parsed_events += 1
+        etype = event.get("type")
+        part = event.get("part") or {}
+        if etype == "text" and part.get("type") == "text":
+            text_parts[part.get("id", f"_{len(text_parts)}")] = part.get("text", "")
+        elif etype == "step_finish":
+            finish_reason = part.get("reason", finish_reason)
+            tokens = part.get("tokens") or {}
+            for k in ("input", "output", "reasoning", "total"):
+                usage[k] += tokens.get(k, 0) or 0
+        elif etype == "error":
+            err = event.get("error") or {}
+            data = err.get("data") or {}
+            errors.append(f"{err.get('name', 'Error')}: {data.get('message', '')[:300]}")
+
+    if parsed_events == 0 and raw.strip():
+        # Not an event stream at all (older CLI or format drift): treat the
+        # raw output as plain text so nothing is silently dropped, and say so.
+        return {"schema": "plaintext-fallback", "text": raw.strip(),
+                "finish_reason": None, "usage": usage, "errors": [],
+                "events": 0, "malformed_lines": malformed}
+
+    return {"schema": PARSER_SCHEMA,
+            "text": "\n\n".join(t for t in text_parts.values() if t).strip(),
+            "finish_reason": finish_reason, "usage": usage, "errors": errors,
+            "events": parsed_events, "malformed_lines": malformed}
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # Truncation detection
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -328,7 +431,7 @@ async def dispatch_one(
         "opencode", "run",
         "--agent", "spec-adversary",
         "--model", model_id,
-        "--format", "default",
+        "--format", "json",
     ]
     if variant:
         cmd.extend(["--variant", variant])
@@ -356,36 +459,52 @@ async def dispatch_one(
             }
 
         elapsed = (datetime.now(timezone.utc) - t0).total_seconds()
-        content = _ANSI_RE.sub("", stdout.decode("utf-8", errors="replace"))
-        lines = content.splitlines()
-        if lines and lines[0].startswith("> "):
-            lines = lines[1:]
-            while lines and not lines[0].strip():
-                lines = lines[1:]
-        content = "\n".join(lines).strip()
+        raw = stdout.decode("utf-8", errors="replace")
+        # Preserve the raw event stream verbatim, alongside the extraction.
+        events_path = out_dir / f"{slice_spec['name']}.events.jsonl"
+        events_path.write_text(raw)
 
-        if proc.returncode != 0 or not content:
-            err = stderr.decode("utf-8", errors="replace")[:1000]
+        parsed = parse_event_stream(_ANSI_RE.sub("", raw))
+        content = parsed["text"]
+
+        if proc.returncode != 0 or (parsed["errors"] and not content):
+            err = "; ".join(parsed["errors"]) or stderr.decode("utf-8", errors="replace")[:500]
             return {
                 "voice": voice_id, "slice": slice_spec["name"],
-                "error": f"exit={proc.returncode}: {err}",
+                "error": f"exit={proc.returncode}: {err[:800]}",
                 "elapsed_s": elapsed,
+                "events_path": str(events_path),
+            }
+        if not content:
+            return {
+                "voice": voice_id, "slice": slice_spec["name"],
+                "error": f"no assistant text in event stream "
+                         f"({parsed['events']} events, {parsed['malformed_lines']} malformed)",
+                "elapsed_s": elapsed,
+                "events_path": str(events_path),
             }
 
+        # The stub detector sees only the extracted Markdown, never JSON.
         if _is_truncated_stub(content):
             return {
                 "voice": voice_id, "slice": slice_spec["name"],
-                "error": f"truncated stub (exit=0, {len(content)} chars, no structural markers)",
+                "error": f"truncated stub (exit=0, {len(content)} chars, no structural markers, "
+                         f"finish_reason={parsed['finish_reason']})",
                 "elapsed_s": elapsed,
                 "stub_content_preview": content[:200],
+                "events_path": str(events_path),
             }
 
         out_path.write_text(content)
         return {
             "voice": voice_id, "slice": slice_spec["name"],
             "out_path": str(out_path),
+            "events_path": str(events_path),
             "elapsed_s": elapsed,
             "chars": len(content),
+            "finish_reason": parsed["finish_reason"],
+            "tokens": parsed["usage"],
+            "parser_schema": parsed["schema"],
         }
     except Exception as e:
         elapsed = (datetime.now(timezone.utc) - t0).total_seconds()
@@ -495,7 +614,7 @@ def aggregate_voice(voice_id: str, slices: list[dict], results: list[dict], outd
 # ─────────────────────────────────────────────────────────────────────────
 
 
-async def main() -> None:
+async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="path to dispatch.json")
     ap.add_argument("--voices", default=None, help="comma-separated voice id slugs to dispatch (default: all)")
@@ -511,7 +630,7 @@ async def main() -> None:
 
     run_tag_env = os.environ.get("COLOSSEUM_RUN_TAG")
     if run_tag_env:
-        run_tag = run_tag_env
+        run_tag = validate_slug("run tag (COLOSSEUM_RUN_TAG)", run_tag_env)
     else:
         _ts_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
         run_tag = f"{cfg['run_tag_prefix']}-{_ts_iso}"
@@ -538,7 +657,7 @@ async def main() -> None:
         run_preflight(cfg, agent_root, meta, outdir)  # exits nonzero on violation
         if args.preflight_only:
             print("Preflight-only run: nothing dispatched.")
-            return
+            return 0
 
         cfg["agent_root"] = agent_root
         cfg["spec_for_agent"] = spec_for_agent
@@ -551,12 +670,23 @@ async def main() -> None:
         ]
         if args.voices:
             wanted = set(args.voices.split(","))
+            unknown = wanted - {v[0] for v in voices_cfg}
+            if unknown:
+                sys.exit(f"FATAL: --voices names not in config: {sorted(unknown)} "
+                         f"(have: {[v[0] for v in voices_cfg]})")
             voices_cfg = [v for v in voices_cfg if v[0] in wanted]
 
         slices_cfg = cfg["slices"]
         if args.slices:
             wanted = set(args.slices.split(","))
+            unknown = wanted - {s["name"] for s in slices_cfg}
+            if unknown:
+                sys.exit(f"FATAL: --slices names not in config: {sorted(unknown)} "
+                         f"(have: {[s['name'] for s in slices_cfg]})")
             slices_cfg = [s for s in slices_cfg if s["name"] in wanted]
+        if not voices_cfg or not slices_cfg:
+            sys.exit("FATAL: selection matched zero voices or slices — "
+                     "a 0-call run is not a successful run")
 
         log_path = outdir / "dispatch.log"
         with log_path.open("a") as logf:
@@ -607,12 +737,24 @@ async def main() -> None:
             })
             print(f"  {voice_id}: {n_ok}/{len(results)} slices OK, {total_elapsed:.0f}s total, {total_chars:,} chars → {agg_path.name}")
 
-        (outdir / "summary.json").write_text(json.dumps(summary, indent=2))
+        # G2: verdict + exit code. Zero successful slices is INCOMPLETE and
+        # exits nonzero — an all-fail run must never look like success.
+        total_ok = sum(s["slices_ok"] for s in summary)
+        total_calls = sum(s["slices_total"] for s in summary)
+        verdict = ("COMPLETE" if total_ok == total_calls
+                   else "PARTIAL" if total_ok > 0 else "INCOMPLETE")
+        (outdir / "summary.json").write_text(json.dumps(
+            {"verdict": verdict, "slices_ok": total_ok,
+             "slices_total": total_calls, "voices": summary}, indent=2))
         print(f"\nSummary written to {outdir}/summary.json")
+        print(f"VERDICT: {verdict} ({total_ok}/{total_calls} slices)")
+        if total_ok == 0:
+            return 1
+        return 0
     finally:
         if worktree is not None:
             remove_ephemeral_worktree(cfg["project_root"], worktree)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

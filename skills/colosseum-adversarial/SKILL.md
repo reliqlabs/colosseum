@@ -99,8 +99,8 @@ Dispatch happens in parallel — every requested voice attacks concurrently.
 
 **Two orchestration shapes** layered on top of the modes above:
 
-- **In-process** — the running Claude Code session dispatches the Claude voice as a child Agent and shells out to OpenCode for the non-Claude voices, blocks until all return, then synthesizes.
-- **Harness-agnostic manifest** (`scripts/colosseum_run.py`) — voices live in different harnesses (Claude voice in Claude Code via Mode 2, non-Claude voices in OpenCode via Mode 1). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage.
+- **In-process** — the running Claude Code session dispatches the Claude voice as a child Agent and shells out to OpenCode for the non-Claude voices, blocks until all return, then synthesizes. No `run.json` is involved; `opencode_dispatch.py`'s own `summary.json` + verdict is the record of the non-Claude fan-out.
+- **Harness-agnostic manifest** (`scripts/colosseum_run.py`) — voices live in different harnesses (Claude voice in Claude Code via Mode 2, non-Claude voices in OpenCode via Mode 1). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine for THIS shape only. `opencode_dispatch.py` never touches `run.json`: after a dispatch batch returns, the orchestrator that invoked it marks each voice `complete`/`error` via `colosseum_run.py`. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage.
 
 ### Mode 1: OpenCode + spec-adversary agent (ReAct) — every non-Claude voice
 
@@ -110,7 +110,7 @@ Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adver
 
 ```bash
 opencode run --agent spec-adversary --model burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6 \
-  --variant max --format default \
+  --variant max --format json \
   "TARGET_SPEC: /path/to/intent.md\n\nTARGET_SLICE: temporal-invariants — ..."
 ```
 

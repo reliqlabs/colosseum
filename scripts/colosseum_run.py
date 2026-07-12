@@ -9,7 +9,11 @@ colosseum-run — harness-agnostic dispatch manifest for multi-model adversarial
 The manifest pattern lets multiple harnesses (Claude Code, OpenCode, plain shell)
 coordinate on a shared adversarial-review run without any in-process coupling.
 Each harness reads + updates the same `run.json` file in the run directory;
-the manifest IS the state machine.
+the manifest IS the state machine — for manifest-mode runs. The in-process
+orchestration shape (opencode_dispatch.py) does not use run.json: there the
+dispatcher's own summary.json is the record, and if a manifest exists it is
+the invoking orchestrator's job to mark voices complete/error here after
+dispatch returns.
 
 USAGE
 
@@ -34,8 +38,10 @@ USAGE
     # per-voice files into one document with a structural-overlap header:
     colosseum_run.py synthesize <run-dir> --out=synthesis-input.md
 
-    # Wait for all voices to land (blocking, no LLM call). Exits 0 on completion,
-    # 1 on timeout. Useful inside a `make` rule or shell pipeline:
+    # Wait for all voices to land (blocking, no LLM call). Exits 0 when all
+    # voices are terminal AND at least one completed; 1 on timeout; 2 when
+    # all voices are terminal but none completed (zero evidence — G2
+    # INCOMPLETE). Useful inside a `make` rule or shell pipeline:
     colosseum_run.py wait <run-dir> --timeout=3600
 
 MANIFEST SCHEMA
@@ -91,7 +97,15 @@ def load_manifest(run_dir: Path) -> dict[str, Any]:
     if not p.exists():
         sys.exit(f"error: no {MANIFEST_NAME} at {p}")
     with p.open() as f:
-        return json.load(f)
+        manifest = json.load(f)
+    # G2: a zero-voice manifest is an invalid run, not a trivially-complete one.
+    if not manifest.get("voices"):
+        sys.exit(f"error: manifest {p} has zero voices — invalid run")
+    ids = [v["id"] for v in manifest["voices"]]
+    if len(ids) != len(set(ids)):
+        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        sys.exit(f"error: manifest {p} has duplicate voice ids: {dupes}")
+    return manifest
 
 
 def save_manifest(run_dir: Path, manifest: dict[str, Any]) -> None:
@@ -143,6 +157,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         sys.exit(f"error: target {target} does not exist")
 
     voice_ids = [v.strip() for v in args.voices.split(",") if v.strip()]
+    if not voice_ids:
+        sys.exit("error: --voices is empty — a zero-voice run is invalid")
+    if len(voice_ids) != len(set(voice_ids)):
+        dupes = sorted({v for v in voice_ids if voice_ids.count(v) > 1})
+        sys.exit(f"error: duplicate voice ids in --voices: {dupes}")
     owners = parse_owners(args.owners) if args.owners else {}
 
     for v in voice_ids:
@@ -277,12 +296,19 @@ def cmd_reset(args: argparse.Namespace) -> int:
     manifest = load_manifest(run_dir)
     voice = find_voice(manifest, args.voice)
 
+    # Retain the retry history: the prior attempt's outcome stays in the
+    # record instead of being silently erased.
+    attempt = {k: voice[k] for k in ("status", "elapsed_s", "finish_reason", "error_detail")
+               if k in voice}
+    attempt["reset_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    voice.setdefault("history", []).append(attempt)
+
     voice["status"] = "pending"
     voice.pop("elapsed_s", None)
     voice.pop("finish_reason", None)
     voice.pop("error_detail", None)
     save_manifest(run_dir, manifest)
-    print(f"reset {args.voice} to pending")
+    print(f"reset {args.voice} to pending (attempt {len(voice['history'])} retained in history)")
     return 0
 
 
@@ -299,6 +325,11 @@ def cmd_wait(args: argparse.Namespace) -> int:
         statuses = {v["status"] for v in manifest["voices"]}
         if "pending" not in statuses:
             counts = {s: sum(1 for v in manifest["voices"] if v["status"] == s) for s in ["complete", "error", "skipped"]}
+            # G2: all-terminal is not success. A run in which no voice
+            # completed produced zero evidence — exit nonzero (INCOMPLETE).
+            if counts["complete"] == 0:
+                print(f"done but INCOMPLETE — zero completed voices: {counts}")
+                return 2
             print(f"done: {counts}")
             return 0
         pending = [v["id"] for v in manifest["voices"] if v["status"] == "pending"]
@@ -366,10 +397,28 @@ def cmd_synthesize(args: argparse.Namespace) -> int:
     run_dir = Path(args.run_dir).resolve()
     manifest = load_manifest(run_dir)
 
+    # G2: synthesis over pending/errored inputs is partial evidence. Refuse
+    # unless explicitly overridden, and label the output when overridden.
+    not_complete = [v for v in manifest["voices"] if v["status"] != "complete"]
+    if not_complete and not args.allow_partial:
+        detail = ", ".join(f"{v['id']}={v['status']}" for v in not_complete)
+        sys.exit(f"error: {len(not_complete)} voice(s) not complete ({detail}); "
+                 f"re-run them, or pass --allow-partial to synthesize anyway "
+                 f"(the output will be labeled PARTIAL)")
+    complete_count = sum(1 for v in manifest["voices"] if v["status"] == "complete")
+    if complete_count == 0:
+        sys.exit("error: zero completed voices — nothing to synthesize, "
+                 "and --allow-partial cannot conjure evidence")
+
     out_path = run_dir / args.out
     parts: list[str] = []
 
     parts.append(f"# Synthesis input — {manifest['run_id']}\n\n")
+    if not_complete:
+        detail = ", ".join(f"{v['id']} ({v['status']})" for v in not_complete)
+        parts.append(f"> **PARTIAL SYNTHESIS INPUT** — {len(not_complete)} voice(s) "
+                     f"did not complete: {detail}. Their absence is a coverage gap, "
+                     f"not agreement.\n\n")
     parts.append(f"- **Target**: `{manifest['target']}`\n")
     parts.append(f"- **Run dir**: `{run_dir}`\n")
     parts.append(f"- **Created**: {manifest['created']}\n\n")
@@ -472,9 +521,11 @@ def main() -> int:
     pw.add_argument("--poll", type=float, default=10.0)
     pw.set_defaults(func=cmd_wait)
 
-    py = sub.add_parser("synthesize", help="Build the synthesis-prompt input. No LLM calls.")
+    py = sub.add_parser("synthesize", help="Build the synthesis-prompt input. No LLM calls. Refuses pending/errored voices unless --allow-partial.")
     py.add_argument("run_dir")
     py.add_argument("--out", default="synthesis-input.md")
+    py.add_argument("--allow-partial", action="store_true",
+                    help="synthesize despite pending/errored voices; output is labeled PARTIAL")
     py.set_defaults(func=cmd_synthesize)
 
     args = p.parse_args()
