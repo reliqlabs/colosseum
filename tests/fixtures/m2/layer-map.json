@@ -1,0 +1,9 @@
+{
+  "order": ["types", "lints", "property-tests", "fuzz", "kani", "verus", "aeneas-lean"],
+  "defects": [
+    {"id": "d1", "cheapest_capable": "types", "actual_caught": "types"},
+    {"id": "d2", "cheapest_capable": "kani", "actual_caught": "kani"},
+    {"id": "d3", "cheapest_capable": "lints", "actual_caught": "verus"},
+    {"id": "d4", "cheapest_capable": "fuzz", "actual_caught": "property-tests"}
+  ]
+}

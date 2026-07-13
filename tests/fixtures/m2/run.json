@@ -1,0 +1,11 @@
+{
+  "run_id": "m2-fixture-2026-07-12T000000Z",
+  "target": "fixture",
+  "created": "2026-07-12T000000Z",
+  "phase": "attack",
+  "voices": [
+    {"id": "A", "harness": "claude", "file": "a.md", "status": "complete"},
+    {"id": "B", "harness": "opencode", "file": "b.md", "status": "complete"}
+  ],
+  "synthesis": {"file": "synthesis.md", "harness": "claude", "status": "pending"}
+}

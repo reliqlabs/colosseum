@@ -1,0 +1,22 @@
+{
+  "dimensionSummaries": [
+    {"dimension": "A", "summary": "voice A synthetic"},
+    {"dimension": "B", "summary": "voice B synthetic"}
+  ],
+  "confirmed": [
+    {"title": "f1", "file": "x.rs", "line": 1, "severity": "high",
+     "sources": ["A"], "verdict": {"confirmed": true}},
+    {"title": "f2", "file": "x.rs", "line": 2, "severity": "medium",
+     "sources": ["A"], "verdict": {"confirmed": true}},
+    {"title": "f3", "file": "x.rs", "line": 3, "severity": "low",
+     "sources": ["A"], "verdict": {"confirmed": true}},
+    {"title": "f5", "file": "y.rs", "line": 5, "severity": "medium",
+     "sources": ["B"], "verdict": {"confirmed": true}}
+  ],
+  "refuted": [
+    {"title": "f4", "file": "y.rs", "line": 4, "severity": "high",
+     "sources": ["A", "B"], "verdict": {"confirmed": false}}
+  ],
+  "judgments": [],
+  "criticFindings": []
+}
