@@ -124,7 +124,7 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
 - `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated)
-- `openai/gpt-5.6-sol` — OpenAI, direct openai provider. candidate — requires `OPENAI_API_KEY`.
+- `openai/gpt-5.6-sol` — OpenAI, direct openai provider. candidate
 - `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending) — endpoint `http://127.0.0.1:8000`.
 - `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending) — requires `GOOGLE_GENERATIVE_AI_API_KEY`.
 - `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS, Burnt gateway. candidate (partial calibration)

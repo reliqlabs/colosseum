@@ -71,9 +71,7 @@
       "default_variant": "max",
       "status": "candidate",
       "calibration": "Seeded-defect recall 8/8 with correct categories, blinded single-pass code review, 2 marginal unmatched extras (calibration/2026-07-13-r1). Sibling variant gpt-5.6-sol-pro scored 8/8 in the same run before the operator standardized on sol.",
-      "requires_env": [
-        "OPENAI_API_KEY"
-      ],
+      "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
