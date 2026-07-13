@@ -1,0 +1,15 @@
+{
+  "voice-a": [
+    {"file": "src/counter.rs", "line": 10, "category": "off-by-one", "title": "loop writes one past end"},
+    {"file": "src/api.rs", "line": 40, "category": "missing-bounds-check", "title": "unvalidated offset"},
+    {"file": "src/nowhere.rs", "line": 99, "category": "style-nit", "title": "candidate false positive, matches no seeded defect"}
+  ],
+  "voice-b": [
+    {"file": "src/counter.rs", "line": 12, "category": "off-by-one", "title": "off-by-one near the loop bound (2 lines off, within tolerance)"},
+    {"file": "src/config.rs", "line": 50, "category": "typo", "title": "right place, wrong category: must NOT count as detecting D5"}
+  ],
+  "voice-c": [
+    {"file": "src/parse.rs", "line": 20, "category": "unchecked-arithmetic", "title": "u32 overflow"},
+    {"file": "src/config.rs", "line": 50, "category": "default-mismatch", "title": "doc vs code default"}
+  ]
+}

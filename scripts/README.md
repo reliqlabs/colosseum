@@ -77,6 +77,14 @@ coverage_dashboard.py --records <project>/.colosseum/evidence/ --require B1,B2,W
 coverage_dashboard.py --records <project>/.colosseum/evidence/ --manifest <obligations.json> --check
 ```
 
+## `recall_score.py` — seeded-defect recall scorer (P2 measurement instrument)
+
+Given a seeded-defect corpus (planted flaws as ground truth) and per-voice detections (or a findings JSON), computes per-voice recall, union/panel recall, and the shared-blind-spot set (seeded defects no voice caught, the direct measure of correlated blindness). Match rule: basename + category + line within tolerance; a right-place wrong-category hit does not count. The scorer is the instrument for the blinded benchmark in `docs/benchmark-protocol.md`; that benchmark has not been run and this tool invents no numbers.
+
+```bash
+recall_score.py --corpus <corpus.json> --detections <per-voice.json|findings.json> [--json]
+```
+
 ## `install-agents.py` — install the canonical agent bodies into a target harness
 
 Builds per-harness agent wrappers (Claude Code subagent or OpenCode subagent) from the canonical bodies under `colosseum/agents/*-body.md`. Run before the first OpenCode dispatch in a new project:

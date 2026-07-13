@@ -1,0 +1,8 @@
+{
+  "confirmed": [
+    {"file": "src/counter.rs", "line": 10, "category": "off-by-one", "sources": ["voice-a", "voice-b"], "title": "D1 credited to two voices via sources[]"},
+    {"file": "src/parse.rs", "line": 20, "category": "unchecked-arithmetic", "sources": ["voice-c"], "title": "D2"}
+  ],
+  "refuted": [],
+  "unverifiedDefects": []
+}

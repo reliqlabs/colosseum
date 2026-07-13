@@ -1,0 +1,64 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "example-crate",
+  "target_snapshot": "0000000+worktree-clean",
+  "line_tolerance": 5,
+  "_comment": "Ground truth for M3 recall scoring. Each defect is a KNOWN planted flaw. A voice's finding counts as detecting a defect iff it matches the defect's detection_key by (file basename, category exact, line within line_tolerance). See docs/benchmark-protocol.md for the match rule and metric definitions. cheapest_capable_layer ties to the assurance pyramid ordering in docs/self-measurement.md (M2); it records the cheapest layer whose method could in principle catch this defect, used later for routing analysis, not for recall.",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "src/counter.rs",
+      "line": 10,
+      "category": "off-by-one",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "loop bound uses <= where < is required, writes one past the buffer",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/counter.rs:10:off-by-one"
+    },
+    {
+      "id": "D2",
+      "file": "src/parse.rs",
+      "line": 20,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "u32 addition can overflow on adversarial input",
+      "cheapest_capable_layer": "bounded-model-check",
+      "detection_key": "src/parse.rs:20:unchecked-arithmetic"
+    },
+    {
+      "id": "D3",
+      "file": "src/state.rs",
+      "line": 30,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "a rare interleaving leaves the accumulator inconsistent with the index; only a model checker over the full transition relation finds it",
+      "cheapest_capable_layer": "proof",
+      "detection_key": "src/state.rs:30:invariant-violation"
+    },
+    {
+      "id": "D4",
+      "file": "src/api.rs",
+      "line": 40,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "public entry point indexes a slice without validating the caller-supplied offset",
+      "cheapest_capable_layer": "types",
+      "detection_key": "src/api.rs:40:missing-bounds-check"
+    },
+    {
+      "id": "D5",
+      "file": "src/config.rs",
+      "line": 50,
+      "category": "default-mismatch",
+      "severity": "low",
+      "planted_by": "corpus-author",
+      "description": "documented default differs from the coded default",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/config.rs:50:default-mismatch"
+    }
+  ]
+}

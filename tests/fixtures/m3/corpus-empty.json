@@ -1,0 +1,7 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "empty-fixture",
+  "target_snapshot": "abc1234+worktree-clean",
+  "line_tolerance": 5,
+  "defects": []
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "m3-fixture-crate",
+  "target_snapshot": "abc1234+worktree-clean",
+  "line_tolerance": 5,
+  "defects": [
+    {"id": "D1", "file": "src/counter.rs", "line": 10, "category": "off-by-one", "severity": "high", "detection_key": "src/counter.rs:10:off-by-one", "cheapest_capable_layer": "property-tests"},
+    {"id": "D2", "file": "src/parse.rs", "line": 20, "category": "unchecked-arithmetic", "severity": "high", "detection_key": "src/parse.rs:20:unchecked-arithmetic", "cheapest_capable_layer": "bounded-model-check"},
+    {"id": "D3", "file": "src/state.rs", "line": 30, "category": "invariant-violation", "severity": "critical", "detection_key": "src/state.rs:30:invariant-violation", "cheapest_capable_layer": "proof"},
+    {"id": "D4", "file": "src/api.rs", "line": 40, "category": "missing-bounds-check", "severity": "medium", "detection_key": "src/api.rs:40:missing-bounds-check", "cheapest_capable_layer": "types"},
+    {"id": "D5", "file": "src/config.rs", "line": 50, "category": "default-mismatch", "severity": "low", "detection_key": "src/config.rs:50:default-mismatch", "cheapest_capable_layer": "property-tests"}
+  ]
+}
