@@ -24,7 +24,7 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 ### Voice roster (authoritative source: `registry/voices.json`)
 
-The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). Only `claude-agent` and `kimi-k2.6` carry non-pending calibration today; the other doc-pinned panel voices are dispatch-verified candidates awaiting a fitness run.
+The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). `claude-agent` and `kimi-k2.6` hold canonical-panel status; `gpt-oss-120b` and `nemotron-3-120b-a12b` are candidates with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); the remaining doc-pinned voices await a fitness run.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
 | Voice id | Model | Family | Harness | Status | Calibration |
@@ -35,7 +35,7 @@ The adversarial voice roster is registry-driven. `registry/voices.json` is the s
 | `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | DeepSeek | opencode | candidate | pending |
 | `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | Google | opencode | candidate | pending |
 | `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | OpenAI-OSS | opencode | candidate | cited |
-| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | NVIDIA | opencode | candidate | pending |
+| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | NVIDIA | opencode | candidate | cited |
 | `glm-5.2` | `burnt/cloudflare-100/@cf/zai-org/glm-5.2` | Zhipu | opencode | candidate | pending |
 | `leanstral-2603` | `lmstudio/leanstral-2603` | Mistral | opencode | local-specialist | n/a |
 | `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | Zhipu | opencode | excluded | cited |

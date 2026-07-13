@@ -1,0 +1,11 @@
+[0m
+> spec-adversary · cloudflare-100/@cf/moonshotai/kimi-k2.6
+[0m
+[0m→ [0mRead REVIEW-INSTRUCTIONS.md
+[0m→ [0mRead INTENT.md
+[0m✱ [0mGlob "src/**/*"[90m 5 matches[0m
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead src/api.rs
+[0m→ [0mRead src/bucket.rs
+[0m→ [0mRead src/window.rs
+[0m→ [0mRead src/config.rs

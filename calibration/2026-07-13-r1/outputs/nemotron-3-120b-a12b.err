@@ -1,0 +1,11 @@
+[0m
+> spec-adversary · cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b
+[0m
+[0m✱ [0mGlob "**"[90m 100 matches[0m
+[0m→ [0mRead REVIEW-INSTRUCTIONS.md
+[0m→ [0mRead INTENT.md
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead src/api.rs
+[0m→ [0mRead src/bucket.rs
+[0m→ [0mRead src/config.rs
+[0m→ [0mRead src/window.rs

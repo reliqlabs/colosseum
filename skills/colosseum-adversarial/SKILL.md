@@ -128,7 +128,7 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 - `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending) — endpoint `http://127.0.0.1:8000`.
 - `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending) — requires `GOOGLE_GENERATIVE_AI_API_KEY`.
 - `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS, Burnt gateway. candidate (partial calibration)
-- `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA, Burnt gateway. candidate (calibration pending)
+- `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA, Burnt gateway. candidate
 - `burnt/cloudflare-100/@cf/zai-org/glm-5.2` — Zhipu, Burnt gateway. candidate (calibration pending)
 - `lmstudio/leanstral-2603` — Mistral, local. local-specialist (Lean-only; substitute for one general voice only when the spec IS a Lean theorem).
 - `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`).

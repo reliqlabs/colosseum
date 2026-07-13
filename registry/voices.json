@@ -1,8 +1,6 @@
 {
   "_comment_purpose": "Colosseum voice registry (C4). THIS FILE, not the prose docs, is the authoritative roster of adversarial voices. Every hand-maintained roster site (README, INSTALL, the adversarial/code-adversarial SKILLs, scripts/README, dispatch.config.example.json) is generated from here by scripts/gen_roster_docs.py between explicit markers. Edit a voice here, run `gen_roster_docs.py`, and the doc blocks follow. `gen_roster_docs.py --check` fails CI on drift.",
-
   "_comment_registry_rule": "REGISTRY RULE — calibration is the gate. A voice may hold status 'canonical-panel' only if its `calibration` field is non-pending: it cites a run that actually demonstrated the voice's adversarial fitness. Calibration evidence is required to ENTER the canonical panel AND to LEAVE it (demotion/retirement records the evidence too). A voice that is doc-pinned but has only a dispatchability probe (`opencode run ... \"Reply with exactly: ok\"`) or a config note is NOT calibrated — it is a 'candidate' with `calibration: pending`. Dispatchability is not fitness. See scripts/colosseum_doctor.py (registry-integrity check) and tests/r0_registry_docs.py (enforced invariant).",
-
   "_comment_schema": {
     "version": "1",
     "voice_fields": {
@@ -33,7 +31,6 @@
       "content_hash": "sha256:<16hex> over the normalized profile (voice id+variant set only; label excluded), computed by scripts/gen_roster_docs.py:profile_content_hash. Recomputed and verified by doctor and tests/r0. A membership or variant change moves the hash, so a pinned 'canonical-5@<hash>' is a frozen, content-addressed panel."
     }
   },
-
   "voices": [
     {
       "id": "claude-agent",
@@ -43,7 +40,7 @@
       "provider": null,
       "default_variant": "max",
       "status": "canonical-panel",
-      "calibration": "verified-rcv intent-revised multi-voice run (7 voices, 16 themes) — Claude-via-Agent contributed file-access findings text-only voices missed (skills/colosseum-adversarial/SKILL.md Step 7 exemplar). Corroborated by the colosseum self-review round1 (claude-fable-5 reviewers, 60/60 confirmed defects — scratchpad/evidence/MANIFEST.txt).",
+      "calibration": "verified-rcv intent-revised multi-voice run (7 voices, 16 themes) — Claude-via-Agent contributed file-access findings text-only voices missed (skills/colosseum-adversarial/SKILL.md Step 7 exemplar). Corroborated by the colosseum self-review round1 (claude-fable-5 reviewers, 60/60 confirmed defects — scratchpad/evidence/MANIFEST.txt). Seeded-defect recall 8/8 plus one confirmed unplanted defect (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
@@ -58,7 +55,7 @@
       "provider": "burnt",
       "default_variant": "max",
       "status": "canonical-panel",
-      "calibration": "verified-rcv single-voice ReAct calibration: caught 5 state-invariant attacks (S5/S6/S9/S10 + Block 6 set-relations) where the inlined single-shot variant found 1 hedged mention; 6.8-15.0K chars/slice, 143-371s, ~10% retry at output cap 131072 (skills/colosseum-adversarial/SKILL.md Step 4 empirical-results table).",
+      "calibration": "verified-rcv single-voice ReAct calibration: caught 5 state-invariant attacks (S5/S6/S9/S10 + Block 6 set-relations) where the inlined single-shot variant found 1 hedged mention; 6.8-15.0K chars/slice, 143-371s, ~10% retry at output cap 131072 (skills/colosseum-adversarial/SKILL.md Step 4 empirical-results table). Seeded-defect recall 8/8, blinded single-pass code review, exact-category match (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
@@ -74,7 +71,9 @@
       "default_variant": "max",
       "status": "candidate",
       "calibration": "pending",
-      "requires_env": ["OPENAI_API_KEY"],
+      "requires_env": [
+        "OPENAI_API_KEY"
+      ],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
@@ -104,7 +103,9 @@
       "default_variant": "max",
       "status": "candidate",
       "calibration": "pending",
-      "requires_env": ["GOOGLE_GENERATIVE_AI_API_KEY"],
+      "requires_env": [
+        "GOOGLE_GENERATIVE_AI_API_KEY"
+      ],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
@@ -118,7 +119,7 @@
       "provider": "burnt",
       "default_variant": "max",
       "status": "candidate",
-      "calibration": "partial: verified-rcv exercised it and characterized a cross-block/cross-section confusion failure mode (flagged 'Block 6 self-contradicts' by conflating Block 5's idempotent self-loop with Block 6's transitional rejection — skills/colosseum-adversarial/SKILL.md Section B). Useful supplementary voice; not yet a clean canonical-panel fitness run.",
+      "calibration": "partial: verified-rcv exercised it and characterized a cross-block/cross-section confusion failure mode (flagged 'Block 6 self-contradicts' by conflating Block 5's idempotent self-loop with Block 6's transitional rejection — skills/colosseum-adversarial/SKILL.md Section B). Useful supplementary voice; not yet a clean canonical-panel fitness run. Clean fitness run: seeded-defect recall 8/8 with exact lines and clean output-contract compliance (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
@@ -133,7 +134,7 @@
       "provider": "burnt",
       "default_variant": "max",
       "status": "candidate",
-      "calibration": "pending",
+      "calibration": "Seeded-defect recall 7/8: found all planted lines but labeled D6 missing-validation where the corpus says error-swallowed, a right-place wrong-category miss under the pre-registered rule (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
@@ -153,7 +154,7 @@
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "Zhipu GLM 5.2 — the full (non-flash) tier proposed as the Zhipu voice after glm-4.7-flash was excluded. Live on Cloudflare Workers AI but not yet exposed on the operator gateway at pin time; calibrate before adding to any panel. Distinct from the excluded glm-4.7-flash."
+      "notes": "Zhipu GLM 5.2 — the full (non-flash) tier proposed as the Zhipu voice after glm-4.7-flash was excluded. Live on Cloudflare Workers AI but not yet exposed on the operator gateway at pin time; calibrate before adding to any panel. Distinct from the excluded glm-4.7-flash. 2026-07-13: agentic dispatch failed twice with gateway 'Unexpected server error' (refs err_f8ee989f, err_1de17803) while trivial probes partially respond; see calibration/2026-07-13-r1/errored.json."
     },
     {
       "id": "leanstral-2603",
@@ -201,17 +202,31 @@
       "notes": "EXCLUDED representative of the theorem-prover-specialist class. Kept as the canonical example so the class exclusion is documented."
     }
   ],
-
   "profiles": [
     {
       "name": "canonical-5",
       "description": "The default milestone panel doc-pinned at 2026-07-11: five family-diverse voices at --variant max. NOTE the honesty gap the registry surfaces: only claude-agent and kimi-k2.6 carry non-pending calibration (status canonical-panel); gpt-5.6-sol-pro, deepseek-v4-flash, and gemini-3.1-pro-preview are dispatch-verified candidates whose adversarial-fitness calibration is still pending. The profile stays pinned (it is what a runner reproduces), but a run should record that 3/5 members are candidate-status. Pin a run as 'panel canonical-5@<content_hash>'.",
       "voices": [
-        {"id": "claude-agent", "variant": "max"},
-        {"id": "gpt-5.6-sol-pro", "variant": "max"},
-        {"id": "kimi-k2.6", "variant": "max"},
-        {"id": "deepseek-v4-flash", "variant": "max"},
-        {"id": "gemini-3.1-pro-preview", "variant": "max"}
+        {
+          "id": "claude-agent",
+          "variant": "max"
+        },
+        {
+          "id": "gpt-5.6-sol-pro",
+          "variant": "max"
+        },
+        {
+          "id": "kimi-k2.6",
+          "variant": "max"
+        },
+        {
+          "id": "deepseek-v4-flash",
+          "variant": "max"
+        },
+        {
+          "id": "gemini-3.1-pro-preview",
+          "variant": "max"
+        }
       ],
       "content_hash": "sha256:19595e6530eb6331"
     }

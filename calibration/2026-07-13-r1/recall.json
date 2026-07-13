@@ -1,0 +1,122 @@
+{
+  "target": "throttle",
+  "target_snapshot": "c6429a67e0ff+worktree-clean",
+  "line_tolerance": 5,
+  "defect_count": 8,
+  "voices": [
+    "claude-agent",
+    "gpt-oss-120b",
+    "kimi-k2.6",
+    "nemotron-3-120b-a12b"
+  ],
+  "per_voice": {
+    "claude-agent": {
+      "recall": 1.0,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 1
+    },
+    "gpt-oss-120b": {
+      "recall": 1.0,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 0
+    },
+    "kimi-k2.6": {
+      "recall": 1.0,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 0
+    },
+    "nemotron-3-120b-a12b": {
+      "recall": 0.875,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 2
+    }
+  },
+  "shared_blind_spot": [],
+  "shared_blind_spot_count": 0,
+  "panel_union_recall": 1.0,
+  "caught_by": {
+    "D1": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ],
+    "D2": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ],
+    "D3": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ],
+    "D4": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ],
+    "D5": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ],
+    "D6": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6"
+    ],
+    "D7": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ],
+    "D8": [
+      "claude-agent",
+      "gpt-oss-120b",
+      "kimi-k2.6",
+      "nemotron-3-120b-a12b"
+    ]
+  },
+  "unmatched_note": "unmatched detections are candidate false positives; precision is not computed without ground-truth labels"
+}

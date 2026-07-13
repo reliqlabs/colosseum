@@ -1,0 +1,97 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "throttle",
+  "target_snapshot": "c6429a67e0ff+worktree-clean",
+  "line_tolerance": 5,
+  "_comment": "Ground truth for calibration run 2026-07-13-r1. Blinded: this file never enters the dispatch directory. Match rule per docs/benchmark-protocol.md: file basename + exact category + line within tolerance.",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "src/window.rs",
+      "line": 37,
+      "category": "off-by-one",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "admit() uses `len() <= limit` where B1 requires `<`; the limit+1-th event in a window is admitted",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/window.rs:37:off-by-one"
+    },
+    {
+      "id": "D2",
+      "file": "src/bucket.rs",
+      "line": 47,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "refill computes `ticks * refill_rate` in u32 without saturation; large elapsed wraps the product, violating B2",
+      "cheapest_capable_layer": "bounded-model-check",
+      "detection_key": "src/bucket.rs:47:unchecked-arithmetic"
+    },
+    {
+      "id": "D3",
+      "file": "src/bucket.rs",
+      "line": 65,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "deposit() saturating_adds without clamping to capacity; tokens can exceed capacity, violating B3",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/bucket.rs:65:invariant-violation"
+    },
+    {
+      "id": "D4",
+      "file": "src/api.rs",
+      "line": 70,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "stats_for() indexes shards with the caller-supplied index and always returns Some; out-of-range panics instead of returning None per B4",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/api.rs:70:missing-bounds-check"
+    },
+    {
+      "id": "D5",
+      "file": "src/config.rs",
+      "line": 9,
+      "category": "default-mismatch",
+      "severity": "low",
+      "planted_by": "corpus-author",
+      "description": "DEFAULT_BURST is 80; B5 and the doc comment say the default burst is 8",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/config.rs:9:default-mismatch"
+    },
+    {
+      "id": "D6",
+      "file": "src/config.rs",
+      "line": 67,
+      "category": "error-swallowed",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "a malformed rate value is silently replaced with DEFAULT_RATE via unwrap_or; B6 requires ConfigError::Malformed",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/config.rs:67:error-swallowed"
+    },
+    {
+      "id": "D7",
+      "file": "src/api.rs",
+      "line": 46,
+      "category": "logic-inversion",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "check() enforces limits for allowlisted keys and bypasses everyone else; B7 requires the opposite",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/api.rs:46:logic-inversion"
+    },
+    {
+      "id": "D8",
+      "file": "src/bucket.rs",
+      "line": 25,
+      "category": "missing-validation",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "new() validates capacity but not refill_interval_ms; zero interval passes B8's required ZeroInterval rejection and later divides by zero in refill()",
+      "cheapest_capable_layer": "types",
+      "detection_key": "src/bucket.rs:25:missing-validation"
+    }
+  ]
+}

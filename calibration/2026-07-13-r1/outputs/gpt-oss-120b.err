@@ -1,0 +1,15 @@
+[0m
+> spec-adversary · cloudflare-100/@cf/openai/gpt-oss-120b
+[0m
+[0m→ [0mRead REVIEW-INSTRUCTIONS.md[90m [limit=2000][0m
+[0m→ [0mRead INTENT.md[90m [limit=2000][0m
+[0m✱ [0mGlob "src/**/*.rs"[90m 5 matches[0m
+[0m→ [0mRead src/api.rs[90m [limit=4000][0m
+[0m→ [0mRead src/bucket.rs[90m [limit=4000][0m
+[0m→ [0mRead src/config.rs[90m [limit=4000][0m
+[0m→ [0mRead src/window.rs[90m [limit=4000][0m
+[0m→ [0mRead src/lib.rs[90m [limit=4000][0m
+[0m→ [0mRead src/window.rs[90m [limit=100][0m
+[0m→ [0mRead src/bucket.rs[90m [limit=120][0m
+[0m→ [0mRead src/config.rs[90m [limit=120][0m
+[0m→ [0mRead src/api.rs[90m [limit=120][0m
