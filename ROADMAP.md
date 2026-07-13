@@ -45,22 +45,24 @@ The plan of record's "dependable" gate has ten criteria. Current state:
 | 6 | Cross-axis claims labeled conformance-tested until refinement exists | satisfied (R24, R26) |
 | 7 | Critique loop exercised once on a REAL contested finding, recorded per G4 | open — machinery tested (R23, R25); no real contested-finding record yet |
 | 8 | Skills/agents/wrappers pass pinned validators | satisfied (R13) |
-| 9 | Known-good reference project passes; known-bad variants fail at intended gates | open (R22) |
+| 9 | Known-good reference project passes; known-bad variants fail at intended gates | satisfied (R22, `tests/fixtures/r22/` jobq project + `tests/r22_reference_project.py`) |
 | 10 | Prospective benchmark shows benefit at reported cost; independent replication | open (M3 benchmark, M6) |
 
 ## Remaining work
 
-### W1. R22 reference project (owner: maintainer/agent; no external inputs)
+### W1. R22 reference project — DONE 2026-07-13
 
-A small known-good Rust project carried through the entire pipeline (intent →
-spec → panel attack → critique loop → verification pyramid → two-gate ledger),
-committed with its full evidence trail, plus known-bad variants that each fail
-at their intended gate (ledger reference gate, semantic evidence gate, floors,
-`quint verify`, axiom gate, conformance replay). Largest remaining in-repo
-item. Doubles as: the dogfooding exemplar, a benchmark target for W2, the M7
-proof target (W5), and the natural place to exercise criterion 7's real
-contested finding. Definition of done: R22 suite in `tests/` runs the good
-project green and every bad variant red at the right gate.
+`tests/fixtures/r22/`: the `jobq` crate (single-worker queue, bounded
+retries) with INTENT.md, Quint spec, obligations manifest, floors,
+hash-bound ledger, and a conformance adapter that path-depends on the real
+library. Verified live at authoring time: 6 tests, clippy clean, Apalache
+depth-12 on B1-B4, W1 witness trace, 5/5 conformance traces, kani bounded
+proof, `VERIFIED[tested]` and `VERIFIED[bounded]`. `tests/r22_reference_project.py`
+runs the good project through every gate and six known-bad mutations that
+each fail at exactly their intended gate while another stays green. Still
+useful as: the W2 benchmark target, the W5 proof target, and the place to
+exercise criterion 7's real contested finding (panel attack on the intent
+has NOT been run yet; only the mechanical gates have).
 
 ### W2. M3 prospective benchmark (owner: maintainer/agent; API cost)
 

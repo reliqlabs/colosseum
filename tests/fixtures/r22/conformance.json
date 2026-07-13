@@ -1,0 +1,8 @@
+{
+  "spec": "project/specs/jobq.qnt",
+  "adapter": ["adapter/target/debug/r22-adapter"],
+  "n_traces": 5,
+  "max_steps": 12,
+  "max_samples": 200,
+  "seed": "0x1"
+}

@@ -1,0 +1,9 @@
+[package]
+name = "r22-adapter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+jobq = { path = "../project" }
+
+[workspace]
