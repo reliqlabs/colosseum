@@ -1,0 +1,41 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "m3b-fixture-crate",
+  "target_snapshot": "0000000+m3b-stub",
+  "line_tolerance": 5,
+  "_comment": "Tiny fixture corpus for tests/m3b_benchmark_runner.py. Four planted defects across two files; the stub dispatcher emits findings that match a hand-computable subset per voice. Never enters the target dir; passed to recall_score by path only.",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "src/a.rs",
+      "line": 10,
+      "category": "off-by-one",
+      "severity": "high",
+      "detection_key": "src/a.rs:10:off-by-one"
+    },
+    {
+      "id": "D2",
+      "file": "src/a.rs",
+      "line": 20,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "detection_key": "src/a.rs:20:unchecked-arithmetic"
+    },
+    {
+      "id": "D3",
+      "file": "src/b.rs",
+      "line": 30,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "detection_key": "src/b.rs:30:invariant-violation"
+    },
+    {
+      "id": "D4",
+      "file": "src/b.rs",
+      "line": 40,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "detection_key": "src/b.rs:40:missing-bounds-check"
+    }
+  ]
+}

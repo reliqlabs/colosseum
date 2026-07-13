@@ -85,6 +85,16 @@ Given a seeded-defect corpus (planted flaws as ground truth) and per-voice detec
 recall_score.py --corpus <corpus.json> --detections <per-voice.json|findings.json> [--json]
 ```
 
+## `benchmark_run.py` — pre-registered ablation-arm runner (P2 measurement instrument)
+
+Runs the five arms fixed in `docs/benchmark-protocol.md` (ordinary review, single model, repeated same-model, multi-family panel, adversarial panel with one critique round) against one seeded target and scores each arm with `recall_score.py`. This is the benchmark RUN the protocol lists as pending. Every model call goes through one dispatch abstraction: a command template (default `opencode run --model {model} --agent spec-adversary {prompt}`, cwd = the `--targets` dir) overridable with `--dispatch-cmd` so tests substitute a stub; no other code path invokes a model. The corpus is never read by the runner and never enters a prompt or the target dir; it is passed by path to `recall_score.py` at scoring time only. Voice outputs are parsed with the fenced-json convention (last `json` block wins, bare-array fallback); an errored dispatch is logged and excluded from detections, never scored as a zero. Arm 5's critique round shows each voice the deduped, authorship-blinded union of the other voices' round-1 findings; round 2 is recorded and scored separately. `--dry-run` prints the dispatch plan and exits without dispatching. Exit 0 = all requested arms scored; 2 = usage/config error; 3 = INCOMPLETE (dispatcher missing, an arm with zero successful dispatches, or `recall_score` could not score it). Token/cost fields in `summary.json` are null unless a dispatch supplies token data.
+
+```bash
+benchmark_run.py --corpus <corpus.json> --targets <dir-with-REVIEW-INSTRUCTIONS.md> \
+  --voices <csv> --out <dir> [--arms ordinary,single,repeated,multi-family,adversarial] \
+  [--repeats 3] [--dispatch-cmd '<template>'] [--dry-run]
+```
+
 ## `self_measure.py` — adversarial-yield, cost, and routing metrics (P2 measurement instrument)
 
 Reports Colosseum's own run artifacts. `yield` gives per-voice adversarial yield by severity and confirmed-vs-refuted at adjudication; `cost` attributes token cost per confirmed finding from opencode `--format json` event data and reports cost unmeasured (not zero) when the data is absent; `routing` computes the cheapest-capable-layer metric only over an explicit layer map, returning INCOMPLETE rather than a number when the label data is missing. Metric definitions live in `docs/self-measurement.md`.
