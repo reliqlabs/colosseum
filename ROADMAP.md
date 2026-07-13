@@ -101,8 +101,11 @@ The gate for "validated" returning to the README. Needs:
 3. Optional but recommended: they author the W2 corpus, closing the
    orchestrator-blindness gap.
 
-A short replication-protocol doc (what to run, what artifacts to return) is
-worth writing before handoff; it does not exist yet.
+The replication protocol exists at `docs/replication-protocol.md` — what to
+run, what to return, and how results get recorded
+(`replications/<date>-<party>/`, manifest conventions, and the
+"validated" gate as a conjunction of a merged replication and published
+benchmark results).
 
 ### W5. M7 refinement proofs (owner: maintainer/agent; heavy proof work)
 

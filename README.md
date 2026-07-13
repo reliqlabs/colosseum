@@ -8,7 +8,7 @@ This is not a product. It is a process — an attempt to develop the practice of
 
 ## Status and roadmap
 
-See **[ROADMAP.md](./ROADMAP.md)** — where the methodology stands against its own exit criteria, what remains open, and who each item waits on.
+See **[ROADMAP.md](./ROADMAP.md)** — where the methodology stands against its own exit criteria, what remains open, and who each item waits on. Independent replication follows [docs/replication-protocol.md](./docs/replication-protocol.md).
 
 ## Starting a new project
 
