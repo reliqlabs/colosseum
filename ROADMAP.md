@@ -43,10 +43,10 @@ The plan of record's "dependable" gate has ten criteria. Current state:
 | 4 | Lean and Quint evidence classes honest | satisfied (R7, R8) |
 | 5 | Least-privilege external-model execution + injection fixtures | satisfied (R10-R12; deny-first confirmed live) |
 | 6 | Cross-axis claims labeled conformance-tested until refinement exists | satisfied (R24, R26) |
-| 7 | Critique loop exercised once on a REAL contested finding, recorded per G4 | open — machinery tested (R23, R25); no real contested-finding record yet |
+| 7 | Critique loop exercised once on a REAL contested finding, recorded per G4 | satisfied (`dogfood/jobq-2026-07-13/ADJUDICATION.md`: panel attack on jobq; F2 finite-arithmetic gap retained OPEN under G4, corroborated by the W5 Aeneas proof) |
 | 8 | Skills/agents/wrappers pass pinned validators | satisfied (R13) |
 | 9 | Known-good reference project passes; known-bad variants fail at intended gates | satisfied (R22, `tests/fixtures/r22/` jobq project + `tests/r22_reference_project.py`) |
-| 10 | Prospective benchmark shows benefit at reported cost; independent replication | open (M3 benchmark, M6) |
+| 10 | Prospective benchmark shows benefit at reported cost; independent replication | open — runner built (`scripts/benchmark_run.py`) and a harder held-out corpus is staged; the benchmark RUN and independent replication have not happened |
 
 ## Remaining work
 
@@ -80,6 +80,13 @@ Needs, in order:
    same-model, multi-family panel, adversarial panel with critique loop.
 3. Results published with negative results and cost accounting, per protocol.
 
+Status 2026-07-13: the arm runner is built and tested
+(`scripts/benchmark_run.py`, `tests/m3b_benchmark_runner.py`), and a harder
+multi-target held-out corpus is staged outside the repo (two crates, ten
+defects across all four hardness axes, authored to break the r1 ceiling).
+The RUN has not happened. Running it needs the live panel over the staged
+corpus, then scoring with `recall_score.py`.
+
 Definition of done: a results file in `calibration/` with all five arms,
 including any arm where the panel failed to beat the baseline.
 
@@ -109,11 +116,12 @@ benchmark results).
 
 ### W5. M7 refinement proofs (owner: maintainer/agent; heavy proof work)
 
-Feasibility spike DONE 2026-07-13 (`spikes/2026-07-13-m7-aeneas/`): jobq
-extracts to Lean with zero crate changes (Charon 0.1.191 + Aeneas e8bd9d0b),
-the extracted model typechecks, and B1 is PROVED sorry-free over the
-extracted `fail` (standard axioms only; conditional on the u32
-well-formedness bound). Verdict: feasible-with-scaffolding. What remains for
+Feasibility spike DONE 2026-07-13 (`docs/m7-feasibility.md`; heavy artifacts
+and repro held outside the repo, paths in the `m7-aeneas-toolchain` memory):
+jobq extracts to Lean with zero crate changes (Charon + Aeneas), the
+extracted model typechecks, and B1 is PROVED sorry-free over the extracted
+`fail` (standard axioms only; conditional on the u32 well-formedness bound).
+Verdict: feasible-with-scaffolding. What remains for
 a real refinement claim: manual Quint-to-Lean transcription of the
 transition relation (~8 defs), a refinement relation bridging int/U32 and
 capacity constant/field (~2 defs), init + per-action forward-simulation
@@ -133,10 +141,25 @@ install it if the Verus layer should participate.
   `http://127.0.0.1:8000`) to be running; then calibrate on the W2 corpus.
 - `gemini-3.1-pro-preview`: requires `GOOGLE_GENERATIVE_AI_API_KEY` (or an
   opencode Google credential); then calibrate on the W2 corpus.
-- `colosseum_doctor` checks env vars but not opencode's auth store, so it
-  false-warns on voices that authenticate via OAuth (as `gpt-5.6-sol` does).
-  Small fix (agent).
+- `colosseum_doctor` OAuth false-warn: FIXED 2026-07-13 (checks all three
+  opencode credential paths, not just env vars).
 - Push `main` (one command once a remote/destination is chosen).
+
+### jobq spec strengthening (owner: maintainer/agent; from the C7 dogfood)
+
+The 2026-07-13 panel attack on the R22 fixture
+(`dogfood/jobq-2026-07-13/ADJUDICATION.md`) confirmed real spec-quality gaps
+in our own reference project, worth fixing so R22 models best practice:
+- add `inv_b1_lower = running implies attempts >= 1` (or a biconditional
+  `inv_b3`) and a non-negativity invariant, so the invariant set is
+  standalone evidence for B1 (F1);
+- parameterize `CAPACITY` in `specs/jobq.qnt` instead of pinning it to 3 (F3);
+- resolve the finite-arithmetic gap (F2, still OPEN): model u32 overflow in
+  Quint with checked/saturating semantics, or add a justified trust
+  assumption bounding total submissions.
+Any of these shifts R22 line numbers, so the ledger hashes and
+`tests/r22_reference_project.py` mutation offsets must be regenerated in the
+same change.
 
 ## Suggested sequence
 
