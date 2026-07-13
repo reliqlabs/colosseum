@@ -6,6 +6,10 @@ A methodology for building dependable software in a world of fast, unreliable LL
 
 This is not a product. It is a process — an attempt to develop the practice of producing software whose correctness is *mechanically* trustworthy, while preserving the speed and breadth that frontier LLMs bring. The methodology is dogfooded against real projects (Quartz, verified-rcv, bidboard — see the table below). These are dogfood observations that drive the next iteration; a project becomes citable methodology evidence only once it has a status:manifested evidence manifest (schema and rule in `docs/dogfood-evidence.md`). Prospective validation — measured defect recall against simpler baselines — has not yet been run.
 
+## Status and roadmap
+
+See **[ROADMAP.md](./ROADMAP.md)** — where the methodology stands against its own exit criteria, what remains open, and who each item waits on.
+
 ## Starting a new project
 
 See **[QUICKSTART.md](./QUICKSTART.md)** — the front door for anyone bringing a new project into the methodology. It traces the minimal install, the project directory setup, and the ten-stage workflow as concrete skill invocations.
