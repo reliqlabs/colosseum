@@ -124,15 +124,28 @@ def validate_record(rec: dict, expect_snapshot: str | None) -> list[str]:
     return defects
 
 
+def unwrap(data: object) -> list[dict]:
+    """Flatten one JSON payload to a list of record objects. A bare list or
+    a bare single record is unversioned (v0). An object carrying a `records`
+    key is the M5 versioned ledger envelope
+    (`{"ledger_schema_version": ..., "records": [...]}`); unwrap it. The
+    version field itself is not validated here (that is
+    check_ledger_version.py's job); this reader only accepts either shape so
+    a versioned ledger and its equivalent bare list gate identically."""
+    if isinstance(data, dict) and "records" in data:
+        data = data["records"]
+    if isinstance(data, list):
+        return data
+    return [data]
+
+
 def load_records(path: Path) -> list[dict]:
     if path.is_dir():
         records = []
         for p in sorted(path.glob("*.json")):
-            data = json.loads(p.read_text())
-            records.extend(data if isinstance(data, list) else [data])
+            records.extend(unwrap(json.loads(p.read_text())))
         return records
-    data = json.loads(path.read_text())
-    return data if isinstance(data, list) else [data]
+    return unwrap(json.loads(path.read_text()))
 
 
 def main() -> int:
