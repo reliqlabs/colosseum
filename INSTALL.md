@@ -370,7 +370,7 @@ Verify with `opencode run --model openai/gpt-5.6-sol-pro "Reply with exactly: ok
 **Canonical panel (`canonical-5@sha256:19595e6530eb6331`).** The milestone panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); the rest dispatch through OpenCode:
 
 - `claude-agent` — in-harness Claude Agent subagent (Mode 2); no opencode.jsonc entry. **canonical-panel** (calibrated)
-- `openai/gpt-5.6-sol-pro` — OpenAI, direct openai provider. candidate (calibration pending). Set `OPENAI_API_KEY`.
+- `openai/gpt-5.6-sol-pro` — OpenAI, direct openai provider. candidate. Set `OPENAI_API_KEY`.
 - `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated).
 - `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending). Local endpoint `http://127.0.0.1:8000` must be reachable.
 - `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending). Set `GOOGLE_GENERATIVE_AI_API_KEY`.

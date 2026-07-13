@@ -124,12 +124,12 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
 - `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated)
-- `openai/gpt-5.6-sol-pro` — OpenAI, direct openai provider. candidate (calibration pending) — requires `OPENAI_API_KEY`.
+- `openai/gpt-5.6-sol-pro` — OpenAI, direct openai provider. candidate — requires `OPENAI_API_KEY`.
 - `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending) — endpoint `http://127.0.0.1:8000`.
 - `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending) — requires `GOOGLE_GENERATIVE_AI_API_KEY`.
 - `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS, Burnt gateway. candidate (partial calibration)
 - `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA, Burnt gateway. candidate
-- `burnt/cloudflare-100/@cf/zai-org/glm-5.2` — Zhipu, Burnt gateway. candidate (calibration pending)
+- `fireworks-ai/accounts/fireworks/models/glm-5p2` — Zhipu, Fireworks. candidate
 - `lmstudio/leanstral-2603` — Mistral, local. local-specialist (Lean-only; substitute for one general voice only when the spec IS a Lean theorem).
 - `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`).
 - **Excluded** (do NOT dispatch): `glm-4.7-flash`, `goedel-prover-v2-32b` — see `registry/voices.json` for the calibration evidence behind each exclusion.

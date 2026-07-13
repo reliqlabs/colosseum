@@ -32,10 +32,26 @@ pass per voice. Its purpose is fitness evidence for the voice registry.
 | claude-agent | 8/8 | D1-D8 | 1 | extra is a real unplanted defect (see below) |
 | gpt-oss-120b | 8/8 | D1-D8 | 0 | clean contract-following, exact lines |
 | kimi-k2.6 | 8/8 | D1-D8 | 0 | |
+| glm-5.2-fireworks | 8/8 | D1-D8 | 0 | same-day addendum; Fireworks route after the burnt-gateway route failed |
+| gpt-5.6-sol-pro | 8/8 | D1-D8 | 3 | same-day addendum; extras are marginal arithmetic calls on counters |
 | nemotron-3-120b-a12b | 7/8 | all but D6 | 2 | found D6's line but labeled it `missing-validation`, not `error-swallowed`; a right-place wrong-category miss under the pre-registered rule |
-| glm-5.2 | errored | n/a | n/a | gateway "Unexpected server error" on both attempts; excluded from recall denominators, not scored as zero |
+| glm-5.2 (burnt route) | errored | n/a | n/a | gateway "Unexpected server error" on both attempts; excluded from recall denominators, not scored as zero |
 
 Union recall: 8/8. Shared-blind-spot set: empty.
+
+### Same-day addendum (glm-5.2-fireworks, gpt-5.6-sol-pro)
+
+Two voices were added hours after the initial dispatch, same corpus, same
+protocol, same blinding. Validity: the corpus had been committed locally
+but never pushed anywhere, so neither API model could have seen it; the
+burn notice below applies from publication onward. glm-5.2 ran via
+`fireworks-ai/accounts/fireworks/models/glm-5p2` after the burnt-gateway
+route proved dead (the gateway config never exposed glm-5.2, only
+glm-4.7-flash). `openai/gpt-5.6-pro` was also requested but the account
+rejects it at dispatch time ("not supported when using Codex with a
+ChatGPT account", an account-level issue, retry pending); the
+registry-pinned `gpt-5.6-sol-pro` variant worked over the same credential
+and was calibrated instead.
 
 ## Instrument observations
 
@@ -62,8 +78,10 @@ Union recall: 8/8. Shared-blind-spot set: empty.
 ## What this run does and does not establish
 
 - DOES: per-voice recall on one seeded target under the pre-registered
-  match rule; contract-following fitness for gpt-oss-120b, kimi-k2.6, and
-  nemotron; dispatch-path failure evidence for glm-5.2.
+  match rule; contract-following fitness for gpt-oss-120b, kimi-k2.6,
+  nemotron, glm-5.2 (Fireworks route), and gpt-5.6-sol-pro; dispatch-path
+  failure evidence for glm-5.2's burnt-gateway route and for
+  gpt-5.6-pro on the current account.
 - DOES NOT: the blinded benchmark with ablation arms (still not run); any
   cross-voice superiority claim (ceiling effect); precision or
   false-positive rates; panel-composition decisions (M4 needs a harder,

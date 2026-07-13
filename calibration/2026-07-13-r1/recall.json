@@ -5,6 +5,8 @@
   "defect_count": 8,
   "voices": [
     "claude-agent",
+    "glm-5.2-fireworks",
+    "gpt-5.6-sol-pro",
     "gpt-oss-120b",
     "kimi-k2.6",
     "nemotron-3-120b-a12b"
@@ -23,6 +25,34 @@
         "D8"
       ],
       "unmatched_detections": 1
+    },
+    "glm-5.2-fireworks": {
+      "recall": 1.0,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 0
+    },
+    "gpt-5.6-sol-pro": {
+      "recall": 1.0,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 3
     },
     "gpt-oss-120b": {
       "recall": 1.0,
@@ -72,47 +102,63 @@
   "caught_by": {
     "D1": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"
     ],
     "D2": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"
     ],
     "D3": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"
     ],
     "D4": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"
     ],
     "D5": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"
     ],
     "D6": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6"
     ],
     "D7": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"
     ],
     "D8": [
       "claude-agent",
+      "glm-5.2-fireworks",
+      "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
       "nemotron-3-120b-a12b"

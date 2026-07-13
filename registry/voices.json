@@ -70,7 +70,7 @@
       "provider": "openai",
       "default_variant": "max",
       "status": "candidate",
-      "calibration": "pending",
+      "calibration": "Seeded-defect recall 8/8 with correct categories, blinded single-pass code review; 3 unmatched extras were marginal counter-arithmetic calls (calibration/2026-07-13-r1).",
       "requires_env": [
         "OPENAI_API_KEY"
       ],
@@ -143,18 +143,18 @@
     },
     {
       "id": "glm-5.2",
-      "model": "burnt/cloudflare-100/@cf/zai-org/glm-5.2",
+      "model": "fireworks-ai/accounts/fireworks/models/glm-5p2",
       "family": "Zhipu",
       "harness": "opencode",
-      "provider": "burnt",
+      "provider": "fireworks-ai",
       "default_variant": "max",
       "status": "candidate",
-      "calibration": "pending",
+      "calibration": "Seeded-defect recall 8/8 with correct categories via the Fireworks route, blinded single-pass code review (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "Zhipu GLM 5.2 — the full (non-flash) tier proposed as the Zhipu voice after glm-4.7-flash was excluded. Live on Cloudflare Workers AI but not yet exposed on the operator gateway at pin time; calibrate before adding to any panel. Distinct from the excluded glm-4.7-flash. 2026-07-13: agentic dispatch failed twice with gateway 'Unexpected server error' (refs err_f8ee989f, err_1de17803) while trivial probes partially respond; see calibration/2026-07-13-r1/errored.json."
+      "notes": "Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md."
     },
     {
       "id": "leanstral-2603",

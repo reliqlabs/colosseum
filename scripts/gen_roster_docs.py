@@ -100,6 +100,7 @@ _SEAT = {
     "burnt": "Burnt gateway",
     "openai": "direct openai provider",
     "google": "direct google provider",
+    "fireworks-ai": "Fireworks",
     "ds4": "local ds4 runner",
     "lmstudio": "local LM Studio",
     None: "in-harness Agent subagent",

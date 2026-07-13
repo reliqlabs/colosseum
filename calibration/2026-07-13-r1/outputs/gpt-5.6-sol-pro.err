@@ -1,0 +1,29 @@
+[0m
+> spec-adversary · gpt-5.6-sol-pro
+[0m
+[0m# [0mTodos
+[•] Read REVIEW-INSTRUCTIONS.md and INTENT.md
+[ ] Read every file under src/ and identify target mode/scope
+[ ] Attack the specification and produce the mandated report with fenced JSON findings block
+[0m
+[0m→ [0mRead REVIEW-INSTRUCTIONS.md
+[0m→ [0mRead INTENT.md
+[0m✱ [0mGlob "src/**/*"[90m in . · 5 matches[0m
+[0m
+[0m# [0mTodos
+[✓] Read REVIEW-INSTRUCTIONS.md and INTENT.md
+[•] Read every file under src/ and identify target mode/scope
+[ ] Attack the specification and produce the mandated report with fenced JSON findings block
+[0m
+[0m→ [0mRead src/api.rs
+[0m→ [0mRead src/window.rs
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead src/bucket.rs
+[0m→ [0mRead src/config.rs
+[0m✱ [0mGlob "*"[90m in . · 100 matches[0m
+[0m
+[0m# [0mTodos
+[✓] Read REVIEW-INSTRUCTIONS.md and INTENT.md
+[✓] Read every file under src/ and identify target mode/scope
+[✓] Attack the specification and produce the mandated report with fenced JSON findings block
+[0m
