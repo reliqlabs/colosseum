@@ -17,7 +17,7 @@ G2 (any fail → FAILED exit 1; any suite that could not run → INCOMPLETE exit
 | `r8_quint_semantics.py` | R8 | rare-path defect missed by seeded `quint run`, found by `quint verify`; evidence classes labeled at all three doc sites | E1 |
 | `r9_r19_obligations.py` | R9, R19 | weakened required invariant → proposal diff (verify alone stays green); vacuous invariant, disabled transition, unreachable witness caught | E3 |
 | `r10_injection_handling.py` | R10 | injection payloads contained in UNTRUSTED-REPORT delimiters; marker spoofing neutralized; skill carries data-not-instructions rule | Z3 |
-| `r11_deny_first_profiles.py` | R11 | deny-first permission shape on both agent wrappers; secrets masked; phantom flag gone (live probe half lands with Z2 environment runs) | Z1 |
+| `r11_deny_first_profiles.py` | R11 | deny-first permission shape on both agent wrappers; secrets masked; phantom flag gone. Live probe invocable via `--live` (off by default): installs the agent into an ephemeral detached worktree and dispatches one real gateway-voice probe attempting bash/write/webfetch/read-.env/edit-manifest; asserts all denied (no probe.txt, manifest byte-unchanged, .env canary never surfaces, no dangerous tool completes). Provider-unreachable is SKIP-FAIL exit 2, never a pass | Z1 |
 | `r12_preflight_scan.py` | R12 | seeded secret + escaping symlink block dispatch; worktree sheds untracked secrets; in-place mode still blocks | Z2 |
 | `r13_frontmatter_validator.py` | R13 | validator green over all skills/agents/wrappers, plus known-bad self-tests | E6 |
 | `r14_cli_contracts.py` | R14 | opencode/quint flag contracts and BOM version pins; flag drift fails here, not in field runs | E6 |
@@ -27,7 +27,10 @@ G2 (any fail → FAILED exit 1; any suite that could not run → INCOMPLETE exit
 | `r24_r26_conformance.py` | R24, R26 | seeded spec/code divergence caught by ITF-trace replay at the exact step; conformance-tested label carries trace scope through Gate B aggregation; REFINEMENT_VERIFIED emitted nowhere; script VERIFIEDs always scoped | C2 |
 | `r25_critique_loop.py` | R25 | critique loop (cross-critique/defense/re-cross-critique) under G4; blinded re-review framing; delta attack mode invocable; mandatory holistic pass; dual spec+intent citations; run-manifest phase field | C3 |
 | `r28_baseline_floors.py` | R28 | floors is a required layer under `tested`; below-floors crate (zero-test public module + missing fuzz surface) → FAILED; compliant → VERIFIED[tested]; feature-matrix combo that fails cargo check → FAILED; absent floors.json → defaults pass; cargo-fuzz absent → fuzz-time floor unmeasurable → INCOMPLETE | C8 |
+| `r_ci_selfcheck.py` | infra (not Part IV) | `ci.py` registers every named check and rejects unknown `--only`; `check_doc_links` catches broken file-links/anchors and ignores fenced code; `check_dispatch_config` rejects missing-field/duplicate/traversal configs | C10 |
 
-Fixtures that need live model dispatch (the behavioral halves of R10, R11,
-R23) are harness runs over the mechanisms tested here; they are exercised
-manually, not in this suite.
+The behavioral halves of R10 and R23 (live injection steering, contested-synthesis
+adjudication) are harness runs over the mechanisms tested here, exercised manually.
+R11's live half is invocable directly via `r11_deny_first_profiles.py --live`
+(off by default so `run_all` is unchanged); its deny-first enforcement was
+confirmed live from a preflight-clean tree.
