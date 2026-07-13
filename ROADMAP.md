@@ -109,12 +109,20 @@ benchmark results).
 
 ### W5. M7 refinement proofs (owner: maintainer/agent; heavy proof work)
 
-For at least one critical relation on a real target (W1's project is the
-candidate): Aeneas-extract the Rust to Lean and machine-check that the
-extracted model refines the Quint transition relation. Only after such a proof
-exists does the `REFINEMENT_VERIFIED` emission path get built; today the label
-is emitted nowhere by design (G3, R26). Note the doctor currently reports
-Verus not installed; install it first if the Verus layer should participate.
+Feasibility spike DONE 2026-07-13 (`spikes/2026-07-13-m7-aeneas/`): jobq
+extracts to Lean with zero crate changes (Charon 0.1.191 + Aeneas e8bd9d0b),
+the extracted model typechecks, and B1 is PROVED sorry-free over the
+extracted `fail` (standard axioms only; conditional on the u32
+well-formedness bound). Verdict: feasible-with-scaffolding. What remains for
+a real refinement claim: manual Quint-to-Lean transcription of the
+transition relation (~8 defs), a refinement relation bridging int/U32 and
+capacity constant/field (~2 defs), init + per-action forward-simulation
+lemmas (~8-10; two-sided adds ~10 with guard alignment), an explicit
+u32-boundedness hypothesis, and a Quint-line citation gate so the
+transcription cannot drift silently. Only after that lands does the
+`REFINEMENT_VERIFIED` emission path get built; today the label is emitted
+nowhere by design (G3, R26). The doctor still reports Verus not installed;
+install it if the Verus layer should participate.
 
 ### W6. Housekeeping (owner: user unless noted)
 
