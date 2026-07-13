@@ -1,5 +1,5 @@
 {
-  "ledger_schema_version": "m5-v1",
+  "ledger_schema_version": "colosseum-ledger/v1",
   "records": [
     {
       "claim_id": "B1",

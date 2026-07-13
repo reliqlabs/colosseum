@@ -85,6 +85,24 @@ Given a seeded-defect corpus (planted flaws as ground truth) and per-voice detec
 recall_score.py --corpus <corpus.json> --detections <per-voice.json|findings.json> [--json]
 ```
 
+## `self_measure.py` — adversarial-yield, cost, and routing metrics (P2 measurement instrument)
+
+Reports Colosseum's own run artifacts. `yield` gives per-voice adversarial yield by severity and confirmed-vs-refuted at adjudication; `cost` attributes token cost per confirmed finding from opencode `--format json` event data and reports cost unmeasured (not zero) when the data is absent; `routing` computes the cheapest-capable-layer metric only over an explicit layer map, returning INCOMPLETE rather than a number when the label data is missing. Metric definitions live in `docs/self-measurement.md`.
+
+```bash
+self_measure.py yield   --findings <findings.json> [--run <manifest.json>] [--json]
+self_measure.py cost    --events <opencode-events.json> [--findings <findings.json>] [--json]
+self_measure.py routing --findings <findings.json> --layer-map <layer-map.json> [--json]
+```
+
+## `check_ledger_version.py` — ledger envelope version gate (M5)
+
+Validates the `ledger_schema_version` field of a ledger envelope (`{"ledger_schema_version": "colosseum-ledger/v1", "records": [...]}`). A bare list or bare record is unversioned/v0 (valid, warns). Exit 0 for a recognized version or unversioned; exit 2 for an unknown version or a `records` object with no version. The record-consuming tools (`check_evidence_records.py`, `coverage_dashboard.py`) read either shape; the version never changes a verdict, it lets the change loop spot a schema migration.
+
+```bash
+check_ledger_version.py --ledger <project>/.colosseum/ledger.json [--json]
+```
+
 ## `install-agents.py` — install the canonical agent bodies into a target harness
 
 Builds per-harness agent wrappers (Claude Code subagent or OpenCode subagent) from the canonical bodies under `colosseum/agents/*-body.md`. Run before the first OpenCode dispatch in a new project:

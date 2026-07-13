@@ -1,7 +1,8 @@
 # Regression suite
 
-Executable fixtures from Part IV of the remediation plan of record, plus a
-small number of infra checks (r0) that are not Part IV fixtures. Each suite
+Executable fixtures from Part IV of the remediation plan of record, plus
+infra checks (r0) and P2 measurement suites (m1-m5) that are not Part IV
+fixtures. Each suite
 is a standalone `uv run --script` file: exit 0 pass, 1 fail, 2 when a required
 toolchain is absent. `./tests/run_all.py` runs everything and aggregates per
 G2 (any fail → FAILED exit 1; any suite that could not run → INCOMPLETE exit 3).
@@ -31,6 +32,7 @@ G2 (any fail → FAILED exit 1; any suite that could not run → INCOMPLETE exit
 | `m1_coverage.py` | infra (P2 measurement) | coverage dashboard reduces G1 records to per-claim status (PASS/FAIL/INCOMPLETE/missing-record/invalid/unwaived-assumption); counts and per-evidence_class breakdown correct; missing required claims surface as gaps; run verdict matches G2 truth table (mixed set → FAILED, all-PASS subset → scoped VERIFIED[...]); `--check` self-conformance catches bare VERIFIED against the token-discipline regex directly; versioned envelope input equals bare-list result | M1 |
 | `m2_yield.py` | infra (P2 measurement) | per-voice adversarial yield by severity + confirmed/refuted at adjudication; cost per confirmed finding from `--format json` token data, reported unmeasured (not zero) when tokens absent; cheapest-capable-layer routing metric computed only over a layer-labeled corpus, INCOMPLETE (exit 3) when asked to route from an unlabeled findings dump | M2 |
 | `m3_recall.py` | infra (P2 measurement) | seeded-defect recall per voice over a ground-truth corpus; match rule (basename + exact category + line within tolerance), right-place wrong-category excluded; shared blind spot (defects no voice caught) and panel union recall; findings-form `confirmed[]`/`sources[]` input path; unmatched detections counted without a precision number; empty corpus and snapshot mismatch → INCOMPLETE | M3 |
+| `m5_boundary_ledger.py` | infra (P2 measurement) | boundary skill frontmatter valid; `check_ledger_version` exit-code contract (v1 → 0, bare/unversioned → 0 with warning, unknown/malformed → 2); a versioned envelope gates to the identical G2 verdict as the equivalent bare list through `check_evidence_records` (load_records unwrap is verdict-neutral); system-intent template carries the A*/G*/composition structure | M5 |
 
 The behavioral halves of R10 and R23 (live injection steering, contested-synthesis
 adjudication) are harness runs over the mechanisms tested here, exercised manually.
