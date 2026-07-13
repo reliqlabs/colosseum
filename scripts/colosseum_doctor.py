@@ -18,9 +18,13 @@ Offline by default (no model calls, no money spent). It answers three questions:
 
   3. Is the provider plumbing in place, for free?  For each OpenCode voice in
      the canonical-4 profile: the provider is named in ~/.config/opencode/
-     opencode.jsonc, required env vars are set, and any local endpoint answers a
-     1-second TCP probe. These are warnings by default (an offline box may lack
-     providers); --strict promotes them to failures.
+     opencode.jsonc, credentials are reachable by one of the three paths
+     opencode actually supports (an env var from requires_env, an apiKey
+     embedded in the provider's opencode.jsonc options block, or an entry in
+     opencode's own auth store at ~/.local/share/opencode/auth.json), and any
+     local endpoint answers a 1-second TCP probe. These are warnings by
+     default (an offline box may lack providers); --strict promotes them to
+     failures.
 
 Drift diagnostics compare the installed state against the repo's canonical copies
 in three classes — uninstalled, drifted (content differs), extra (installed with
@@ -48,6 +52,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -163,6 +168,132 @@ def _opencode_config_text() -> str:
     return cfg.read_text() if cfg.exists() else ""
 
 
+_ENV_PLACEHOLDER_RE = re.compile(r"^\{env:[A-Za-z_][A-Za-z0-9_]*\}$")
+
+
+def _strip_jsonc_comments(text: str) -> str:
+    """Strip // line and /* */ block comments, string-aware so a literal '//'
+    inside a quoted value (e.g. a baseURL) survives."""
+    out = []
+    in_string = False
+    escape = False
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if in_string:
+            out.append(c)
+            if escape:
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == '"':
+                in_string = False
+            i += 1
+            continue
+        if c == '"':
+            in_string = True
+            out.append(c)
+            i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+_JSON_STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
+
+
+def _strip_trailing_commas(text: str) -> str:
+    """Drop a comma that precedes a closing }/] (jsonc allows these; json
+    does not), skipping over string literals so a literal ',}' in a value
+    survives untouched."""
+    out, last = [], 0
+    for m in _JSON_STRING_RE.finditer(text):
+        out.append(re.sub(r",(\s*[}\]])", r"\1", text[last:m.start()]))
+        out.append(m.group(0))
+        last = m.end()
+    out.append(re.sub(r",(\s*[}\]])", r"\1", text[last:]))
+    return "".join(out)
+
+
+def _opencode_config(cfg_text: str) -> dict | None:
+    if not cfg_text:
+        return None
+    try:
+        stripped = _strip_trailing_commas(_strip_jsonc_comments(cfg_text))
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def _provider_api_key(cfg: dict | None, provider: str | None) -> str | None:
+    """Raw (unresolved) apiKey option string for a provider block, or None if
+    the provider or the key is absent."""
+    if not cfg or not provider:
+        return None
+    block = cfg.get("provider", {}).get(provider)
+    if not isinstance(block, dict):
+        return None
+    key = block.get("options", {}).get("apiKey")
+    return key if isinstance(key, str) else None
+
+
+def _auth_store_providers() -> set[str]:
+    """Lowercased provider ids present in opencode's auth store. Names only —
+    never reads or reports credential values. An absent/unreadable/malformed
+    file yields an empty set: that auth source is skipped, not a failure."""
+    path = Path.home() / ".local" / "share" / "opencode" / "auth.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    return {k.lower() for k in data if isinstance(k, str)}
+
+
+def _voice_needs_credential(v: dict, cfg: dict | None) -> bool:
+    """True if this voice's auth plumbing is worth checking: it declares a
+    requires_env, or its provider's config block carries an apiKey option
+    (embedded literal or {env:...} placeholder alike). Providers with no
+    apiKey option (lmstudio, ds4 — local endpoints) need no credential and
+    keep the prior behavior of emitting no check."""
+    if v.get("requires_env"):
+        return True
+    return _provider_api_key(cfg, v.get("provider")) is not None
+
+
+def _credential_status(v: dict, cfg: dict | None, auth_store: set[str]) -> tuple[str, str]:
+    """Check env var, then embedded provider apiKey, then the opencode auth
+    store, in that order — the three ways opencode actually authenticates."""
+    provider = v.get("provider")
+    req_env = v.get("requires_env", [])
+    if req_env and all(os.environ.get(e) for e in req_env):
+        return "ok", f"via env ({', '.join('$' + e for e in req_env)})"
+    raw_key = _provider_api_key(cfg, provider)
+    if raw_key and not _ENV_PLACEHOLDER_RE.match(raw_key):
+        return "ok", "via provider config (apiKey embedded in opencode.jsonc)"
+    if provider and provider.lower() in auth_store:
+        return "ok", "via opencode auth store"
+    ways = []
+    if req_env:
+        ways.append(f"set {', '.join('$' + e for e in req_env)}")
+    if provider:
+        ways.append(f"embed an apiKey for `{provider}` in ~/.config/opencode/opencode.jsonc")
+        ways.append(f"run `opencode auth login` for `{provider}`")
+    return "warn", "no credential found — " + "; ".join(ways)
+
+
 def _endpoint_reachable(endpoint: str) -> bool:
     u = urlparse(endpoint)
     host = u.hostname or "127.0.0.1"
@@ -183,6 +314,8 @@ def profile_opencode_voices(gen, reg: dict, name: str = "canonical-4") -> list[d
 def check_plumbing(rep: Report, gen, reg: dict) -> None:
     cfg_text = _opencode_config_text()
     have_cfg = bool(cfg_text)
+    cfg = _opencode_config(cfg_text)
+    auth_store = _auth_store_providers()
     for v in profile_opencode_voices(gen, reg):
         vid = v["id"]
         if have_cfg:
@@ -193,10 +326,9 @@ def check_plumbing(rep: Report, gen, reg: dict) -> None:
         else:
             rep.add("plumbing", f"{vid}: opencode.jsonc", "warn",
                     "~/.config/opencode/opencode.jsonc not found")
-        for env in v.get("requires_env", []):
-            rep.add("plumbing", f"{vid}: ${env}",
-                    "ok" if os.environ.get(env) else "warn",
-                    "set" if os.environ.get(env) else "unset")
+        if _voice_needs_credential(v, cfg):
+            status, detail = _credential_status(v, cfg, auth_store)
+            rep.add("plumbing", f"{vid}: credentials", status, detail)
         if v.get("endpoint"):
             up = _endpoint_reachable(v["endpoint"])
             rep.add("plumbing", f"{vid}: endpoint {v['endpoint']}",
