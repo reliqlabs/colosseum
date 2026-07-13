@@ -158,6 +158,21 @@ in our own reference project, worth fixing so R22 models best practice:
 - resolve the finite-arithmetic gap (F2, still OPEN): model u32 overflow in
   Quint with checked/saturating semantics, or add a justified trust
   assumption bounding total submissions.
+
+From the addendum (all four seats reported; two findings mutant-proven):
+- encode terminal-count monotonicity (F4): ghost prev-counters in state with
+  `done >= prev_done and failed >= prev_failed`, since a plain state
+  invariant cannot express it; the `clawback` mutant passes `inv_all` today;
+- make the operator constants distinct (F6): CAPACITY=2 vs MAX_ATTEMPTS=3,
+  so constant-reference mix-ups stop verifying (the swap mutant passes
+  today);
+- add the failed-path witness (F7): `witness_b1_failed = failed > 0` as a
+  required obligation next to W1;
+- decide error-outcome observability (F5): an `outcome` state variable the
+  replay bridge can check (ITF v1 OUT tokens), or an INTENT edit scoping
+  error-value conformance out;
+- process note (F8): panel attack copies must carry the full project
+  (`.colosseum/`, adapter) so absence findings adjudicate cleanly.
 Any of these shifts R22 line numbers, so the ledger hashes and
 `tests/r22_reference_project.py` mutation offsets must be regenerated in the
 same change.

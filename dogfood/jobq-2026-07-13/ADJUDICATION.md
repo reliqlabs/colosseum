@@ -95,3 +95,94 @@ closed by agreement, alongside confirmed spec-quality findings (F1, F3)
 whose resolution is evidence-defined and tracked. The panel found real
 weaknesses in our own reference project, which is dogfooding working as
 intended. Follow-ups are in ROADMAP.md under "jobq spec strengthening."
+
+## Addendum (same day, late-arriving evidence)
+
+The run section above understates the panel: `kimi-k2.6`'s first dispatch
+was killed by a 600s timeout, and the `claude-agent` seat HAD run (a fresh
+`colosseum-spec-adversary` subagent on Fable 5) but its report reached the
+orchestrator after this record was committed. Both reports are now in
+`reports/` (kimi via a 900s retry). All four canonical-4 seats therefore
+reported, all four with VERDICT: BREAKS. New evidence is dispositioned
+here; nothing above is rewritten.
+
+### Corroborations of existing findings
+
+- F1: claude-agent #6 independently derives the inv_b3 vacuity half of F1's
+  fix. Third voice.
+- F2: claude-agent #8 adds the third independent axis (spec int totality vs
+  u32 partiality with the debug-panic/release-wrap split). kimi #5 flags
+  the same unbounded-int modeling from the non-negativity side. F2 REMAINS
+  OPEN; the closing options are unchanged.
+- F3: kimi #1 makes it four-of-four voices on the pinned CAPACITY.
+  claude-agent #3 sharpens the disposition: the Quint artifact and the kani
+  harness prove NON-EQUIVALENT theorems (capacity=3 vs capacity in [1,4]),
+  and the spec cannot replay the fixture's own `new(4)`/`new(1)` unit
+  tests. kimi #4 (capacity=0 unverified by any artifact) folds into the
+  same parameterization fix.
+
+### New findings
+
+### F4. Terminal-count monotonicity is unencoded — CONFIRMED (executable evidence)
+
+claude-agent #1 demonstrates it with a passing mutant: a `clawback` action
+that decrements `failed` and `submitted` together conserves `inv_b2` and
+passes `quint verify --invariant=inv_all` clean, while violating INTENT
+line 43 ("counts only ever increase"). glm-5.2 #5/#6 and kimi #2 raised the
+same gap declaratively. Quint state invariants cannot express a transition
+property; the fix is a ghost-variable encoding (prev-counters carried in
+state, invariant `done >= prev_done and failed >= prev_failed`) per the
+quint-spec-generator ghost pattern, or action-level postcondition checks.
+Tracked in the ROADMAP follow-up list.
+
+### F5. Error outcomes are unobservable to the spec and the conformance bridge — CONFIRMED (scope limitation)
+
+Raised independently by gpt-5.6-sol #2 (serious), claude-agent #5
+(serious), kimi #3 (serious), glm-5.2 #8 (cosmetic; severity disagreement
+noted, resolved toward serious on the evidence that INTENT B4 NAMES the
+error value, so the spec under-specifies its own contract). The scalar
+state carries no outcome datum, so a state-only replay cannot distinguish
+`Full` from `NotRunning`. Resolution options: an `outcome` state variable
+(ITF v1 already supports declared OUT tokens in the replay protocol), or an
+INTENT edit scoping error-value conformance out. One must land; tracked.
+
+### F6. Equal operator constants mask reference confusion — CONFIRMED (executable evidence)
+
+claude-agent #2, unique to that voice: with CAPACITY == MAX_ATTEMPTS == 3,
+swapping the constants in the submit guard and inv_b4 still verifies clean,
+so a live guard/invariant mix-up is invisible to the model checker. Cheap
+fix with outsized value: distinct constants (CAPACITY=2, MAX_ATTEMPTS=3) so
+every reference discriminates. Tracked.
+
+### F7. The witness set is asymmetric: no failed-path reachability witness — CONFIRMED
+
+claude-agent #4: the only witness is `done > 0`; B1's defining outcome (a
+job permanently failing after the third attempt) has no `failed > 0`
+witness, so an edit making `fail_final` unreachable keeps `inv_all` green.
+Fix: `witness_b1_failed = failed > 0` (and ideally a full-retry-chain
+witness), added to the obligations manifest as a required target. Tracked.
+
+### F8. "Missing obligations.json / ITF adapter" — REFUTED (environment artifact), with a confirmed residue
+
+claude-agent #7 and kimi's glob both found no `.colosseum/obligations.json`
+and no adapter. Both are artifacts of the attack environment: the dispatch
+copy contained only INTENT.md, specs/, src/, and Cargo.toml. In the real
+fixture both exist (`tests/fixtures/r22/project/.colosseum/obligations.json`,
+`tests/fixtures/r22/adapter/`), are exercised by
+`tests/r22_reference_project.py`, and Gate A/B run against them in CI. The
+finding as stated is closed by that evidence. The residue is real and
+CONFIRMED: the frozen manifest does not require the obligations F4 and F7
+identify (no monotonicity target, no failed-path witness), so the
+required-evidence set is weaker than the intent. That residue is exactly
+F4/F7's fix path. Process note for future runs: attack copies should carry
+the full project (or the report should name what was absent from scope) so
+absence findings adjudicate cleanly.
+
+### Outcome (addendum)
+
+Unchanged: criterion 7 stands on F2 remaining OPEN under G4. The addendum
+adds two executable-evidence findings (F4, F6), one four-voice confirmation
+(F3), one severity-adjudicated scope limitation (F5), one asymmetric-witness
+gap (F7), and one evidence-refuted finding with a confirmed residue (F8),
+which together also exercise the refute-with-evidence arm of G4. Follow-ups
+extended in ROADMAP.md.
