@@ -27,10 +27,14 @@ Against the `tests/fixtures/r22/` `jobq` crate, unmodified:
 4. `lean` typechecked both `Jobq.lean` and `JobqProofs.lean`; the `.olean`
    files are the evidence of a sorry-free, axiom-clean build.
 
-Reproduction script and artifacts live outside the repo (heavy, and they
-depend on locally-built Charon/Aeneas and a prebuilt Aeneas Lean library);
-paths are recorded in the `m7-aeneas-toolchain` memory. The build reuses the
-`verified-rcv/specs` Lean environment (toolchain 4.30.0-rc2) read-only.
+The Lean source (`Jobq.lean`, `JobqProofs.lean`), the reproduction script,
+and a not-in-CI note are committed under `spikes/2026-07-13-m7-aeneas/`. The
+heavy build outputs (`.olean`, `.llbc`, `target/`) are not committed and
+depend on locally-built Charon/Aeneas plus a prebuilt Aeneas Lean library;
+toolchain paths are recorded in the `m7-aeneas-toolchain` memory. The build
+reuses the `verified-rcv/specs` Lean environment (4.30.0-rc2) read-only,
+which is ahead of the BOM pin (4.29.0); reconciling that pin is part of
+closing M7.
 
 ## What this establishes and what it does not
 

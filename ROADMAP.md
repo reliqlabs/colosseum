@@ -116,8 +116,9 @@ benchmark results).
 
 ### W5. M7 refinement proofs (owner: maintainer/agent; heavy proof work)
 
-Feasibility spike DONE 2026-07-13 (`docs/m7-feasibility.md`; heavy artifacts
-and repro held outside the repo, paths in the `m7-aeneas-toolchain` memory):
+Feasibility spike DONE 2026-07-13 (`docs/m7-feasibility.md` narrative,
+`spikes/2026-07-13-m7-aeneas/` Lean source + repro; heavy build outputs held
+outside the repo, paths in the `m7-aeneas-toolchain` memory):
 jobq extracts to Lean with zero crate changes (Charon + Aeneas), the
 extracted model typechecks, and B1 is PROVED sorry-free over the extracted
 `fail` (standard axioms only; conditional on the u32 well-formedness bound).
