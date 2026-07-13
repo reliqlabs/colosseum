@@ -88,7 +88,7 @@ NULLABLE = {"seeds", "waiver"}
 # record. Drives both the run verdict and the "incomplete" summary bucket.
 GAP_STATUSES = {"missing-record", "invalid", "INCOMPLETE", "unwaived-assumption"}
 
-BARE_VERIFIED = re.compile(r"VERIFIED(?!\[)")
+UNSCOPED_VERDICT_RE = re.compile(r"VERIFIED(?!\[)")  # a bare, unqualified verdict
 
 
 def validate_record(rec: dict) -> list[str]:
@@ -307,7 +307,7 @@ def main() -> int:
         vline = verdict_line(dashboard["verdict"])
         payload = json.dumps(dashboard, indent=2)
         blob = "\n".join([text, vline, payload])
-        offending = [ln for ln in blob.splitlines() if BARE_VERIFIED.search(ln)]
+        offending = [ln for ln in blob.splitlines() if UNSCOPED_VERDICT_RE.search(ln)]
         if offending:
             print("CHECK: bare VERIFIED token found in dashboard output:",
                   file=sys.stderr)
