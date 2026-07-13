@@ -24,14 +24,14 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 ### Voice roster (authoritative source: `registry/voices.json`)
 
-The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). `claude-agent` and `kimi-k2.6` hold canonical-panel status; `gpt-5.6-sol-pro`, `gpt-oss-120b`, `nemotron-3-120b-a12b`, and `glm-5.2` are candidates with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
+The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). `claude-agent` and `kimi-k2.6` hold canonical-panel status; `gpt-5.6-sol`, `gpt-oss-120b`, `nemotron-3-120b-a12b`, and `glm-5.2` are candidates with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
 | Voice id | Model | Family | Harness | Status | Calibration |
 |---|---|---|---|---|---|
 | `claude-agent` | `in-harness` | Anthropic | claude-code | canonical-panel | cited |
 | `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | canonical-panel | cited |
-| `gpt-5.6-sol-pro` | `openai/gpt-5.6-sol-pro` | OpenAI | opencode | candidate | cited |
+| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | OpenAI | opencode | candidate | cited |
 | `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | DeepSeek | opencode | candidate | pending |
 | `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | Google | opencode | candidate | pending |
 | `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | OpenAI-OSS | opencode | candidate | cited |

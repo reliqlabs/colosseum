@@ -6,9 +6,9 @@
   "_comment_canonical_panel": "CANONICAL 5-VOICE PANEL for adversarial spec review. Each voice is pinned to the strongest variant of its family verified dispatchable at pin time (2026-07-11) with max thinking enabled. Pins drift, and `opencode models` lists catalog entries the provider may reject — probe with `opencode run --model <id> \"Reply with exactly: ok\"` before milestone runs. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent (NOT through this script) — dispatch claude-agent separately alongside opencode_dispatch.py. The four voices below are the OpenCode-dispatched roster. For Lean-specific tasks substitute the local Leanstral voice (lmstudio/leanstral-2603; upstream discontinued 2026-06-30, Leanstral 1.5 is the successor for new installs).",
   "voices": [
     {
-      "id": "gpt-5.6-sol-pro",
-      "model": "openai/gpt-5.6-sol-pro",
-      "note": "OpenAI via direct openai provider. status=candidate. Doc-pinned into the canonical-5 profile but only dispatchability was verified (2026-07-11, ChatGPT-account/Codex auth, which rejects gpt-5.6-pro and the retired gpt-5.1-thinking; API-key installs may prefer openai/gpt-5.6-pro). No adversarial-fitness run is documented, so status is 'candidate' pending calibration. ChatGPT-account auth needs no OPENAI_API_KEY; API-key installs do — doctor treats the env var as advisory. Pro-tier reasoning latency is high; budget per_call_timeout generously."
+      "id": "gpt-5.6-sol",
+      "model": "openai/gpt-5.6-sol",
+      "note": "OpenAI via direct openai provider. status=candidate. OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc."
     },
     {
       "id": "kimi-k2.6",

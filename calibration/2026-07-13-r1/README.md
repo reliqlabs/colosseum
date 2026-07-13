@@ -34,6 +34,7 @@ pass per voice. Its purpose is fitness evidence for the voice registry.
 | kimi-k2.6 | 8/8 | D1-D8 | 0 | |
 | glm-5.2-fireworks | 8/8 | D1-D8 | 0 | same-day addendum; Fireworks route after the burnt-gateway route failed |
 | gpt-5.6-sol-pro | 8/8 | D1-D8 | 3 | same-day addendum; extras are marginal arithmetic calls on counters |
+| gpt-5.6-sol | 8/8 | D1-D8 | 2 | same-day addendum; calibrated after the operator standardized on the sol variant as the OpenAI seat |
 | nemotron-3-120b-a12b | 7/8 | all but D6 | 2 | found D6's line but labeled it `missing-validation`, not `error-swallowed`; a right-place wrong-category miss under the pre-registered rule |
 | glm-5.2 (burnt route) | errored | n/a | n/a | gateway "Unexpected server error" on both attempts; excluded from recall denominators, not scored as zero |
 

@@ -63,21 +63,21 @@
       "notes": "Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
     },
     {
-      "id": "gpt-5.6-sol-pro",
-      "model": "openai/gpt-5.6-sol-pro",
+      "id": "gpt-5.6-sol",
+      "model": "openai/gpt-5.6-sol",
       "family": "OpenAI",
       "harness": "opencode",
       "provider": "openai",
       "default_variant": "max",
       "status": "candidate",
-      "calibration": "Seeded-defect recall 8/8 with correct categories, blinded single-pass code review; 3 unmatched extras were marginal counter-arithmetic calls (calibration/2026-07-13-r1).",
+      "calibration": "Seeded-defect recall 8/8 with correct categories, blinded single-pass code review, 2 marginal unmatched extras (calibration/2026-07-13-r1). Sibling variant gpt-5.6-sol-pro scored 8/8 in the same run before the operator standardized on sol.",
       "requires_env": [
         "OPENAI_API_KEY"
       ],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "Doc-pinned into the canonical-5 profile but only dispatchability was verified (2026-07-11, ChatGPT-account/Codex auth, which rejects gpt-5.6-pro and the retired gpt-5.1-thinking; API-key installs may prefer openai/gpt-5.6-pro). No adversarial-fitness run is documented, so status is 'candidate' pending calibration. ChatGPT-account auth needs no OPENAI_API_KEY; API-key installs do — doctor treats the env var as advisory. Pro-tier reasoning latency is high; budget per_call_timeout generously."
+      "notes": "OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc."
     },
     {
       "id": "deepseek-v4-flash",
@@ -205,14 +205,14 @@
   "profiles": [
     {
       "name": "canonical-5",
-      "description": "The default milestone panel doc-pinned at 2026-07-11: five family-diverse voices at --variant max. NOTE the honesty gap the registry surfaces: only claude-agent and kimi-k2.6 carry non-pending calibration (status canonical-panel); gpt-5.6-sol-pro, deepseek-v4-flash, and gemini-3.1-pro-preview are dispatch-verified candidates whose adversarial-fitness calibration is still pending. The profile stays pinned (it is what a runner reproduces), but a run should record that 3/5 members are candidate-status. Pin a run as 'panel canonical-5@<content_hash>'.",
+      "description": "The default milestone panel: five family-diverse voices at --variant max. Membership updated 2026-07-13 (operator decision): gpt-5.6-sol replaces gpt-5.6-sol-pro as the OpenAI seat; both variants scored 8/8 in calibration/2026-07-13-r1. Honesty gap the registry surfaces: deepseek-v4-flash and gemini-3.1-pro-preview remain dispatch-verified candidates with pending adversarial-fitness calibration; a run should record that 2/5 members are candidate-status. Pin a run as 'panel canonical-5@<content_hash>'; the pre-2026-07-13 membership pins to canonical-5@sha256:19595e6530eb6331.",
       "voices": [
         {
           "id": "claude-agent",
           "variant": "max"
         },
         {
-          "id": "gpt-5.6-sol-pro",
+          "id": "gpt-5.6-sol",
           "variant": "max"
         },
         {
@@ -228,7 +228,7 @@
           "variant": "max"
         }
       ],
-      "content_hash": "sha256:19595e6530eb6331"
+      "content_hash": "sha256:63b7c9db3c128174"
     }
   ]
 }

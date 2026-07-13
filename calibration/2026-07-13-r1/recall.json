@@ -6,6 +6,7 @@
   "voices": [
     "claude-agent",
     "glm-5.2-fireworks",
+    "gpt-5.6-sol",
     "gpt-5.6-sol-pro",
     "gpt-oss-120b",
     "kimi-k2.6",
@@ -39,6 +40,20 @@
         "D8"
       ],
       "unmatched_detections": 0
+    },
+    "gpt-5.6-sol": {
+      "recall": 1.0,
+      "caught": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 2
     },
     "gpt-5.6-sol-pro": {
       "recall": 1.0,
@@ -103,6 +118,7 @@
     "D1": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
@@ -111,6 +127,7 @@
     "D2": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
@@ -119,6 +136,7 @@
     "D3": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
@@ -127,6 +145,7 @@
     "D4": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
@@ -135,6 +154,7 @@
     "D5": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
@@ -143,6 +163,7 @@
     "D6": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6"
@@ -150,6 +171,7 @@
     "D7": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",
@@ -158,6 +180,7 @@
     "D8": [
       "claude-agent",
       "glm-5.2-fireworks",
+      "gpt-5.6-sol",
       "gpt-5.6-sol-pro",
       "gpt-oss-120b",
       "kimi-k2.6",

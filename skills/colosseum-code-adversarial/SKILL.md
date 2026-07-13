@@ -32,7 +32,7 @@ Two practical shapes:
 - **Cross-harness** — code author runs in Claude Code; code-adversarial runs in OpenCode with a different model (frontier-tier preferred — verify pins per the adversarial skill's drift note). Frontier voices, generated from the registry:
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-`openai/gpt-5.6-sol-pro` (OpenAI, candidate), `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` (Moonshot, canonical-panel), `ds4/deepseek-v4-flash` (DeepSeek, candidate), `google/gemini-3.1-pro-preview` (Google, candidate)
+`openai/gpt-5.6-sol` (OpenAI, candidate), `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` (Moonshot, canonical-panel), `ds4/deepseek-v4-flash` (DeepSeek, candidate), `google/gemini-3.1-pro-preview` (Google, candidate)
 <!-- END GENERATED: voice-roster -->
 
   The OpenCode agent reads files via its native tool.

@@ -121,7 +121,7 @@ def main() -> int:
         check("dispatch.json target_spec filled", cfg["target_spec"] == str(spec_path.resolve()))
         check("dispatch.json voices come from the registry (canonical-5 opencode set)",
               [v["id"] for v in cfg["voices"]]
-              == ["gpt-5.6-sol-pro", "kimi-k2.6", "deepseek-v4-flash", "gemini-3.1-pro-preview"])
+              == ["gpt-5.6-sol", "kimi-k2.6", "deepseek-v4-flash", "gemini-3.1-pro-preview"])
 
         # Idempotence: corrupt a file, re-run without --force -> untouched (skipped).
         djson = proj / ".colosseum" / "dispatch.json"

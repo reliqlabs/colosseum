@@ -1,0 +1,28 @@
+[0m
+> spec-adversary · gpt-5.6-sol
+[0m
+[0m# [0mTodos
+[•] Read review instructions and intent
+[ ] Read every file under src/ and identify grounded attacks
+[ ] Produce report in mandated format with fenced JSON findings block
+[0m
+[0m→ [0mRead REVIEW-INSTRUCTIONS.md
+[0m→ [0mRead INTENT.md
+[0m✱ [0mGlob "src/**"[90m in . · 5 matches[0m
+[0m
+[0m# [0mTodos
+[✓] Read review instructions and intent
+[•] Read every file under src/ and identify grounded attacks
+[ ] Produce report in mandated format with fenced JSON findings block
+[0m
+[0m→ [0mRead src/api.rs
+[0m→ [0mRead src/window.rs
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead src/config.rs
+[0m→ [0mRead src/bucket.rs
+[0m
+[0m# [0mTodos
+[✓] Read review instructions and intent
+[✓] Read every file under src/ and identify grounded attacks
+[✓] Produce report in mandated format with fenced JSON findings block
+[0m
