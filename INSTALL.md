@@ -367,13 +367,12 @@ Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environmen
 Verify with `opencode run --model openai/gpt-5.6-sol-pro "Reply with exactly: ok"` and similar one-shot probes per provider before relying on the dispatch script. A missing `GOOGLE_GENERATIVE_AI_API_KEY` fails every Gemini dispatch with an unregistered-caller error.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-**Canonical panel (`canonical-5@sha256:63b7c9db3c128174`).** The milestone panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); the rest dispatch through OpenCode:
+**Canonical panel (`canonical-4@sha256:08831d0ce9f2086b`).** The milestone panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); the rest dispatch through OpenCode:
 
 - `claude-agent` — in-harness Claude Agent subagent (Mode 2); no opencode.jsonc entry. **canonical-panel** (calibrated)
-- `openai/gpt-5.6-sol` — OpenAI, direct openai provider. candidate.
+- `openai/gpt-5.6-sol` — OpenAI, direct openai provider. **canonical-panel** (calibrated).
+- `fireworks-ai/accounts/fireworks/models/glm-5p2` — Zhipu, Fireworks. **canonical-panel** (calibrated).
 - `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated).
-- `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending). Local endpoint `http://127.0.0.1:8000` must be reachable.
-- `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending). Set `GOOGLE_GENERATIVE_AI_API_KEY`.
 
 Roster generated from `registry/voices.json`; verify pins with a one-shot probe (`opencode run --model <id> "Reply with exactly: ok"`) before milestone runs — a catalog listing is not confirmation.
 <!-- END GENERATED: voice-roster -->

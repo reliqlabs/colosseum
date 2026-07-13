@@ -24,19 +24,19 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 ### Voice roster (authoritative source: `registry/voices.json`)
 
-The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). `claude-agent` and `kimi-k2.6` hold canonical-panel status; `gpt-5.6-sol`, `gpt-oss-120b`, `nemotron-3-120b-a12b`, and `glm-5.2` are candidates with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
+The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). The canonical panel (`canonical-4`, operator decision 2026-07-13) is `claude-agent` (Fable 5, or the strongest available Opus), `gpt-5.6-sol`, `glm-5.2`, and `kimi-k2.6`, all with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); `gpt-oss-120b` and `nemotron-3-120b-a12b` are calibrated candidates; `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
 | Voice id | Model | Family | Harness | Status | Calibration |
 |---|---|---|---|---|---|
 | `claude-agent` | `in-harness` | Anthropic | claude-code | canonical-panel | cited |
 | `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | canonical-panel | cited |
-| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | OpenAI | opencode | candidate | cited |
+| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | OpenAI | opencode | canonical-panel | cited |
 | `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | DeepSeek | opencode | candidate | pending |
 | `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | Google | opencode | candidate | pending |
 | `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | OpenAI-OSS | opencode | candidate | cited |
 | `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | NVIDIA | opencode | candidate | cited |
-| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | Zhipu | opencode | candidate | cited |
+| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | Zhipu | opencode | canonical-panel | cited |
 | `leanstral-2603` | `lmstudio/leanstral-2603` | Mistral | opencode | local-specialist | n/a |
 | `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | Zhipu | opencode | excluded | cited |
 | `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | theorem-prover-specialist | opencode | excluded | cited |
@@ -191,7 +191,7 @@ colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bo
 
 ```bash
 # Phase 1 — orchestrator creates the manifest. Owner mapping is required.
-# Voice ids come from registry/voices.json (canonical-5 profile shown here;
+# Voice ids come from registry/voices.json (canonical-4 profile shown here;
 # glm-4.7-flash and the goedel class are excluded — see the roster table above).
 colosseum_run.py init \
     /path/to/.colosseum/intent.md \

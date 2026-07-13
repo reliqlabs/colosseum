@@ -8,22 +8,17 @@
     {
       "id": "gpt-5.6-sol",
       "model": "openai/gpt-5.6-sol",
-      "note": "OpenAI via direct openai provider. status=candidate. OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc."
+      "note": "OpenAI via direct openai provider. status=canonical-panel. OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc."
+    },
+    {
+      "id": "glm-5.2",
+      "model": "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "note": "Zhipu via Fireworks. status=canonical-panel. Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md."
     },
     {
       "id": "kimi-k2.6",
       "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
       "note": "Moonshot via Burnt gateway. status=canonical-panel. Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
-    },
-    {
-      "id": "deepseek-v4-flash",
-      "model": "ds4/deepseek-v4-flash",
-      "note": "DeepSeek via local ds4 runner. status=candidate. DeepSeek V4 Flash via the local ds4 provider (DwarfStar4 at http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant, invoked at --variant max. Doc-pinned into canonical-5 but no fitness run is documented — candidate pending calibration. Local endpoint must be up for dispatch."
-    },
-    {
-      "id": "gemini-3.1-pro-preview",
-      "model": "google/gemini-3.1-pro-preview",
-      "note": "Google via direct google provider. status=candidate. Current Gemini Pro (gemini-3-pro-preview retired 2026-03, now aliases 3.1; bare gemini-3-pro was never a valid API id). Doc-pinned into canonical-5 but only auth/config documented, no fitness run — candidate pending calibration. Requires GOOGLE_GENERATIVE_AI_API_KEY; unset means every dispatch fails with an unregistered-caller error."
     }
   ],
   "_comment_claude_voice": "The fifth voice in the canonical panel is the strongest Claude available to the harness session, dispatched in-harness as `claude-agent` via the colosseum-spec-adversary Agent subagent. That voice does NOT run through opencode_dispatch.py — the Agent tool invocation happens from the Claude Code session that owns the adversarial pass. See SKILL Step 4 Mode 2.",

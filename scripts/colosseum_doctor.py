@@ -17,7 +17,7 @@ Offline by default (no model calls, no money spent). It answers three questions:
      enforced: a canonical-panel voice with pending calibration is a failure.
 
   3. Is the provider plumbing in place, for free?  For each OpenCode voice in
-     the canonical-5 profile: the provider is named in ~/.config/opencode/
+     the canonical-4 profile: the provider is named in ~/.config/opencode/
      opencode.jsonc, required env vars are set, and any local endpoint answers a
      1-second TCP probe. These are warnings by default (an offline box may lack
      providers); --strict promotes them to failures.
@@ -174,7 +174,7 @@ def _endpoint_reachable(endpoint: str) -> bool:
         return False
 
 
-def profile_opencode_voices(gen, reg: dict, name: str = "canonical-5") -> list[dict]:
+def profile_opencode_voices(gen, reg: dict, name: str = "canonical-4") -> list[dict]:
     prof = gen.profile_by_name(reg, name)
     return [gen.voice_by_id(reg, pv["id"]) for pv in prof["voices"]
             if gen.voice_by_id(reg, pv["id"])["harness"] == "opencode"]

@@ -28,7 +28,7 @@
       "name": "profile label; a run pins 'panel <name>@<content_hash>'.",
       "description": "what the profile is for.",
       "voices": "ordered list of {id, variant} referencing voice ids above.",
-      "content_hash": "sha256:<16hex> over the normalized profile (voice id+variant set only; label excluded), computed by scripts/gen_roster_docs.py:profile_content_hash. Recomputed and verified by doctor and tests/r0. A membership or variant change moves the hash, so a pinned 'canonical-5@<hash>' is a frozen, content-addressed panel."
+      "content_hash": "sha256:<16hex> over the normalized profile (voice id+variant set only; label excluded), computed by scripts/gen_roster_docs.py:profile_content_hash. Recomputed and verified by doctor and tests/r0. A membership or variant change moves the hash, so a pinned 'canonical-4@<hash>' is a frozen, content-addressed panel."
     }
   },
   "voices": [
@@ -45,7 +45,7 @@
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "The one voice that does NOT route through OpenCode: dispatched in-harness via the colosseum-spec-adversary Agent subagent (Mode 2). Always the strongest Claude available to the session. No opencode.jsonc entry."
+      "notes": "The one voice that does NOT route through OpenCode: dispatched in-harness via the colosseum-spec-adversary Agent subagent (Mode 2). Target model pinned by operator decision 2026-07-13: Fable 5 (claude-fable-5); if Fable is unavailable in the session, use the strongest available Opus. No opencode.jsonc entry."
     },
     {
       "id": "kimi-k2.6",
@@ -69,7 +69,7 @@
       "harness": "opencode",
       "provider": "openai",
       "default_variant": "max",
-      "status": "candidate",
+      "status": "canonical-panel",
       "calibration": "Seeded-defect recall 8/8 with correct categories, blinded single-pass code review, 2 marginal unmatched extras (calibration/2026-07-13-r1). Sibling variant gpt-5.6-sol-pro scored 8/8 in the same run before the operator standardized on sol.",
       "requires_env": [],
       "endpoint": null,
@@ -90,7 +90,7 @@
       "endpoint": "http://127.0.0.1:8000",
       "added": "2026-07-11",
       "retired": null,
-      "notes": "DeepSeek V4 Flash via the local ds4 provider (DwarfStar4 at http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant, invoked at --variant max. Doc-pinned into canonical-5 but no fitness run is documented — candidate pending calibration. Local endpoint must be up for dispatch."
+      "notes": "DeepSeek V4 Flash via the local ds4 provider (DwarfStar4 at http://127.0.0.1:8000). 400K context, reasoning on, q2-q4-imatrix quant, invoked at --variant max. Rostered candidate, no fitness run documented; left the default panel when canonical-5 was superseded by canonical-4 (2026-07-13). Local endpoint must be up for dispatch."
     },
     {
       "id": "gemini-3.1-pro-preview",
@@ -107,7 +107,7 @@
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "Current Gemini Pro (gemini-3-pro-preview retired 2026-03, now aliases 3.1; bare gemini-3-pro was never a valid API id). Doc-pinned into canonical-5 but only auth/config documented, no fitness run — candidate pending calibration. Requires GOOGLE_GENERATIVE_AI_API_KEY; unset means every dispatch fails with an unregistered-caller error."
+      "notes": "Current Gemini Pro (gemini-3-pro-preview retired 2026-03, now aliases 3.1; bare gemini-3-pro was never a valid API id). Rostered candidate, only auth/config documented, no fitness run; left the default panel when canonical-5 was superseded by canonical-4 (2026-07-13). Requires GOOGLE_GENERATIVE_AI_API_KEY; unset means every dispatch fails with an unregistered-caller error."
     },
     {
       "id": "gpt-oss-120b",
@@ -146,7 +146,7 @@
       "harness": "opencode",
       "provider": "fireworks-ai",
       "default_variant": "max",
-      "status": "candidate",
+      "status": "canonical-panel",
       "calibration": "Seeded-defect recall 8/8 with correct categories via the Fireworks route, blinded single-pass code review (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
@@ -202,8 +202,8 @@
   ],
   "profiles": [
     {
-      "name": "canonical-5",
-      "description": "The default milestone panel: five family-diverse voices at --variant max. Membership updated 2026-07-13 (operator decision): gpt-5.6-sol replaces gpt-5.6-sol-pro as the OpenAI seat; both variants scored 8/8 in calibration/2026-07-13-r1. Honesty gap the registry surfaces: deepseek-v4-flash and gemini-3.1-pro-preview remain dispatch-verified candidates with pending adversarial-fitness calibration; a run should record that 2/5 members are candidate-status. Pin a run as 'panel canonical-5@<content_hash>'; the pre-2026-07-13 membership pins to canonical-5@sha256:19595e6530eb6331.",
+      "name": "canonical-4",
+      "description": "The default milestone panel, set by operator decision 2026-07-13: claude-agent (in-harness, Fable 5 or strongest available Opus), gpt-5.6-sol (direct openai provider), glm-5.2 (Fireworks), and kimi-k2.6 (Burnt gateway), all at --variant max, all with cited 8/8 seeded-recall calibration (calibration/2026-07-13-r1). Supersedes canonical-5 (memberships pinnable at canonical-5@sha256:19595e6530eb6331 and canonical-5@sha256:63b7c9db3c128174). Pin a run as 'panel canonical-4@<content_hash>'.",
       "voices": [
         {
           "id": "claude-agent",
@@ -214,19 +214,15 @@
           "variant": "max"
         },
         {
+          "id": "glm-5.2",
+          "variant": "max"
+        },
+        {
           "id": "kimi-k2.6",
-          "variant": "max"
-        },
-        {
-          "id": "deepseek-v4-flash",
-          "variant": "max"
-        },
-        {
-          "id": "gemini-3.1-pro-preview",
           "variant": "max"
         }
       ],
-      "content_hash": "sha256:63b7c9db3c128174"
+      "content_hash": "sha256:08831d0ce9f2086b"
     }
   ]
 }

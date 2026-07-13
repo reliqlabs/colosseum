@@ -72,7 +72,7 @@ def voice_by_id(reg: dict, vid: str) -> dict:
 
 def profile_content_hash(profile: dict) -> str:
     """Content address a run profile over its normalized voice id+variant set.
-    The label is deliberately NOT hashed: a pin `canonical-5@<hash>` binds the
+    The label is deliberately NOT hashed: a pin `canonical-4@<hash>` binds the
     membership, so renaming the profile keeps the hash while adding/removing a
     voice or changing a variant moves it."""
     normalized = {
@@ -172,7 +172,7 @@ def render_adversarial_model_ids(reg: dict) -> str:
 def render_code_adversarial_frontier(reg: dict) -> str:
     """skills/colosseum-code-adversarial/SKILL.md — the pinned frontier IDs, as
     one line (lives inside a bulleted list item)."""
-    prof = profile_by_name(reg, "canonical-5")
+    prof = profile_by_name(reg, "canonical-4")
     parts = []
     for pv in prof["voices"]:
         v = voice_by_id(reg, pv["id"])
@@ -202,7 +202,7 @@ def render_scripts_readme_roster(reg: dict) -> str:
 
 def render_install_roster(reg: dict) -> str:
     """INSTALL.md §7.2 — canonical panel reference (model strings + auth)."""
-    prof = profile_by_name(reg, "canonical-5")
+    prof = profile_by_name(reg, "canonical-4")
     lines = [f"**Canonical panel (`{prof['name']}@{prof['content_hash']}`).** The milestone "
              f"panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); "
              f"the rest dispatch through OpenCode:", ""]
@@ -239,9 +239,9 @@ DISPATCH_CONFIG = "scripts/dispatch.config.example.json"
 
 
 def render_dispatch_voices(reg: dict) -> list[dict]:
-    """The canonical-5 profile's OpenCode voices as dispatch-config entries.
+    """The canonical-4 profile's OpenCode voices as dispatch-config entries.
     claude-agent is dropped: it never runs through opencode_dispatch.py."""
-    prof = profile_by_name(reg, "canonical-5")
+    prof = profile_by_name(reg, "canonical-4")
     out = []
     for pv in prof["voices"]:
         v = voice_by_id(reg, pv["id"])
