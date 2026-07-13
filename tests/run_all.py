@@ -6,7 +6,8 @@
 """
 run_all — P0 regression suite runner.
 
-Discovers tests/r*.py and runs each fixture suite. Per-suite exit codes:
+Discovers tests/r*.py (Part IV fixtures + infra) and tests/m*.py (P2
+measurement suites) and runs each. Per-suite exit codes:
 0 pass, 1 fail, 2 environment-incomplete (a required toolchain is absent;
 the suite could not exercise its fixtures). Runner verdict follows G2:
 
@@ -36,7 +37,8 @@ def main() -> int:
                     help="comma-separated fixture prefixes (e.g. r7,r14)")
     args = ap.parse_args()
 
-    suites = sorted(p for p in TESTS_DIR.glob("r*.py") if p.name != "run_all.py")
+    suites = sorted(p for p in [*TESTS_DIR.glob("r*.py"), *TESTS_DIR.glob("m*.py")]
+                    if p.name != "run_all.py")
     if args.only:
         wanted = {w.strip() for w in args.only.split(",") if w.strip()}
         matched = [p for p in suites

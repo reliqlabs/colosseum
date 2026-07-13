@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "invariants": [
+    { "id": "B1", "name": "inv_b1" },
+    { "id": "B2", "name": "inv_b2" },
+    { "id": "B3", "name": "inv_b3" },
+    { "id": "B4", "name": "inv_b4" }
+  ],
+  "witnesses": [
+    { "id": "W1", "name": "witness_w1" },
+    { "id": "S1", "name": "witness_s1" }
+  ]
+}

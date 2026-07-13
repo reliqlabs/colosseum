@@ -68,6 +68,15 @@ colosseum/scripts/check_evidence_records.py --records <project>/.colosseum/evide
   --manifest <project>/.colosseum/obligations.json --expect-snapshot <commit>
 ```
 
+## `coverage_dashboard.py` — G1 coverage view (read-only; not a gate)
+
+Renders a per-required-claim coverage table from typed G1 evidence records (same schema as `check_evidence_records.py`, plus the M5 versioned-envelope shape). Computes the same G2 verdict as Gate B but is a visibility tool, not an enforcement gate. `--check` is a self-conformance mode: exits nonzero if the dashboard's own rendered output would ever emit a bare (unqualified) `VERIFIED`.
+
+```bash
+coverage_dashboard.py --records <project>/.colosseum/evidence/ --require B1,B2,W1 [--json]
+coverage_dashboard.py --records <project>/.colosseum/evidence/ --manifest <obligations.json> --check
+```
+
 ## `install-agents.py` — install the canonical agent bodies into a target harness
 
 Builds per-harness agent wrappers (Claude Code subagent or OpenCode subagent) from the canonical bodies under `colosseum/agents/*-body.md`. Run before the first OpenCode dispatch in a new project:

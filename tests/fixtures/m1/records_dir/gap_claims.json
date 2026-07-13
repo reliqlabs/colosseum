@@ -1,0 +1,106 @@
+[
+  {
+    "claim_id": "B2",
+    "required": true,
+    "evidence_class": "bounded-checked",
+    "result": "FAIL",
+    "scope": "safety under bound 10, Apalache 0.56.1",
+    "bindings": {
+      "source_snapshot": "aaaaaaa1+worktree-clean",
+      "intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "obligation_manifest_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "profile": "bounded",
+      "required_targets": [
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "W1",
+        "S1"
+      ],
+      "environment_policy": "z2-worktree",
+      "toolchain_digests": {
+        "quint": "0.32.0",
+        "apalache": "0.56.1"
+      },
+      "command": "quint verify --invariant=inv_b2 --max-steps=10 main.qnt",
+      "configuration": {
+        "max_steps": 10
+      },
+      "seeds": null,
+      "raw_output_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "parser_schema_version": "quint-cli-0.32",
+      "run_id": "m1-fixture-run-b2"
+    },
+    "waiver": null
+  },
+  {
+    "claim_id": "B3",
+    "required": true,
+    "evidence_class": "test-witnessed",
+    "result": "INCOMPLETE",
+    "scope": "witness reachability, trace length 4, seed 0x1 \u2014 run timed out",
+    "bindings": {
+      "source_snapshot": "aaaaaaa1+worktree-clean",
+      "intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "obligation_manifest_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "profile": "bounded",
+      "required_targets": [
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "W1",
+        "S1"
+      ],
+      "environment_policy": "z2-worktree",
+      "toolchain_digests": {
+        "quint": "0.32.0"
+      },
+      "command": "quint run --invariant=witness_b3 --max-steps=10 --seed=0x1 main.qnt",
+      "configuration": {
+        "max_steps": 10,
+        "max_samples": 200
+      },
+      "seeds": "0x1",
+      "raw_output_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "parser_schema_version": "quint-cli-0.32",
+      "run_id": "m1-fixture-run-b3"
+    },
+    "waiver": null
+  },
+  {
+    "claim_id": "S1",
+    "required": true,
+    "evidence_class": "unverified",
+    "result": "PASS",
+    "scope": "asserted by implementer, no evidence artifact",
+    "bindings": {
+      "source_snapshot": "aaaaaaa1+worktree-clean",
+      "intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "obligation_manifest_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "profile": "bounded",
+      "required_targets": [
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "W1",
+        "S1"
+      ],
+      "environment_policy": "z2-worktree",
+      "toolchain_digests": {
+        "note": "no toolchain, asserted"
+      },
+      "command": "n/a \u2014 unverified",
+      "configuration": {
+        "note": "no local re-derivation"
+      },
+      "seeds": null,
+      "raw_output_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "parser_schema_version": "n/a",
+      "run_id": "m1-fixture-run-s1"
+    },
+    "waiver": null
+  }
+]
