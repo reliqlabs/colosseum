@@ -91,6 +91,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import shutil
@@ -208,9 +209,14 @@ class Dispatcher:
 
     def run(self, model: str, prompt: str) -> dict:
         argv = self.argv(model, prompt)
+        # opencode resolves its project from $PWD, not getcwd; subprocess
+        # cwd= alone leaves the parent's stale PWD and the dispatch
+        # server-errors. Keep them consistent.
+        env = {**os.environ, "PWD": str(self.cwd)}
         t0 = time.monotonic()
         try:
-            proc = subprocess.run(argv, cwd=self.cwd, capture_output=True,
+            proc = subprocess.run(argv, cwd=self.cwd, env=env,
+                                  capture_output=True,
                                   text=True, timeout=self.timeout)
         except FileNotFoundError as e:
             raise DispatcherMissing(str(e))
