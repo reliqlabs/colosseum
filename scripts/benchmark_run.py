@@ -223,22 +223,30 @@ class Dispatcher:
         return {"text": proc.stdout, "elapsed": elapsed}
 
 
+def _fslug(key: str) -> str:
+    """Voice ids double as raw-artifact filenames but may carry path
+    separators (`openai/gpt-5.6-sol`, `...@cf/...`); slug them for the
+    filesystem only. Detection-map keys keep the full id."""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", key)
+
+
 def dispatch_and_parse(dispatcher: Dispatcher, model: str, prompt: str,
                        raw_dir: Path, key: str) -> tuple[list[dict] | None, str | None]:
     """Run one dispatch, persist raw stdout + prompt, and parse. Returns
     (findings, None) on success or (None, reason) on an errored dispatch."""
     raw_dir.mkdir(parents=True, exist_ok=True)
-    (raw_dir / f"{key}.prompt").write_text(prompt)
+    stem = _fslug(key)
+    (raw_dir / f"{stem}.prompt").write_text(prompt)
     res = dispatcher.run(model, prompt)
     text = res.get("text") or ""
-    (raw_dir / f"{key}.out").write_text(text)
+    (raw_dir / f"{stem}.out").write_text(text)
     if "error" in res:
-        (raw_dir / f"{key}.err").write_text(res["error"])
+        (raw_dir / f"{stem}.err").write_text(res["error"])
         return None, res["error"]
     findings = parse_findings(text)
     if findings is None:
         reason = "no parseable json findings block"
-        (raw_dir / f"{key}.err").write_text(reason)
+        (raw_dir / f"{stem}.err").write_text(reason)
         return None, reason
     return findings, None
 
@@ -424,7 +432,7 @@ def run_adversarial_arm(dispatcher: Dispatcher, voices: list[str], instructions:
         union = dedup([f for ov, fs in r1_det.items() if ov != voice for f in fs])
         prompt = critique_prompt(instructions, union)
         (out_arm / "critique").mkdir(parents=True, exist_ok=True)
-        (out_arm / "critique" / f"{voice}.prompt").write_text(prompt)
+        (out_arm / "critique" / f"{_fslug(voice)}.prompt").write_text(prompt)
         return prompt
 
     r2_det, r2_err = run_panel_round(
