@@ -146,36 +146,37 @@ install it if the Verus layer should participate.
   opencode credential paths, not just env vars).
 - Push `main` (one command once a remote/destination is chosen).
 
-### jobq spec strengthening (owner: maintainer/agent; from the C7 dogfood)
+### jobq spec strengthening — DONE 2026-07-14 except F2 (commit 61e6588)
 
 The 2026-07-13 panel attack on the R22 fixture
-(`dogfood/jobq-2026-07-13/ADJUDICATION.md`) confirmed real spec-quality gaps
-in our own reference project, worth fixing so R22 models best practice:
-- add `inv_b1_lower = running implies attempts >= 1` (or a biconditional
-  `inv_b3`) and a non-negativity invariant, so the invariant set is
-  standalone evidence for B1 (F1);
-- parameterize `CAPACITY` in `specs/jobq.qnt` instead of pinning it to 3 (F3);
-- resolve the finite-arithmetic gap (F2, still OPEN): model u32 overflow in
-  Quint with checked/saturating semantics, or add a justified trust
-  assumption bounding total submissions.
+(`dogfood/jobq-2026-07-13/ADJUDICATION.md`) found real spec-quality gaps in
+our own reference project; the dogfood loop closed by fixing them (INTENT
+v1.1, `specs/jobq.qnt`, obligations B5/W2, rebound ledger, adapter, R22
+suite):
+- F1: `inv_b3` is now the biconditional (idle => attempts 0, running =>
+  1..MAX) plus `inv_nonneg`, so the invariant set stands alone;
+- F3+F6: `CAPACITY` parameterized (`jobqP` module), verified at 2 and 4,
+  default 2 made distinct from MAX_ATTEMPTS 3; both former mutants
+  (constant swap, capacity pin) now produce counterexamples;
+- F4: terminal monotonicity encoded with ghost prev-counters as required
+  target B5; the `clawback` mutant now fails verify;
+- F7: failure-path witness W2 (`witness_b1_failed`) added as an obligation;
+- F5: INTENT K3 scopes error VALUES out of replay conformance (rejection is
+  modeled as action absence; error enums are unit-tested and ledger-cited);
+- F8 (process): panel attack copies must carry the full project.
+- **F2 remains OPEN**, by design, as the recorded contested finding (Quint
+  proves conservation over unbounded int; the code is u32). Resolving it
+  needs either checked-arithmetic Quint modeling or a justified
+  submission-bound trust assumption, plus new evidence, not a vote.
 
-From the addendum (all four seats reported; two findings mutant-proven):
-- encode terminal-count monotonicity (F4): ghost prev-counters in state with
-  `done >= prev_done and failed >= prev_failed`, since a plain state
-  invariant cannot express it; the `clawback` mutant passes `inv_all` today;
-- make the operator constants distinct (F6): CAPACITY=2 vs MAX_ATTEMPTS=3,
-  so constant-reference mix-ups stop verifying (the swap mutant passes
-  today);
-- add the failed-path witness (F7): `witness_b1_failed = failed > 0` as a
-  required obligation next to W1;
-- decide error-outcome observability (F5): an `outcome` state variable the
-  replay bridge can check (ITF v1 OUT tokens), or an INTENT edit scoping
-  error-value conformance out;
-- process note (F8): panel attack copies must carry the full project
-  (`.colosseum/`, adapter) so absence findings adjudicate cleanly.
-Any of these shifts R22 line numbers, so the ledger hashes and
-`tests/r22_reference_project.py` mutation offsets must be regenerated in the
-same change.
+Also fixed in the same push (c363545): a latent broken-clone bug the
+strengthening surfaced. The global `.colosseum/` gitignore had hidden every
+fixture manifest (r22 obligations/ledger/floors, four r28 floors.json) from
+git, so local CI passed while fresh clones failed r22/r28. Negated the
+ignore for `tests/fixtures/`, tracked the seven manifests, and added a
+`fixture-tracking` CI check (verified by cloning fresh and running r22
+green off the clone) so an untracked fixture can never ship a broken clone
+again.
 
 ## Suggested sequence
 
