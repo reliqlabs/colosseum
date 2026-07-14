@@ -1,0 +1,74 @@
+```json
+[
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD is 65536, admitting a payload one byte above the 65535-byte contract limit."
+  },
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, breaking wire interoperability."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 27,
+    "category": "unchecked-arithmetic",
+    "severity": "medium",
+    "title": "The backpressure length addition is unchecked and can overflow before comparison with HIGH_WATER."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "missing-bounds-check",
+    "severity": "medium",
+    "title": "The public consume method accepts values larger than the available data and can overflow or corrupt the read cursor."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 30,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Feeding after partial consumption never reclaims the consumed prefix, allowing physical buffer storage to grow without bound."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "The parser slices the declared payload and trailer without first checking that the complete frame is buffered."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A checksum failure consumes the entire declared frame instead of resynchronizing at the next magic sequence."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "A checksum mismatch is silently reported as an incomplete frame instead of returning FrameError."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "Drain discards every parsing error, preventing malformed frames from surfacing to its caller."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "Resynchronization discards a trailing first magic byte, breaking magic sequences split across feed boundaries."
+  }
+]
+```

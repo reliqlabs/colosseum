@@ -1,0 +1,42 @@
+{
+  "target": "corpus-v2 (alpha=lru-ttl, beta=framer)",
+  "target_snapshot": "held-out+worktree-clean",
+  "line_tolerance": 5,
+  "defect_count": 5,
+  "voices": [
+    "openai/gpt-5.6-sol"
+  ],
+  "per_voice": {
+    "openai/gpt-5.6-sol": {
+      "recall": 0.8,
+      "caught": [
+        "BD1",
+        "BD2",
+        "BD3",
+        "BD4"
+      ],
+      "unmatched_detections": 7
+    }
+  },
+  "shared_blind_spot": [
+    "BD5"
+  ],
+  "shared_blind_spot_count": 1,
+  "panel_union_recall": 0.8,
+  "caught_by": {
+    "BD1": [
+      "openai/gpt-5.6-sol"
+    ],
+    "BD2": [
+      "openai/gpt-5.6-sol"
+    ],
+    "BD3": [
+      "openai/gpt-5.6-sol"
+    ],
+    "BD4": [
+      "openai/gpt-5.6-sol"
+    ],
+    "BD5": []
+  },
+  "unmatched_note": "unmatched detections are candidate false positives; precision is not computed without ground-truth labels"
+}

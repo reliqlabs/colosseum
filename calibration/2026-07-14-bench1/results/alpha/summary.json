@@ -1,0 +1,199 @@
+{
+  "schema": "colosseum-benchmark/v1",
+  "corpus": "/private/tmp/claude-501/-Users-mvid-Development-reliq-colosseum/4ac0bcb5-5833-4ca6-b763-ec591652b4ee/scratchpad/corpus-v2/corpus-alpha.json",
+  "targets": "/private/tmp/claude-501/-Users-mvid-Development-reliq-colosseum/4ac0bcb5-5833-4ca6-b763-ec591652b4ee/scratchpad/corpus-v2/targets/alpha",
+  "dispatch_cmd": "timeout 900 opencode run --model {model} --agent spec-adversary {prompt}",
+  "voices": [
+    "openai/gpt-5.6-sol",
+    "fireworks-ai/accounts/fireworks/models/glm-5p2",
+    "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6"
+  ],
+  "repeats": 3,
+  "arms_requested": [
+    "ordinary",
+    "single",
+    "repeated",
+    "multi-family",
+    "adversarial"
+  ],
+  "total_dispatches": 14,
+  "arms": {
+    "ordinary": {
+      "status": "INCOMPLETE",
+      "dispatches": 1,
+      "successful": 0,
+      "errored": {
+        "openai/gpt-5.6-sol": "no parseable json findings block"
+      },
+      "tokens": null,
+      "cost_per_confirmed_defect": null,
+      "reason": "the arm's only voice errored; nothing to score"
+    },
+    "single": {
+      "status": "OK",
+      "dispatches": 1,
+      "successful": 1,
+      "errored": {},
+      "tokens": null,
+      "cost_per_confirmed_defect": null,
+      "panel_union_recall": 1.0,
+      "shared_blind_spot": [],
+      "shared_blind_spot_count": 0,
+      "per_voice": {
+        "openai/gpt-5.6-sol": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 1
+        }
+      }
+    },
+    "repeated": {
+      "status": "OK",
+      "dispatches": 3,
+      "successful": 3,
+      "errored": {},
+      "tokens": null,
+      "cost_per_confirmed_defect": null,
+      "panel_union_recall": 1.0,
+      "shared_blind_spot": [],
+      "shared_blind_spot_count": 0,
+      "per_voice": {
+        "openai/gpt-5.6-sol#pass1": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 1
+        },
+        "openai/gpt-5.6-sol#pass2": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 6
+        },
+        "openai/gpt-5.6-sol#pass3": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 4
+        }
+      }
+    },
+    "multi-family": {
+      "status": "OK",
+      "dispatches": 3,
+      "successful": 2,
+      "errored": {
+        "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6": "no parseable json findings block"
+      },
+      "tokens": null,
+      "cost_per_confirmed_defect": null,
+      "panel_union_recall": 1.0,
+      "shared_blind_spot": [],
+      "shared_blind_spot_count": 0,
+      "per_voice": {
+        "fireworks-ai/accounts/fireworks/models/glm-5p2": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 1
+        },
+        "openai/gpt-5.6-sol": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 6
+        }
+      }
+    },
+    "adversarial": {
+      "status": "OK",
+      "dispatches": 6,
+      "successful": 6,
+      "errored": {},
+      "tokens": null,
+      "cost_per_confirmed_defect": null,
+      "panel_union_recall": 1.0,
+      "shared_blind_spot": [],
+      "shared_blind_spot_count": 0,
+      "per_voice": {
+        "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 2
+        },
+        "fireworks-ai/accounts/fireworks/models/glm-5p2": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 2
+        },
+        "openai/gpt-5.6-sol": {
+          "recall": 1.0,
+          "caught": [
+            "AD1",
+            "AD2",
+            "AD3",
+            "AD4",
+            "AD5"
+          ],
+          "unmatched_detections": 1
+        }
+      }
+    }
+  },
+  "error_log": [
+    {
+      "arm": "ordinary",
+      "key": "openai/gpt-5.6-sol",
+      "reason": "no parseable json findings block"
+    },
+    {
+      "arm": "multi-family",
+      "key": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "reason": "no parseable json findings block"
+    }
+  ],
+  "verdict": "INCOMPLETE"
+}

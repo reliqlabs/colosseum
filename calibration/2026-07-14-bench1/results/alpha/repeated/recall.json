@@ -1,0 +1,77 @@
+{
+  "target": "corpus-v2 (alpha=lru-ttl, beta=framer)",
+  "target_snapshot": "held-out+worktree-clean",
+  "line_tolerance": 5,
+  "defect_count": 5,
+  "voices": [
+    "openai/gpt-5.6-sol#pass1",
+    "openai/gpt-5.6-sol#pass2",
+    "openai/gpt-5.6-sol#pass3"
+  ],
+  "per_voice": {
+    "openai/gpt-5.6-sol#pass1": {
+      "recall": 1.0,
+      "caught": [
+        "AD1",
+        "AD2",
+        "AD3",
+        "AD4",
+        "AD5"
+      ],
+      "unmatched_detections": 1
+    },
+    "openai/gpt-5.6-sol#pass2": {
+      "recall": 1.0,
+      "caught": [
+        "AD1",
+        "AD2",
+        "AD3",
+        "AD4",
+        "AD5"
+      ],
+      "unmatched_detections": 6
+    },
+    "openai/gpt-5.6-sol#pass3": {
+      "recall": 1.0,
+      "caught": [
+        "AD1",
+        "AD2",
+        "AD3",
+        "AD4",
+        "AD5"
+      ],
+      "unmatched_detections": 4
+    }
+  },
+  "shared_blind_spot": [],
+  "shared_blind_spot_count": 0,
+  "panel_union_recall": 1.0,
+  "caught_by": {
+    "AD1": [
+      "openai/gpt-5.6-sol#pass1",
+      "openai/gpt-5.6-sol#pass2",
+      "openai/gpt-5.6-sol#pass3"
+    ],
+    "AD2": [
+      "openai/gpt-5.6-sol#pass1",
+      "openai/gpt-5.6-sol#pass2",
+      "openai/gpt-5.6-sol#pass3"
+    ],
+    "AD3": [
+      "openai/gpt-5.6-sol#pass1",
+      "openai/gpt-5.6-sol#pass2",
+      "openai/gpt-5.6-sol#pass3"
+    ],
+    "AD4": [
+      "openai/gpt-5.6-sol#pass1",
+      "openai/gpt-5.6-sol#pass2",
+      "openai/gpt-5.6-sol#pass3"
+    ],
+    "AD5": [
+      "openai/gpt-5.6-sol#pass1",
+      "openai/gpt-5.6-sol#pass2",
+      "openai/gpt-5.6-sol#pass3"
+    ]
+  },
+  "unmatched_note": "unmatched detections are candidate false positives; precision is not computed without ground-truth labels"
+}

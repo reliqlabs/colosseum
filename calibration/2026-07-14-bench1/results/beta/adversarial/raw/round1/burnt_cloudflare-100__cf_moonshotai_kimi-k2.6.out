@@ -1,0 +1,53 @@
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16 initial value is 0x0000 instead of the required 0xFFFF, breaking interoperability"
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD is 65536, violating the intent bound of at most 65535 bytes"
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 27,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Backpressure check uses unchecked addition that can wrap on attacker-controlled chunk lengths"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "Payload and trailer are sliced without verifying the buffer contains the full frame length"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "critical",
+    "title": "Checksum mismatch returns Ok(None) instead of FrameError, silently dropping malformed frames"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain silently discards FrameError from next_frame, preventing caller from seeing malformed frames"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "drain budget accounting uses unchecked subtraction that can underflow on reentrant feed"
+  }
+]
+```

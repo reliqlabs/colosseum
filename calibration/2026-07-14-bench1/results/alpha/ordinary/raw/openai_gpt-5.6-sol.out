@@ -1,0 +1,86 @@
+VERDICT: BREAKS (five core behavioral clauses are violated by direct implementation paths)
+
+### 1. Expired entries can be returned using a stale timestamp [severity: critical]
+- **Category**: refinement mismatch
+- **Affected**: `src/clock.rs:3-30`, INTENT A2
+- **What's wrong**: `Clock` reuses one timestamp for eight reads. If construction samples `0`, insertion creates a deadline of `5`, and actual time advances to `10`, a subsequent lookup can still observe `0` and return the expired value.
+- **Cite (spec)**:
+  > `const SAMPLE_WINDOW: u32 = 8;`
+  >
+  > `self.reads_since_sample += 1;`
+  >
+  > `self.sampled_ms`
+- **Cite (intent)**:
+  > “Every expiry decision consults the current time; time is read fresh for each decision, never reused from an earlier operation.”
+- **Fix recommendation**: Call the source on every `now_ms` invocation. Remove timestamp sampling from expiry decisions.
+
+### 2. Eviction removes the most recently used entry [severity: critical]
+- **Category**: logic inversion
+- **Affected**: `src/evict.rs:8`, INTENT A3
+- **What's wrong**: The recency queue declares its front as least recently used and appends touched entries to the back. `pop_back()` therefore evicts the most recently used entry. With capacity 2, inserting `a`, then `b`, then `c` evicts `b` instead of `a`.
+- **Cite (spec)**:
+  > `/// Recency order: front is least recently used (INTENT A3).`
+  >
+  > `let victim = match cache.order.pop_back() {`
+- **Cite (intent)**:
+  > “Eviction removes the least recently used entry. The most recently used entry is never the eviction victim while any other entry exists.”
+- **Fix recommendation**: Select the victim with `pop_front()`.
+
+### 3. Handles ignore their generation [severity: critical]
+- **Category**: refinement mismatch
+- **Affected**: `src/cache.rs:115-126`, INTENT A4
+- **What's wrong**: `get_by_handle` checks only whether the key exists. Insert `k`, save its handle, clear the cache, then reinsert `k`: the old handle resolves the new value despite carrying the old generation.
+- **Cite (spec)**:
+  > `if self.map.contains_key(&handle.key) {`
+  >
+  > `return self.map.get(&handle.key).map(|e| e.value.as_str());`
+- **Cite (intent)**:
+  > “A `Handle` issued before a `clear` MUST NOT resolve afterwards, even if the same key is reinserted. Handle resolution compares the handle's generation against the entry's generation.”
+- **Fix recommendation**: Require the located entry’s generation to equal `handle.generation`; record a miss and return `None` otherwise.
+
+### 4. Expired key lookups are counted as hits [severity: serious]
+- **Category**: contradiction
+- **Affected**: `src/cache.rs:99-105`, INTENT A5
+- **What's wrong**: `get` increments `hits` before checking expiry and never records a miss on the expired path. For an entry with TTL zero, `get` returns `None` while stats become `hits = 1, misses = 0`.
+- **Cite (spec)**:
+  > `self.stats.record_hit();`
+  >
+  > `if expired {`
+  >
+  > `    self.remove(key);`
+  >
+  > `    return None;`
+- **Cite (intent)**:
+  > “`hits` counts only lookups that returned a live value; `misses` counts lookups that returned nothing, including expired entries.”
+- **Fix recommendation**: Test expiry first. Record a miss on expiration and a hit only immediately before returning a live value.
+
+### 5. Tombstones grow without bound during ordinary insertion [severity: serious]
+- **Category**: resource-leak
+- **Affected**: `src/evict.rs:16`, `src/cache.rs:69-72`, INTENT A6
+- **What's wrong**: Every capacity eviction appends a tombstone, while insertion never drains them. With capacity 1 and `N` distinct sequential insertions, the map stays at one entry but `tombstones` grows to `N - 1`. The separate public compaction function does not satisfy automatic draining during normal operation.
+- **Cite (spec)**:
+  > `cache.tombstones.push(victim.clone());`
+  >
+  > `pub fn compact_tombstones(cache: &mut Cache) {`
+- **Cite (intent)**:
+  > “Eviction records are drained during normal operation; no auxiliary structure grows without bound.”
+- **Fix recommendation**: Remove unnecessary tombstones or drain them automatically as part of insertion or eviction, with storage bounded relative to capacity.
+
+### 6. TTL deadline calculation can overflow [severity: serious]
+- **Category**: edge case
+- **Affected**: `src/cache.rs:73`
+- **What's wrong**: `now_ms + ttl_ms` panics in overflow-checked builds and wraps in release builds. For `now_ms = u64::MAX` and `ttl_ms = 1`, insertion either panics or stores deadline zero, causing a newly inserted long-lived entry to be treated as expired.
+- **Cite (spec)**:
+  > `let expires_at_ms = self.clock.now_ms() + ttl_ms;`
+- **Cite (intent)**:
+  > “`lru-ttl` stores string entries under string keys with a per-entry TTL”
+  >
+  > “K2: the time source is monotonic milliseconds.”
+- **Fix recommendation**: Define deadline-overflow behavior and implement it explicitly, such as rejecting the TTL or using checked addition with a documented saturation policy.
+
+META
+
+- Categories attacked: contradiction, edge case, logic inversion, refinement mismatch, resource-leak.
+- Categories without evidence: under-specification, over-specification, triviality, ambiguity, coverage gap, composition failure, temporal-state mismatch, impossibility-hypothesis vacuity, disjunction-vs-decomposition collapse, preconditional over-strength.
+- Missing artifacts: tests, downstream usage, and prior versions.
+- Estimated confidence: high.

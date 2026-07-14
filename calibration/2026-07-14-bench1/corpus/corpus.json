@@ -1,0 +1,120 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "corpus_id": "v2-2026-07-13",
+  "target": "corpus-v2 (alpha=lru-ttl, beta=framer)",
+  "target_snapshot": "held-out+worktree-clean",
+  "line_tolerance": 5,
+  "_comment": "Held-out benchmark corpus. Targets carry their own path prefix (targets/alpha, targets/beta). Match rule per docs/benchmark-protocol.md: file basename + exact category + line within tolerance. Designed to discriminate frontier voices (expected 40-70% single-pass recall), unlike r1 which ceilinged. Hardness axes recorded in DESIGN-NOTES.md.",
+  "defects": [
+    {
+      "id": "AD1",
+      "file": "targets/alpha/src/cache.rs",
+      "line": 115,
+      "category": "missing-validation",
+      "severity": "high",
+      "hardness": "spec-level-omission",
+      "planted_by": "corpus-author",
+      "description": "get_by_handle never compares handle.generation against the entry generation; A4 requires a handle issued before a clear to fail resolution, but the code resolves purely on key presence, so a stale handle resolves after clear+reinsert. The comparison A4 mandates exists nowhere.",
+      "detection_key": "targets/alpha/src/cache.rs:115:missing-validation"
+    },
+    {
+      "id": "AD2",
+      "file": "targets/alpha/src/clock.rs",
+      "line": 25,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "hardness": "cross-file+symptom-far",
+      "planted_by": "corpus-author",
+      "description": "Clock reuses a sampled timestamp for up to SAMPLE_WINDOW reads; A2 requires time read fresh for each expiry decision. Cause is in clock.rs; the observable failure (an expired entry returned as live) manifests in cache.rs get.",
+      "detection_key": "targets/alpha/src/clock.rs:25:invariant-violation"
+    },
+    {
+      "id": "AD3",
+      "file": "targets/alpha/src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "hardness": "cross-file",
+      "planted_by": "corpus-author",
+      "description": "evict_one pops from the back of the recency queue, but cache.rs maintains the back as most-recently-used (touch push_backs on hit); A3 requires evicting the least-recently-used entry, so the code evicts the MRU. Correct fix is pop_front.",
+      "detection_key": "targets/alpha/src/evict.rs:8:logic-inversion"
+    },
+    {
+      "id": "AD4",
+      "file": "targets/alpha/src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "medium",
+      "hardness": "spec-level-omission",
+      "planted_by": "corpus-author",
+      "description": "tombstones grows on every eviction and is never drained during normal operation; compact_tombstones exists but no insert/get/evict path calls it. A6 requires bookkeeping bounded and drained in normal operation.",
+      "detection_key": "targets/alpha/src/evict.rs:16:resource-leak"
+    },
+    {
+      "id": "AD5",
+      "file": "targets/alpha/src/cache.rs",
+      "line": 100,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "hardness": "cross-file",
+      "planted_by": "corpus-author",
+      "description": "get records a hit before the expiry check, so an expired lookup is counted as a hit and returns nothing; A5 says hits count only lookups that returned a live value and expired lookups are misses. get_by_handle handles this correctly, so the two methods disagree.",
+      "detection_key": "targets/alpha/src/cache.rs:100:invariant-violation"
+    },
+    {
+      "id": "BD1",
+      "file": "targets/beta/src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "high",
+      "hardness": "symptom-far",
+      "planted_by": "corpus-author",
+      "description": "crc16 initializes the register to 0x0000; P1 fixes CRC-16-CCITT with initial value 0xFFFF. Encode and parse share the wrong constant so round-trips pass locally; only interoperation with a spec-conformant peer breaks.",
+      "detection_key": "targets/beta/src/checksum.rs:5:default-mismatch"
+    },
+    {
+      "id": "BD2",
+      "file": "targets/beta/src/parse.rs",
+      "line": 44,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "hardness": "cross-file",
+      "planted_by": "corpus-author",
+      "description": "next_frame slices the payload and reads the trailer using the claimed length without first checking the buffer actually holds HEADER_LEN + len + TRAILER_LEN bytes; P2 requires validating the length field against buffered data before any slicing. A truncated frame panics.",
+      "detection_key": "targets/beta/src/parse.rs:44:missing-bounds-check"
+    },
+    {
+      "id": "BD3",
+      "file": "targets/beta/src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "high",
+      "hardness": "symptom-far",
+      "planted_by": "corpus-author",
+      "description": "on checksum mismatch next_frame consumes the frame and returns Ok(None), silently dropping a corrupt frame and signalling need-more-data; P4 requires surfacing FrameError. Inside drain this also ends the loop, stopping delivery.",
+      "detection_key": "targets/beta/src/parse.rs:50:error-swallowed"
+    },
+    {
+      "id": "BD4",
+      "file": "targets/beta/src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "medium",
+      "hardness": "cross-file",
+      "planted_by": "corpus-author",
+      "description": "MAX_PAYLOAD is 65536; P2 caps payloads at 65535 bytes. Both encode and next_frame admit a 65536-byte payload, one over the bound.",
+      "detection_key": "targets/beta/src/frame.rs:11:off-by-one"
+    },
+    {
+      "id": "BD5",
+      "file": "targets/beta/src/parse.rs",
+      "line": 59,
+      "category": "race-condition",
+      "severity": "high",
+      "hardness": "concurrency-reentrancy",
+      "planted_by": "corpus-author",
+      "description": "drain snapshots the byte budget once before the loop and decrements it per delivered frame; K2 supports the handler feeding reentrantly, but frames fed during a callback fall outside the stale budget and go undelivered, and budget can underflow. Outcome depends on reentrant feed ordering.",
+      "detection_key": "targets/beta/src/parse.rs:59:race-condition"
+    }
+  ]
+}

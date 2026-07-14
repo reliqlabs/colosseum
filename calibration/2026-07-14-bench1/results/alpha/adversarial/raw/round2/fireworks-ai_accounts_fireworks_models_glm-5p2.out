@@ -1,0 +1,58 @@
+Looking at the code and intent now. Let me verify each candidate against the actual source.
+All candidates verified against source. Confirmed: `compact_tombstones` is never called from any normal-operation path (only `clear` touches tombstones directly at line 146); `get_by_handle` never reads `handle.generation` or `entry.generation` despite both fields existing; `evict_one` pops back (MRU) not front (LRU).
+
+I'm declining the `cache.rs:70` candidate (replace-skips-eviction). A1's invariant "number of live entries never exceeds capacity" holds on replace since count doesn't increase; the literal "evicts exactly one entry first" describes the mechanism for new entries, and evicting on replace would be over-eviction. Not a real defect.
+
+```json
+[
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "Clock reuses one sampled timestamp across eight now_ms calls, so expiry checks consult stale time and expired entries can be returned as live, violating A2."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one pops the back of the recency queue (the most recently used entry) instead of the front, violating A3's requirement that eviction removes the least recently used entry."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle checks only that the key exists in the map and never compares handle.generation against the entry's generation, so a handle issued before clear resolves a reinserted value after clear, violating A4."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Computing expires_at_ms as now_ms() + ttl_ms is unchecked u64 addition that panics in debug or wraps to a tiny deadline in release, making the entry immediately expired."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "get calls record_hit before the expiry check, so a lookup that finds an expired entry and returns None still increments hits instead of misses, violating A5."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "evict_one pushes a cloned key into tombstones on every eviction, but compact_tombstones is never called during normal operation, so the tombstone vec grows without bound, violating A6."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 21,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "hit_rate computes self.hits + self.misses as unchecked u64 addition that overflows (panic in debug, wrong rate in release) once the lookup count approaches u64::MAX."
+  }
+]
+```

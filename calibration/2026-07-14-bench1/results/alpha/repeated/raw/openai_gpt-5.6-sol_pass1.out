@@ -1,0 +1,46 @@
+```json
+[
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Adding ttl_ms to the current timestamp can overflow, causing a panic or an invalid expiration deadline."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A key lookup records a hit before checking expiration, so expired entries count as hits instead of misses."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "high",
+    "title": "Handle lookup never compares the handle generation with the entry generation, allowing pre-clear handles to resolve reinserted keys."
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "The clock reuses one sampled timestamp for multiple reads despite the contract requiring fresh time for every expiry decision."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "high",
+    "title": "Eviction pops from the back of the queue, removing the most recently used entry instead of the least recently used entry."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction appends a tombstone that normal cache operations never drain, allowing bookkeeping memory to grow without bound."
+  }
+]
+```

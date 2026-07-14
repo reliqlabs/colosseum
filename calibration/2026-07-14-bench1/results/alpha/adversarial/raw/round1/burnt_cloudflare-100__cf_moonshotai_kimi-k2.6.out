@@ -1,0 +1,47 @@
+```json
+[
+  {
+    "file": "src/clock.rs",
+    "line": 24,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "Clock samples and reuses timestamps for up to 8 calls, violating A2's requirement that every expiry decision reads fresh time"
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one pops the back of the recency queue, evicting the most-recently-used entry instead of the least-recently-used front"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 115,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle never compares handle.generation against the entry's generation, allowing pre-clear handles to resolve after clear"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "get records a hit before checking expiry, so expired entries are counted as hits contrary to A5"
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction pushes a cloned key into tombstones, but compact_tombstones is never called during normal operation, unbounded growth"
+  }
+]
+```
+
+**Analysis**
+
+- **A2 (freshness)**: `Clock::now_ms` caches the timestamp for `SAMPLE_WINDOW` (8) reads. Intent A2 explicitly states "time is read fresh for each decision, never reused from an earlier operation." The sampling strategy directly contradicts this.
+- **A3 (LRU)**: `Cache::touch` pushes accessed keys to the back, making the back MRU and the front LRU. `evict_one` uses `pop_back()`, evicting the MRU entry. This inverts the eviction policy.
+- **A4 (generations)**: `get_by_handle` checks `contains_key` and expiry, but never reads `handle.generation` or compares it to `entry.generation`. After `clear()` increments the cache generation and the same key is reinserted, old handles still resolve.
+- **A5 (stats)**: In `get`, `self.stats.record_hit()` is called immediately when `contains_key` is true, before the expiry check. An expired entry therefore increments `hits` and returns `None`, violating "hits counts only lookups that returned a live value."
+- **A6 (bounded bookkeeping)**: `evict_one` pushes every evicted key into `tombstones`. The `compact_tombstones` function exists but is never invoked by any `Cache` method; only `clear()` clears the vector. During sustained churn, `tombstones` grows without bound, violating the bounded-bookkeeping requirement.

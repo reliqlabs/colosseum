@@ -1,0 +1,81 @@
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16 starts at 0x0000 instead of the required 0xFFFF, making encoded and verified checksums incompatible with compliant peers."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD admits 65536-byte payloads although P2 limits payloads to 65535 bytes."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame slices the payload and indexes its trailer without first checking that the complete declared frame is buffered."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 40,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "An oversized length consumes the entire header instead of resynchronizing at the next magic sequence, potentially skipping a valid overlapping frame."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Checksum failure consumes the untrusted declared frame length instead of searching for the next magic sequence, so a corrupted length can discard valid frames."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "critical",
+    "title": "Checksum mismatch returns Ok(None), silently reporting malformed input as an incomplete frame instead of FrameError::Corrupt."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Reentrant feeding after malformed bytes can make a subsequently consumed frame exceed the stale drain budget, causing subtraction underflow."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every FrameError from next_frame and provides no way for its caller to observe malformed input."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Resynchronization discards a trailing 0xA5 that may be the first byte of a magic sequence split across feeds."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "missing-bounds-check",
+    "severity": "medium",
+    "title": "Public consume accepts values larger than the available bytes, corrupting read_pos and causing arithmetic or slicing panics."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 30,
+    "category": "resource-leak",
+    "severity": "medium",
+    "title": "feed appends without reclaiming consumed prefixes, allowing next_frame users to grow the backing allocation without bound while unread bytes remain below HIGH_WATER."
+  }
+]
+```

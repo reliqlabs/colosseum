@@ -1,0 +1,239 @@
+{
+  "openai/gpt-5.6-sol": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16 starts at 0x0000 instead of the required 0xFFFF, making encoded and verified checksums incompatible with compliant peers."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "MAX_PAYLOAD admits 65536-byte payloads although P2 limits payloads to 65535 bytes."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 44,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame slices the payload and indexes its trailer without first checking that the complete declared frame is buffered."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 40,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "An oversized length consumes the entire header instead of resynchronizing at the next magic sequence, potentially skipping a valid overlapping frame."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Checksum failure consumes the untrusted declared frame length instead of searching for the next magic sequence, so a corrupted length can discard valid frames."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "critical",
+      "title": "Checksum mismatch returns Ok(None), silently reporting malformed input as an incomplete frame instead of FrameError::Corrupt."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Reentrant feeding after malformed bytes can make a subsequently consumed frame exceed the stale drain budget, causing subtraction underflow."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every FrameError from next_frame and provides no way for its caller to observe malformed input."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Resynchronization discards a trailing 0xA5 that may be the first byte of a magic sequence split across feeds."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "title": "Public consume accepts values larger than the available bytes, corrupting read_pos and causing arithmetic or slicing panics."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 30,
+      "category": "resource-leak",
+      "severity": "medium",
+      "title": "feed appends without reclaiming consumed prefixes, allowing next_frame users to grow the backing allocation without bound while unread bytes remain below HIGH_WATER."
+    }
+  ],
+  "fireworks-ai/accounts/fireworks/models/glm-5p2": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16 initial value is 0x0000 instead of the 0xFFFF required by P1, making every checksum disagree with a compliant peer (K3)."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "medium",
+      "title": "MAX_PAYLOAD is 65536 but P2 caps payload length at 65535; both encode and parse accept a one-byte-oversize frame that a compliant peer rejects."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 27,
+      "category": "unchecked-arithmetic",
+      "severity": "medium",
+      "title": "Backpressure check adds self.available() + chunk.len() without checked_add; on 32-bit an attacker-controlled chunk length can wrap the sum past HIGH_WATER (P5)."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "title": "pub consume advances read_pos by n without verifying n <= available(), so an over-large n silently discards unread data and makes peek() panic."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 42,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "consume only clears the Vec when every byte is consumed; with even one unread byte the consumed prefix is retained, and since feed backpressure checks available() not bytes.len(), repeated next_frame calls grow the allocation without bound."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 43,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame computes frame_len but never checks data.len() >= frame_len before slicing the payload and trailer on lines 44-46, panicking on any partial frame the normal streaming case that P2 and P6 require handling."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "On checksum failure the parser consumes the entire declared frame_len instead of resynchronizing at the next magic sequence as P4 requires, skipping over valid frames embedded in the corrupt region."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "critical",
+      "title": "Checksum mismatch returns Ok(None) instead of Err(FrameError::Corrupt), silently dropping the malformed frame and violating P4's requirement that malformed input surfaces FrameError and is never silently dropped."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "drain subtracts consumed from a stale budget without checked_sub; a reentrant handler feed (K2) can introduce a frame larger than the remaining budget, causing the subtraction to underflow in release mode and the loop to spin for a huge iteration count (P5)."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every Err from next_frame via Err(_) => continue and returns (), so FrameError from malformed frames never reaches the drain caller, violating P4."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "resync returns data.len() when no magic is found, consuming a trailing 0xA5 byte that may be the first half of a magic sequence completed by the next feed, violating P6's preservation of incomplete trailing frames."
+    }
+  ],
+  "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16 initial value is 0x0000 but INTENT P1 requires 0xFFFF, so every checksum is wrong versus a compliant peer."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "default-mismatch",
+      "severity": "high",
+      "title": "MAX_PAYLOAD is 65536 but INTENT P2 caps payload at 65535; encode and parse both accept a payload one byte over the limit."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 27,
+      "category": "unchecked-arithmetic",
+      "severity": "medium",
+      "title": "feed computes self.available() + chunk.len() without overflow checking; on 32-bit a large chunk can wrap the sum past HIGH_WATER, bypassing the P3 backpressure bound."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "title": "Public consume accepts values larger than the unread region; read_pos can overflow or advance past the end, breaking subsequent peek and available calls."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 42,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Consumed prefixes are retained whenever one unread byte remains, allowing repeated next_frame use to grow the allocation without bound."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 43,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame computes frame_len then slices payload and trailer without verifying data.len() >= frame_len, panicking on any partial frame."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "On checksum failure next_frame consumes frame_len instead of resynchronizing at the next magic sequence as P4 requires, so a corrupted length field skips past valid frames."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "critical",
+      "title": "Checksum failure returns Ok(None) instead of Err(FrameError::Corrupt), silently dropping malformed input in direct violation of P4."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "drain does budget -= consumed without underflow checking; a reentrant handler that feeds new bytes can make consumed exceed budget, panicking in debug or wrapping in release."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every parsing error even though malformed frames must surface FrameError to the caller."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "resync returns data.len() when no magic is found, consuming a trailing 0xA5 that could be the first byte of a split magic sequence, violating P6 preservation of partial frames."
+    }
+  ]
+}

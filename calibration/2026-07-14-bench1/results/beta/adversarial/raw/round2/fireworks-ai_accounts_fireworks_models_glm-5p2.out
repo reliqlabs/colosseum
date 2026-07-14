@@ -1,0 +1,110 @@
+I'll read the intent and all source files to verify each candidate finding against the actual code.
+Now I have all the code. Let me verify each candidate finding against the actual code and intent clauses.
+
+Key verifications:
+
+1. **checksum.rs:5** — `let mut crc: u16 = 0x0000;` vs INTENT P1 "initial value 0xFFFF". Clear default-mismatch. Every CRC differs from a compliant peer. Critical.
+
+2. **frame.rs:11** — `MAX_PAYLOAD: usize = 65536` vs INTENT P2 "at most 65535 bytes". Used in encode (line 27: `> MAX_PAYLOAD` accepts 65536) and parse (line 39: same). Off-by-one.
+
+3. **buffer.rs:27** — `self.available() + chunk.len()` unchecked. P5 says "Additions over attacker-influenced values are checked or bounded." available() ≤ 1MiB, but chunk.len() is attacker-controlled. On 32-bit could wrap.
+
+4. **buffer.rs:41** — `self.read_pos += n` with no check `n <= available()`. consume is `pub`. If n > available, read_pos exceeds bytes.len(), peek() panics, available() underflows.
+
+5. **buffer.rs:42** — `if self.read_pos >= self.bytes.len()` only clears when fully consumed. With any unread byte, consumed prefix retained. Backpressure checks `available()` not `bytes.len()`, so Vec grows unbounded. Attacker sends many small frames + trailing byte.
+
+6. **parse.rs:43-44** — Only checks `data.len() < HEADER_LEN` (line 30). Never checks `data.len() >= frame_len` before slicing on line 44. INTENT P2: "parse validates the length field against the buffered data before any slicing." Panic on partial frame (the normal streaming case).
+
+7. **parse.rs:49** — Checksum failure does `consume(frame_len)`, skipping entire declared frame. INTENT P4: "resynchronizes at the next magic sequence." Should scan for next MAGIC, not skip declared length (which may be corrupt).
+
+8. **parse.rs:50** — `return Ok(None)` on checksum mismatch. INTENT P4: "surfaces FrameError" and "Malformed input is never silently dropped." Caller can't distinguish corrupt from incomplete.
+
+9. **parse.rs:65** — `budget -= consumed` where budget is stale (set once from available()). Handler (line 64) can feed reentrantly (K2). New frame from fed bytes can have consumed > budget → underflow in release mode → huge budget → long loop. P5 violation.
+
+10. **parse.rs:68** — `Err(_) => continue` swallows all FrameError. drain returns `()` so errors never reach caller. INTENT P4: "surfaces FrameError to the caller."
+
+11. **parse.rs:95** — `resync` returns `data.len()` when no magic found. If last byte is 0xA5 (MAGIC[0]), it's consumed. Next feed brings 0x5A but 0xA5 is gone. INTENT P6: "bytes of an incomplete trailing frame are preserved intact across feed."
+
+All 11 verified against specific code lines and intent clauses. Compiling final list.
+
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16 initial value is 0x0000 instead of the 0xFFFF required by P1, making every checksum disagree with a compliant peer (K3)."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "medium",
+    "title": "MAX_PAYLOAD is 65536 but P2 caps payload length at 65535; both encode and parse accept a one-byte-oversize frame that a compliant peer rejects."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 27,
+    "category": "unchecked-arithmetic",
+    "severity": "medium",
+    "title": "Backpressure check adds self.available() + chunk.len() without checked_add; on 32-bit an attacker-controlled chunk length can wrap the sum past HIGH_WATER (P5)."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "missing-bounds-check",
+    "severity": "medium",
+    "title": "pub consume advances read_pos by n without verifying n <= available(), so an over-large n silently discards unread data and makes peek() panic."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 42,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "consume only clears the Vec when every byte is consumed; with even one unread byte the consumed prefix is retained, and since feed backpressure checks available() not bytes.len(), repeated next_frame calls grow the allocation without bound."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 43,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame computes frame_len but never checks data.len() >= frame_len before slicing the payload and trailer on lines 44-46, panicking on any partial frame the normal streaming case that P2 and P6 require handling."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "On checksum failure the parser consumes the entire declared frame_len instead of resynchronizing at the next magic sequence as P4 requires, skipping over valid frames embedded in the corrupt region."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "critical",
+    "title": "Checksum mismatch returns Ok(None) instead of Err(FrameError::Corrupt), silently dropping the malformed frame and violating P4's requirement that malformed input surfaces FrameError and is never silently dropped."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "drain subtracts consumed from a stale budget without checked_sub; a reentrant handler feed (K2) can introduce a frame larger than the remaining budget, causing the subtraction to underflow in release mode and the loop to spin for a huge iteration count (P5)."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every Err from next_frame via Err(_) => continue and returns (), so FrameError from malformed frames never reaches the drain caller, violating P4."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "resync returns data.len() when no magic is found, consuming a trailing 0xA5 byte that may be the first half of a magic sequence completed by the next feed, violating P6's preservation of incomplete trailing frames."
+  }
+]
+```

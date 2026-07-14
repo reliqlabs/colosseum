@@ -1,0 +1,77 @@
+{
+  "target": "corpus-v2 (alpha=lru-ttl, beta=framer)",
+  "target_snapshot": "held-out+worktree-clean",
+  "line_tolerance": 5,
+  "defect_count": 5,
+  "voices": [
+    "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+    "fireworks-ai/accounts/fireworks/models/glm-5p2",
+    "openai/gpt-5.6-sol"
+  ],
+  "per_voice": {
+    "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6": {
+      "recall": 1.0,
+      "caught": [
+        "AD1",
+        "AD2",
+        "AD3",
+        "AD4",
+        "AD5"
+      ],
+      "unmatched_detections": 2
+    },
+    "fireworks-ai/accounts/fireworks/models/glm-5p2": {
+      "recall": 1.0,
+      "caught": [
+        "AD1",
+        "AD2",
+        "AD3",
+        "AD4",
+        "AD5"
+      ],
+      "unmatched_detections": 2
+    },
+    "openai/gpt-5.6-sol": {
+      "recall": 1.0,
+      "caught": [
+        "AD1",
+        "AD2",
+        "AD3",
+        "AD4",
+        "AD5"
+      ],
+      "unmatched_detections": 1
+    }
+  },
+  "shared_blind_spot": [],
+  "shared_blind_spot_count": 0,
+  "panel_union_recall": 1.0,
+  "caught_by": {
+    "AD1": [
+      "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "openai/gpt-5.6-sol"
+    ],
+    "AD2": [
+      "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "openai/gpt-5.6-sol"
+    ],
+    "AD3": [
+      "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "openai/gpt-5.6-sol"
+    ],
+    "AD4": [
+      "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "openai/gpt-5.6-sol"
+    ],
+    "AD5": [
+      "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "openai/gpt-5.6-sol"
+    ]
+  },
+  "unmatched_note": "unmatched detections are candidate false positives; precision is not computed without ground-truth labels"
+}

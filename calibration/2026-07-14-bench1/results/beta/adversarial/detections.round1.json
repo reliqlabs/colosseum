@@ -1,0 +1,183 @@
+{
+  "openai/gpt-5.6-sol": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "high",
+      "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, breaking wire interoperability."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "medium",
+      "title": "MAX_PAYLOAD permits 65536 bytes although P2 limits payloads to 65535 bytes."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "title": "Public consume accepts values larger than the unread region and can silently discard data or wrap the cursor."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 42,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Consumed prefixes are retained whenever one unread byte remains, allowing repeated next_frame use to grow the allocation without bound."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 43,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame never checks that the complete declared frame is buffered before slicing its payload and trailer."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "A checksum failure consumes the entire claimed frame instead of resynchronizing at the next magic sequence."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "A checksum mismatch is reported as Ok(None) rather than FrameError::Corrupt."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "race-condition",
+      "severity": "high",
+      "title": "Reentrant feed can make a newly completed frame exceed the stale drain budget and underflow the budget subtraction."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every parsing error even though malformed frames must surface FrameError to the caller."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Resynchronization discards a trailing 0xA5 byte, corrupting a magic sequence split across feed calls."
+    }
+  ],
+  "fireworks-ai/accounts/fireworks/models/glm-5p2": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16 initial value is 0x0000 but INTENT P1 requires 0xFFFF, so every checksum is wrong versus a compliant peer (K3)."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "default-mismatch",
+      "severity": "high",
+      "title": "MAX_PAYLOAD is 65536 but INTENT P2 caps payload at 65535; encode and parse both accept a payload one byte over the limit."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 43,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame computes frame_len then slices data[HEADER_LEN..HEADER_LEN+len] and indexes the trailer without verifying data.len() >= frame_len, panicking on any partial frame (violates P2 and P5)."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "critical",
+      "title": "Checksum failure returns Ok(None) instead of Err(FrameError::Corrupt), silently dropping malformed input in direct violation of P4."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "drain does budget -= consumed without underflow checking; a reentrant handler that feeds new bytes (K2) can make consumed exceed budget, panicking in debug or wrapping in release."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "On checksum failure next_frame consumes frame_len instead of resynchronizing at the next magic sequence as P4 requires, so a corrupted length field skips past valid frames."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "resync returns data.len() when no magic is found, consuming a trailing 0xA5 that could be the first byte of a split magic sequence, violating P6 preservation of partial frames."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 27,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "feed computes self.available() + chunk.len() without overflow checking; on 32-bit a large attacker-influenced chunk can wrap the sum past HIGH_WATER, bypassing the P3 backpressure bound."
+    }
+  ],
+  "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16 initial value is 0x0000 instead of the required 0xFFFF, breaking interoperability"
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "MAX_PAYLOAD is 65536, violating the intent bound of at most 65535 bytes"
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 27,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Backpressure check uses unchecked addition that can wrap on attacker-controlled chunk lengths"
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 44,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "Payload and trailer are sliced without verifying the buffer contains the full frame length"
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "critical",
+      "title": "Checksum mismatch returns Ok(None) instead of FrameError, silently dropping malformed frames"
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain silently discards FrameError from next_frame, preventing caller from seeing malformed frames"
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "drain budget accounting uses unchecked subtraction that can underflow on reentrant feed"
+    }
+  ]
+}

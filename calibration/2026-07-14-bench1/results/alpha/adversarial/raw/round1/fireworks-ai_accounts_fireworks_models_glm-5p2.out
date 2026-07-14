@@ -1,0 +1,59 @@
+I'll read the intent contract and every source file, then check each clause A1-A7 against the code.
+`compact_tombstones` is defined but never called anywhere in the crate. `generation` is stored on entries and handles but never compared in `get_by_handle`. Let me verify no internal caller of `compact_tombstones` exists and confirm the `get_by_handle` body has no generation comparison.
+Confirmed: `compact_tombstones` is never called internally, and `handle.generation` is never compared to any entry generation anywhere in the codebase. All findings are verified. Here is my analysis:
+
+**Clause-by-clause:**
+- **A1 (capacity):** Maintained. `insert` evicts before adding when full and key is new. OK.
+- **A2 (freshness):** Broken. `Clock::now_ms` reuses a sampled timestamp for 8 reads (clock.rs:25), directly contradicting "time is read fresh for each decision, never reused."
+- **A3 (LRU order):** Broken. `evict_one` calls `pop_back()` (evict.rs:8), but back is MRU per the recency convention (push_back in touch/insert). It evicts the most recently used entry.
+- **A4 (generations):** Broken. `get_by_handle` never compares `handle.generation` to `entry.generation`. A handle from before `clear` resolves after reinsert.
+- **A5 (stats):** Broken. `get` calls `record_hit()` before the expiry check (cache.rs:100), so expired entries are counted as hits, not misses.
+- **A6 (bounded bookkeeping):** Broken. `tombstones` grows one per eviction but `compact_tombstones` is never called by any normal operation.
+- **A7 (callback):** OK. Callback fires after map and order are updated.
+
+```json
+[
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one pops the back of the recency queue (MRU) instead of the front (LRU), evicting the most recently used entry in direct violation of A3."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "logic-inversion",
+    "severity": "high",
+    "title": "get calls record_hit before the expiry check, so an expired entry that returns None is counted as a hit instead of a miss, violating A5."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle never compares handle.generation to the entry's generation, so a handle issued before clear still resolves after the same key is reinserted, violating A4."
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "now_ms reuses a cached timestamp for up to 8 reads before resampling, violating A2's requirement that every expiry decision reads time fresh and never reuses a value from an earlier operation."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "tombstones is pushed on every eviction but compact_tombstones is never called during normal operation, so the auxiliary structure grows without bound, violating A6."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "expires_at_ms is computed with unchecked u64 addition (now_ms + ttl_ms) that wraps in release mode, making a large ttl_ms produce an immediately-expired entry."
+  }
+]
+```

@@ -1,0 +1,81 @@
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "high",
+    "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD admits 65536 bytes although the contract permits at most 65535."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "A partial frame with a complete header is sliced using its declared length before verifying that the payload and trailer are buffered."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "A checksum mismatch is reported as Ok(None) instead of surfacing FrameError."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Checksum recovery consumes the entire declared frame instead of resynchronizing at the next magic sequence."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain silently discards every malformed-frame error returned by next_frame."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Resynchronization discards a trailing 0xA5 byte that may be the first byte of a magic sequence split across feeds."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 40,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "Oversize-frame recovery skips the whole header and can discard the next magic sequence when it begins inside the rejected length field."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "race-condition",
+    "severity": "critical",
+    "title": "After malformed bytes leave the drain budget stale, a reentrant feed can make drain process new data and underflow its budget."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "unchecked-arithmetic",
+    "severity": "medium",
+    "title": "The public consume method adds an unchecked caller-controlled count to read_pos and can wrap the cursor."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 26,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Feeding after repeated next_frame calls never compacts a consumed prefix when a partial suffix remains, allowing the backing vector to grow without bound."
+  }
+]
+```

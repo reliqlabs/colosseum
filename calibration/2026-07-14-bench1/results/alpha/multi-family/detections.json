@@ -1,0 +1,125 @@
+{
+  "openai/gpt-5.6-sol": [
+    {
+      "file": "src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "high",
+      "title": "Eviction pops the most-recently-used key instead of the least-recently-used key."
+    },
+    {
+      "file": "src/clock.rs",
+      "line": 25,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Clock reads reuse a cached timestamp for eight calls despite A2 requiring a fresh time read for every expiry decision."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 116,
+      "category": "missing-validation",
+      "severity": "high",
+      "title": "Handle lookup never validates the handle generation against the entry generation, so pre-clear handles resolve reinserted keys."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 100,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Key lookup records a hit before checking expiration, causing expired entries to count as hits rather than misses."
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Every eviction appends a tombstone that normal cache operations never drain, allowing bookkeeping memory to grow without bound."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 85,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "Replacing an existing entry leaves it in its old recency position instead of marking the replacement as most recently used."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 73,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Adding the TTL to the current timestamp can overflow, producing an invalid deadline or panicking."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 147,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "The generation counter can overflow, panic, or wrap back to a generation held by an old handle."
+    },
+    {
+      "file": "src/stats.rs",
+      "line": 12,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "The hit counter can overflow, violating the lookup-count invariant or panicking."
+    },
+    {
+      "file": "src/stats.rs",
+      "line": 16,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "The miss counter can overflow, violating the lookup-count invariant or panicking."
+    },
+    {
+      "file": "src/stats.rs",
+      "line": 21,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "Hit-rate calculation can overflow while summing individually valid hit and miss counters."
+    }
+  ],
+  "fireworks-ai/accounts/fireworks/models/glm-5p2": [
+    {
+      "file": "src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "title": "evict_one pops the back of the recency queue (most-recently-used) instead of the front (least-recently-used), so capacity eviction removes the MRU entry rather than the LRU entry required by A3."
+    },
+    {
+      "file": "src/clock.rs",
+      "line": 25,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "now_ms returns a cached timestamp for up to 8 consecutive reads instead of consulting the source on every call, violating A2's fresh-time requirement and allowing expired entries to be judged live."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 116,
+      "category": "missing-validation",
+      "severity": "critical",
+      "title": "get_by_handle resolves a handle by key presence alone and never compares handle.generation against the entry's generation, so a handle issued before clear still resolves after the same key is reinserted, violating A4."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 100,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "get increments hits before checking expiry, so an expired lookup that returns None is recorded as a hit instead of a miss, violating A5's rule that hits count only live-value lookups."
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "tombstones is appended on every eviction but compact_tombstones is never invoked during normal operation, so the vec grows without bound between clears, violating A6."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 73,
+      "category": "unchecked-arithmetic",
+      "severity": "medium",
+      "title": "expires_at_ms is computed as now_ms() + ttl_ms with unchecked u64 addition that silently wraps in release builds, corrupting the expiry deadline for large ttl values."
+    }
+  ]
+}

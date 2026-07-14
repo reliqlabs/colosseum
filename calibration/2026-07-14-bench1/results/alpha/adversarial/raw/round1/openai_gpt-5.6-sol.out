@@ -1,0 +1,60 @@
+```json
+[
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Clock reuses one timestamp for eight reads, allowing expired entries to be returned in violation of A2."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Adding ttl_ms to the current time can overflow, panic, or produce an already-expired deadline."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 70,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "Replacing an existing key in a full cache skips the eviction that A1 requires before every full-cache insertion."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "high",
+    "title": "Eviction pops the back of the queue and therefore removes the most recently used entry instead of the least recently used entry."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Key lookup records a hit before checking expiry, so expired entries increment hits instead of misses."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "Handle lookup never compares generations, so a handle issued before clear can resolve a reinserted value."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction appends a tombstone without any normal-operation drain, allowing bookkeeping memory to grow without bound."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 21,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "hit_rate can overflow when summing the public hit and miss counters, causing a panic or an incorrect rate."
+  }
+]
+```

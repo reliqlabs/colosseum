@@ -1,0 +1,74 @@
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "high",
+    "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, breaking wire interoperability."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "medium",
+    "title": "MAX_PAYLOAD permits 65536 bytes although P2 limits payloads to 65535 bytes."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "missing-bounds-check",
+    "severity": "medium",
+    "title": "Public consume accepts values larger than the unread region and can silently discard data or wrap the cursor."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 42,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Consumed prefixes are retained whenever one unread byte remains, allowing repeated next_frame use to grow the allocation without bound."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 43,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame never checks that the complete declared frame is buffered before slicing its payload and trailer."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A checksum failure consumes the entire claimed frame instead of resynchronizing at the next magic sequence."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "A checksum mismatch is reported as Ok(None) rather than FrameError::Corrupt."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "race-condition",
+    "severity": "high",
+    "title": "Reentrant feed can make a newly completed frame exceed the stale drain budget and underflow the budget subtraction."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every parsing error even though malformed frames must surface FrameError to the caller."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Resynchronization discards a trailing 0xA5 byte, corrupting a magic sequence split across feed calls."
+  }
+]
+```

@@ -1,0 +1,204 @@
+{
+  "openai/gpt-5.6-sol#pass1": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, breaking wire interoperability."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "MAX_PAYLOAD admits 65536-byte payloads although P2 limits payloads to 65535 bytes."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 44,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame slices the payload and trailer before verifying that the complete declared frame is buffered, allowing partial input to panic."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "A checksum failure consumes the entire declared frame instead of resynchronizing at the next magic sequence."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "A checksum mismatch is returned as Ok(None), silently hiding malformed input from the caller."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Reentrant feed can let a parsed frame exceed the drain budget, causing budget subtraction to underflow."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every FrameError from next_frame, so malformed frames never surface to its caller."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Resynchronization discards a trailing 0xA5 byte, losing a magic sequence split across feed calls."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 30,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "feed appends without reclaiming consumed prefixes, allowing repeated next_frame and feed calls to grow the allocation without bound while unconsumed bytes remain bounded."
+    }
+  ],
+  "openai/gpt-5.6-sol#pass2": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, making encoded frames incompatible with conforming peers."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "MAX_PAYLOAD is 65536, so encode and parse admit one byte beyond the 65535-byte contract limit."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "title": "Public consume accepts counts larger than the available data, allowing unread bytes to be discarded or cursor arithmetic to overflow."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Repeated next_frame use with a persistent partial suffix advances the cursor without compacting, allowing the backing vector to grow without bound despite HIGH_WATER."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 44,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame slices the declared payload and trailer without first checking that the complete frame is buffered, so a partial frame can panic."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "A checksum failure consumes the entire declared frame instead of resynchronizing at the next magic sequence, potentially discarding a recoverable frame."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "A checksum mismatch is returned as Ok(None), silently dropping malformed input instead of surfacing FrameError."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "The drain budget can underflow after a corrupt prefix and reentrant feed cause more frame bytes to be consumed than remain in the snapshot budget."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every parsing error and exposes no return channel, violating the requirement that malformed frames surface FrameError."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "Resynchronization drops a trailing 0xA5 byte that could combine with the next feed's 0x5A, destroying a magic sequence split across chunks."
+    }
+  ],
+  "openai/gpt-5.6-sol#pass3": [
+    {
+      "file": "src/checksum.rs",
+      "line": 5,
+      "category": "default-mismatch",
+      "severity": "critical",
+      "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, making frames wire-incompatible."
+    },
+    {
+      "file": "src/frame.rs",
+      "line": 11,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "MAX_PAYLOAD permits 65536 bytes although P2 limits payloads to 65535 bytes."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 44,
+      "category": "missing-bounds-check",
+      "severity": "critical",
+      "title": "next_frame slices the declared payload and trailer without first checking that the complete frame is buffered."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 49,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "A checksum failure consumes the entire declared frame instead of resynchronizing at the next magic sequence."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 50,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "A checksum failure is returned as Ok(None), silently hiding malformed input from the caller."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 65,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Reentrant feed can make a parsed frame larger than the remaining drain budget, causing budget subtraction to underflow."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 68,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "drain discards every parser error even though P4 requires malformed-frame errors to reach the caller."
+    },
+    {
+      "file": "src/parse.rs",
+      "line": 95,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Resynchronization discards a trailing 0xA5 byte that may be the first half of magic split across feeds."
+    },
+    {
+      "file": "src/buffer.rs",
+      "line": 41,
+      "category": "missing-bounds-check",
+      "severity": "medium",
+      "title": "Public consume accepts values larger than the unread buffer, corrupting read_pos and causing later underflow or panics."
+    }
+  ]
+}

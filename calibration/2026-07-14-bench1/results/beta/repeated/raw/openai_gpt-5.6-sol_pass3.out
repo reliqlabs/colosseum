@@ -1,0 +1,67 @@
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, making frames wire-incompatible."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD permits 65536 bytes although P2 limits payloads to 65535 bytes."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame slices the declared payload and trailer without first checking that the complete frame is buffered."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A checksum failure consumes the entire declared frame instead of resynchronizing at the next magic sequence."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "A checksum failure is returned as Ok(None), silently hiding malformed input from the caller."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Reentrant feed can make a parsed frame larger than the remaining drain budget, causing budget subtraction to underflow."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every parser error even though P4 requires malformed-frame errors to reach the caller."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Resynchronization discards a trailing 0xA5 byte that may be the first half of magic split across feeds."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "missing-bounds-check",
+    "severity": "medium",
+    "title": "Public consume accepts values larger than the unread buffer, corrupting read_pos and causing later underflow or panics."
+  }
+]
+```

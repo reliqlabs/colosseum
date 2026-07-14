@@ -1,0 +1,73 @@
+I'll read the intent contract and all source files to ground every finding.
+All source and intent text verified. Here are the findings, grounded line-by-line.
+
+**P1 (checksum):** `checksum.rs:5` initializes CRC to `0x0000`; INTENT P1 mandates `0xFFFF`. Every checksum this crate produces or accepts is wrong versus a compliant peer (K3). Killing defect.
+
+**P2 (bounds):** `frame.rs:11` sets `MAX_PAYLOAD = 65536`; INTENT P2 says "at most 65535 bytes." The `> MAX_PAYLOAD` checks in encode and parse both admit a 65536-byte payload, one past the limit. Separately, `parse.rs:43-44` computes `frame_len` then immediately slices `data[HEADER_LEN..HEADER_LEN+len]` and indexes the trailer without ever checking `data.len() >= frame_len`. P2 explicitly requires "parse validates the length field against the buffered data before any slicing or offset movement." A frame header announcing `len=1000` with only 10 bytes buffered panics on the slice. This is the most easily triggered crash in the crate.
+
+**P4 (malformed frames):** `parse.rs:48-50`: on checksum mismatch the code does `consume(frame_len)` then `return Ok(None)`. Two distinct defects on this path. (a) `Ok(None)` is the "need more bytes" signal, not an error; P4 requires surfacing `FrameError`. Malformed input is silently dropped, the exact behavior P4 forbids. (b) `consume(frame_len)` assumes the length field is trustworthy; P4 says "resynchronizes at the next magic sequence." A corrupted length field skips past valid frames instead of scanning for magic. The magic-failure path correctly calls `resync`; the checksum path does not.
+
+**P5 (arithmetic):** `parse.rs:65` in `drain`: `budget -= consumed` where `budget` is `usize`. `budget` is initialized to `available()` and only decremented on success. The handler may reentrantly call `feed` (K2), growing the buffer. A subsequent `next_frame` can consume more bytes than `budget` accounts for, so `consumed > budget` and the subtraction panics (debug) or wraps to a huge value (release), defeating the loop guard entirely. Also `buffer.rs:27`: `self.available() + chunk.len()` is unchecked; on 32-bit a large chunk can wrap the sum below `HIGH_WATER`, bypassing backpressure.
+
+**P6 (partial frames):** `parse.rs:95`: `resync` returns `data.len()` when no magic is found, causing `consume(data.len())`. If the final buffered byte is `0xA5` (the first byte of MAGIC) and `0x5A` has not yet arrived, that byte is consumed and lost. The next `feed` delivering `0x5A` no longer forms a magic sequence. P6 requires incomplete trailing frame bytes be preserved intact.
+
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16 initial value is 0x0000 but INTENT P1 requires 0xFFFF, so every checksum is wrong versus a compliant peer (K3)."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "default-mismatch",
+    "severity": "high",
+    "title": "MAX_PAYLOAD is 65536 but INTENT P2 caps payload at 65535; encode and parse both accept a payload one byte over the limit."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 43,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame computes frame_len then slices data[HEADER_LEN..HEADER_LEN+len] and indexes the trailer without verifying data.len() >= frame_len, panicking on any partial frame (violates P2 and P5)."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "critical",
+    "title": "Checksum failure returns Ok(None) instead of Err(FrameError::Corrupt), silently dropping malformed input in direct violation of P4."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "drain does budget -= consumed without underflow checking; a reentrant handler that feeds new bytes (K2) can make consumed exceed budget, panicking in debug or wrapping in release."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "On checksum failure next_frame consumes frame_len instead of resynchronizing at the next magic sequence as P4 requires, so a corrupted length field skips past valid frames."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "resync returns data.len() when no magic is found, consuming a trailing 0xA5 that could be the first byte of a split magic sequence, violating P6 preservation of partial frames."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 27,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "feed computes self.available() + chunk.len() without overflow checking; on 32-bit a large attacker-influenced chunk can wrap the sum past HIGH_WATER, bypassing the P3 backpressure bound."
+  }
+]
+```

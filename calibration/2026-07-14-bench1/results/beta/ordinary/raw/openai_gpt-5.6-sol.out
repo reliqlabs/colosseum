@@ -1,0 +1,74 @@
+```json
+[
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD admits 65536-byte payloads although P2 limits payloads to 65535 bytes."
+  },
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "high",
+    "title": "CRC-16 is initialized to 0x0000 instead of the contractually required 0xFFFF."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "missing-bounds-check",
+    "severity": "medium",
+    "title": "consume accepts values larger than the available bytes and can discard unread data or overflow read_pos."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 41,
+    "category": "resource-leak",
+    "severity": "medium",
+    "title": "Consumed prefixes are never reclaimed when callers use next_frame directly while retaining a partial trailing frame, allowing the allocation to grow without bound."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame slices the payload and trailer before checking that the complete declared frame is buffered, so ordinary partial input can panic."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A checksum failure consumes the declared frame length instead of resynchronizing at the next magic sequence, potentially discarding a following valid frame."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "A checksum mismatch is reported as Ok(None), silently dropping malformed input instead of returning FrameError."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "race-condition",
+    "severity": "high",
+    "title": "Malformed-prefix consumption combined with a handler's supported reentrant feed can make the fixed drain budget underflow."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every parser error, so malformed frames never surface to callers using the bulk-delivery API."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Resynchronization consumes a trailing 0xA5 magic prefix, breaking frames whose magic sequence is split across feed calls."
+  }
+]
+```

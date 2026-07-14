@@ -1,0 +1,46 @@
+{
+  "openai/gpt-5.6-sol": [
+    {
+      "file": "src/clock.rs",
+      "line": 25,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Clock sampling reuses stale timestamps for eight reads, allowing expired entries to be returned"
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "high",
+      "title": "Eviction pops the most recently used entry instead of the least recently used entry"
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 100,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "Key lookup records an expired entry as a hit instead of a miss"
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 116,
+      "category": "missing-validation",
+      "severity": "high",
+      "title": "Handle lookup never compares generations, so pre-clear handles resolve reinserted keys"
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Every eviction appends a tombstone that normal cache operations never drain"
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 73,
+      "category": "unchecked-arithmetic",
+      "severity": "medium",
+      "title": "Adding the TTL to the current time can overflow, causing a panic or an incorrect expiration deadline"
+    }
+  ]
+}

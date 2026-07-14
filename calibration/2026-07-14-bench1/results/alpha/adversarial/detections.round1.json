@@ -1,0 +1,141 @@
+{
+  "openai/gpt-5.6-sol": [
+    {
+      "file": "src/clock.rs",
+      "line": 25,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Clock reuses one timestamp for eight reads, allowing expired entries to be returned in violation of A2."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 73,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Adding ttl_ms to the current time can overflow, panic, or produce an already-expired deadline."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 70,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "Replacing an existing key in a full cache skips the eviction that A1 requires before every full-cache insertion."
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "high",
+      "title": "Eviction pops the back of the queue and therefore removes the most recently used entry instead of the least recently used entry."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 100,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Key lookup records a hit before checking expiry, so expired entries increment hits instead of misses."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 116,
+      "category": "missing-validation",
+      "severity": "critical",
+      "title": "Handle lookup never compares generations, so a handle issued before clear can resolve a reinserted value."
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Every eviction appends a tombstone without any normal-operation drain, allowing bookkeeping memory to grow without bound."
+    },
+    {
+      "file": "src/stats.rs",
+      "line": 21,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "hit_rate can overflow when summing the public hit and miss counters, causing a panic or an incorrect rate."
+    }
+  ],
+  "fireworks-ai/accounts/fireworks/models/glm-5p2": [
+    {
+      "file": "src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "title": "evict_one pops the back of the recency queue (MRU) instead of the front (LRU), evicting the most recently used entry in direct violation of A3."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 100,
+      "category": "logic-inversion",
+      "severity": "high",
+      "title": "get calls record_hit before the expiry check, so an expired entry that returns None is counted as a hit instead of a miss, violating A5."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 116,
+      "category": "missing-validation",
+      "severity": "critical",
+      "title": "get_by_handle never compares handle.generation to the entry's generation, so a handle issued before clear still resolves after the same key is reinserted, violating A4."
+    },
+    {
+      "file": "src/clock.rs",
+      "line": 25,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "now_ms reuses a cached timestamp for up to 8 reads before resampling, violating A2's requirement that every expiry decision reads time fresh and never reuses a value from an earlier operation."
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "tombstones is pushed on every eviction but compact_tombstones is never called during normal operation, so the auxiliary structure grows without bound, violating A6."
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 73,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "expires_at_ms is computed with unchecked u64 addition (now_ms + ttl_ms) that wraps in release mode, making a large ttl_ms produce an immediately-expired entry."
+    }
+  ],
+  "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6": [
+    {
+      "file": "src/clock.rs",
+      "line": 24,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "Clock samples and reuses timestamps for up to 8 calls, violating A2's requirement that every expiry decision reads fresh time"
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 8,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "title": "evict_one pops the back of the recency queue, evicting the most-recently-used entry instead of the least-recently-used front"
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 115,
+      "category": "missing-validation",
+      "severity": "critical",
+      "title": "get_by_handle never compares handle.generation against the entry's generation, allowing pre-clear handles to resolve after clear"
+    },
+    {
+      "file": "src/cache.rs",
+      "line": 100,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "get records a hit before checking expiry, so expired entries are counted as hits contrary to A5"
+    },
+    {
+      "file": "src/evict.rs",
+      "line": 16,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "Every eviction pushes a cloned key into tombstones, but compact_tombstones is never called during normal operation, unbounded growth"
+    }
+  ]
+}

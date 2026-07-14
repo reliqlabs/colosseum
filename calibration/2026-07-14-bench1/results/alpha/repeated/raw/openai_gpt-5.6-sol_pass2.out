@@ -1,0 +1,81 @@
+```json
+[
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "high",
+    "title": "Eviction removes the most recently used entry instead of the least recently used entry."
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "The clock reuses one timestamp for eight reads instead of consulting the time source for every expiry decision."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 70,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "Replacing an existing key in a full cache skips the contractually required pre-insertion eviction."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Adding the TTL to the current time can overflow, causing a panic or an incorrect expiration deadline."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A key lookup records an expired entry as a hit even though it returns no value."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "Handle lookup never compares generations, so a pre-clear handle can resolve a reinserted entry."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 147,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "Advancing the cache generation can overflow, panic, or eventually reuse a generation and revive stale handles."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction appends a tombstone that normal cache operations never drain, allowing unbounded memory growth."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 12,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "The hit counter can overflow and either panic or wrap to zero."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 16,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "The miss counter can overflow and either panic or wrap to zero."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 21,
+    "category": "unchecked-arithmetic",
+    "severity": "medium",
+    "title": "Hit-rate calculation can overflow while summing the public hit and miss counters."
+  }
+]
+```

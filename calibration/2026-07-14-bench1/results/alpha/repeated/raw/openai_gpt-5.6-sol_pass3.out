@@ -1,0 +1,67 @@
+```json
+[
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "high",
+    "title": "Eviction removes the most recently used entry instead of the least recently used entry"
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Clock sampling reuses stale timestamps across expiry decisions, allowing expired entries to be returned"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "Key lookup records an expired entry as a hit instead of a miss"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "Handle lookup never compares generations, so pre-clear handles can resolve reinserted keys"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "TTL deadline addition can overflow, panic, or make a newly inserted entry immediately expired"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 147,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "Generation increment can overflow and eventually make invalidated handles valid again"
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction appends a tombstone but normal cache operations never drain the log"
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 12,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "Lookup counters can overflow, violating the required relationship between statistics and lookup calls"
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 21,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "Hit-rate total calculation can overflow even before either individual counter does"
+  }
+]
+```

@@ -1,0 +1,53 @@
+```json
+[
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "now_ms reuses a cached timestamp for up to 8 reads before resampling, violating A2's requirement that every expiry decision reads time fresh."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "expires_at_ms computed with unchecked u64 addition (now_ms + ttl_ms) that can wrap or panic, producing an immediately-expired deadline."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one pops the back of the recency queue (MRU) instead of the front (LRU), evicting the most recently used entry in violation of A3."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "get records a hit before checking expiry, so an expired entry that returns None is counted as a hit instead of a miss, violating A5."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle never compares handle.generation to the entry's generation, so a stale handle issued before clear still resolves after reinsertion, violating A4."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction pushes a tombstone but compact_tombstones is never called during normal operation, allowing the auxiliary structure to grow without bound, violating A6."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 21,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "hit_rate sums public hit and miss counters with unchecked u64 addition that can overflow, yielding an incorrect rate or panic in debug mode."
+  }
+]
+```

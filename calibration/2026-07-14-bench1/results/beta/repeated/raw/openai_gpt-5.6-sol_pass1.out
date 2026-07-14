@@ -1,0 +1,67 @@
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16-CCITT starts at 0x0000 instead of the required 0xFFFF, breaking wire interoperability."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD admits 65536-byte payloads although P2 limits payloads to 65535 bytes."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame slices the payload and trailer before verifying that the complete declared frame is buffered, allowing partial input to panic."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "A checksum failure consumes the entire declared frame instead of resynchronizing at the next magic sequence."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "A checksum mismatch is returned as Ok(None), silently hiding malformed input from the caller."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Reentrant feed can let a parsed frame exceed the drain budget, causing budget subtraction to underflow."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every FrameError from next_frame, so malformed frames never surface to its caller."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 95,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Resynchronization discards a trailing 0xA5 byte, losing a magic sequence split across feed calls."
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 30,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "feed appends without reclaiming consumed prefixes, allowing repeated next_frame and feed calls to grow the allocation without bound while unconsumed bytes remain bounded."
+  }
+]
+```

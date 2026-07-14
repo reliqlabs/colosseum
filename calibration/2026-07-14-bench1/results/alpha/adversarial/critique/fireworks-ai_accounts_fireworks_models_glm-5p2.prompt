@@ -1,0 +1,150 @@
+# Review task
+
+You are reviewing the `lru-ttl` crate (this repository) against its
+behavioral contract, `INTENT.md`. The implementation landed recently; tests
+are deferred. Your job is adversarial code review: find every place the code
+violates the intent, and any defect that would matter in production even if
+the intent does not name it.
+
+Read `INTENT.md` first, then every file under `src/`. Check each clause
+A1-A7 against the code that claims to implement it. Defects may span more
+than one file: a value maintained in one module and misused in another, a
+constant whose meaning the intent fixes, an enforcement the intent requires
+that no code path performs.
+
+## Reporting format (mandatory)
+
+Report your findings as ONE fenced ```json code block containing a JSON
+array. Each finding is an object with exactly these fields:
+
+- `file`: repo-relative path, e.g. `"src/cache.rs"`
+- `line`: integer, the line where the defect lives (the line a fix would
+  change; for a missing check, the place the check belongs)
+- `category`: exactly one of the taxonomy below
+- `severity`: one of `"critical"`, `"high"`, `"medium"`, `"low"`
+- `title`: one sentence stating the defect
+
+Prose analysis around the block is welcome, but the block must be present,
+must be valid JSON, and is the only thing that is scored.
+
+## Category taxonomy (closed list; categorize by ROOT CAUSE)
+
+- `off-by-one` — a boundary admits or excludes exactly one element wrongly
+- `unchecked-arithmetic` — arithmetic that can wrap, overflow, or lose value
+- `invariant-violation` — a stated invariant can be broken by some path
+- `missing-bounds-check` — an index or range used without validation
+- `default-mismatch` — a coded default differs from the documented default
+- `error-swallowed` — a failure is silently absorbed instead of propagated
+- `logic-inversion` — a condition or branch has inverted polarity
+- `missing-validation` — an input or parameter accepted without a required check
+- `race-condition` — outcome depends on unsynchronized concurrent or reentrant ordering
+- `resource-leak` — memory, handles, or entries grow without bound or release
+- `injection` — untrusted input reaches an interpreter or sink unescaped
+- `dead-code` — code that can never execute or has no effect
+
+Report only defects you can ground in specific lines. Do not pad the list;
+a wrong finding costs credibility. There is no expected number of findings.
+
+
+---
+
+You have completed one review pass of this crate. Below are candidate findings raised by OTHER reviewers of the same crate. Their authorship is withheld; treat each as a hypothesis to verify against the code, not as an authority.
+
+Candidate findings from other reviewers (authorship withheld):
+```json
+[
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Clock reuses one timestamp for eight reads, allowing expired entries to be returned in violation of A2."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "Adding ttl_ms to the current time can overflow, panic, or produce an already-expired deadline."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 70,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "Replacing an existing key in a full cache skips the eviction that A1 requires before every full-cache insertion."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "high",
+    "title": "Eviction pops the back of the queue and therefore removes the most recently used entry instead of the least recently used entry."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "Key lookup records a hit before checking expiry, so expired entries increment hits instead of misses."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "Handle lookup never compares generations, so a handle issued before clear can resolve a reinserted value."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction appends a tombstone without any normal-operation drain, allowing bookkeeping memory to grow without bound."
+  },
+  {
+    "file": "src/stats.rs",
+    "line": 21,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "hit_rate can overflow when summing the public hit and miss counters, causing a panic or an incorrect rate."
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 24,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "Clock samples and reuses timestamps for up to 8 calls, violating A2's requirement that every expiry decision reads fresh time"
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one pops the back of the recency queue, evicting the most-recently-used entry instead of the least-recently-used front"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 115,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle never compares handle.generation against the entry's generation, allowing pre-clear handles to resolve after clear"
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "get records a hit before checking expiry, so expired entries are counted as hits contrary to A5"
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction pushes a cloned key into tombstones, but compact_tombstones is never called during normal operation, unbounded growth"
+  }
+]
+```
+
+Re-review the crate with these in mind. You MAY add findings you can now substantiate and MAY decline any candidate you judge wrong; a candidate you do not include is treated as withdrawn. Emit your FINAL findings list in the JSON contract above. Only your final JSON block is scored.

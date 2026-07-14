@@ -46,7 +46,7 @@ The plan of record's "dependable" gate has ten criteria. Current state:
 | 7 | Critique loop exercised once on a REAL contested finding, recorded per G4 | satisfied (`dogfood/jobq-2026-07-13/ADJUDICATION.md`: panel attack on jobq; F2 finite-arithmetic gap retained OPEN under G4, corroborated by the W5 Aeneas proof) |
 | 8 | Skills/agents/wrappers pass pinned validators | satisfied (R13) |
 | 9 | Known-good reference project passes; known-bad variants fail at intended gates | satisfied (R22, `tests/fixtures/r22/` jobq project + `tests/r22_reference_project.py`) |
-| 10 | Prospective benchmark shows benefit at reported cost; independent replication | open — runner built (`scripts/benchmark_run.py`) and a harder held-out corpus is staged; the benchmark RUN and independent replication have not happened |
+| 10 | Prospective benchmark shows benefit at reported cost; independent replication | half-open — the benchmark RAN 2026-07-14 (`calibration/2026-07-14-bench1/RESULTS.md`) and the published result is NEGATIVE: no arm beat single-voice recall on the two-crate corpus, so the "shows benefit" clause is currently unmet on the evidence; independent replication still needed |
 
 ## Remaining work
 
@@ -80,15 +80,15 @@ Needs, in order:
    same-model, multi-family panel, adversarial panel with critique loop.
 3. Results published with negative results and cost accounting, per protocol.
 
-Status 2026-07-13: the arm runner is built and tested
-(`scripts/benchmark_run.py`, `tests/m3b_benchmark_runner.py`), and a harder
-multi-target held-out corpus is staged outside the repo (two crates, ten
-defects across all four hardness axes, authored to break the r1 ceiling).
-The RUN has not happened. Running it needs the live panel over the staged
-corpus, then scoring with `recall_score.py`.
-
-Definition of done: a results file in `calibration/` with all five arms,
-including any arm where the panel failed to beat the baseline.
+DONE 2026-07-14: all five arms ran over the held-out two-crate corpus and
+the results are published at `calibration/2026-07-14-bench1/RESULTS.md`,
+definition-of-done met including its hardest clause: the published headline
+is the arm where the panel failed to beat the baseline (every arm scored
+0.8 union on beta and 1.0 on alpha; the panel bought zero recall at 3-6x
+dispatch cost; the one reentrancy defect was a universal blind spot).
+Remaining for a stronger W2 iteration, not blockers: a second-party
+corpus (pairs with W4), larger targets, reentrancy-weighted defect
+classes, and a token-accounting dispatch path.
 
 ### W3. M4 panel optimization (owner: maintainer/agent; blocked on W2)
 

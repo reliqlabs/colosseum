@@ -102,5 +102,11 @@ team reproduces it (M6), not before.
 - Recall scorer: ready (`scripts/recall_score.py`, tested by
   `tests/m3_recall.py`).
 - Corpus schema: ready (`templates/seeded-defect-corpus.example.json`).
-- Benchmark run: **pending**. Requires live multi-model dispatch across the
-  arms and a seeded target corpus. Not executed. No results exist.
+- Benchmark run: **executed 2026-07-14** over a two-target held-out corpus
+  (`calibration/2026-07-14-bench1/RESULTS.md`). Headline is a negative
+  result, published per this protocol: no arm beat single-voice recall at
+  that target scale, and the one concurrency/reentrancy defect was a
+  universal blind spot. Caveats recorded there: fork-authored corpus (not
+  second-party), two sub-500-line targets, one run per arm, token costs
+  unmeasured. A second-party corpus and larger targets remain wanted; this
+  run does not retire the protocol.

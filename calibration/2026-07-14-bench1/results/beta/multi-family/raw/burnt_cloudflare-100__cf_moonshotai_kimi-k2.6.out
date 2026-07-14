@@ -1,0 +1,65 @@
+Reading `INTENT.md` and all source files reveals multiple violations of clauses P1–P6 and several production defects.
+
+**P1 (checksum)** — `src/checksum.rs:5` initializes the CRC to `0x0000`; the intent mandates `0xFFFF`. This breaks the interoperability contract (K3).
+
+**P2 (bounds)** — `src/frame.rs:11` sets `MAX_PAYLOAD = 65536`, allowing a 65536-byte payload when the intent caps it at 65535.
+
+**P4 (malformed frames)** — `src/parse.rs:51` returns `Ok(None)` on checksum mismatch instead of `FrameError::Corrupt`, silently dropping the frame. Additionally, `src/parse.rs:68` swallows all `FrameError` values inside `drain`, so malformed frames never surface to the caller.
+
+**P5 (arithmetic)** — `src/buffer.rs:27` performs `self.available() + chunk.len()` without overflow checking, so a malicious chunk can wrap the sum and bypass `HIGH_WATER`. In `src/parse.rs:65`, `drain` decrements `budget -= consumed` without checking underflow; when the handler reentrantly feeds more bytes (K2), the next frame can be larger than the remaining budget, causing a panic in debug or wrap in release.
+
+**Missing bounds check** — `src/parse.rs:44` slices `data[HEADER_LEN..HEADER_LEN + len]` (and line 46 reads the trailer) without first verifying `data.len() >= frame_len`. A valid header with an incomplete frame causes a panic instead of returning `Ok(None)`.
+
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "CRC-16 initial value is 0x0000 instead of the required 0xFFFF, breaking interoperability"
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD is 65536, exceeding the intent limit of 65535 bytes"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "Frame payload and trailer are sliced without verifying the full frame is present in the buffer"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 51,
+    "category": "error-swallowed",
+    "severity": "critical",
+    "title": "Checksum mismatch returns Ok(None) instead of FrameError::Corrupt, silently dropping malformed frames"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain silently discards all FrameError values instead of surfacing malformed-frame errors"
+  },
+  {
+    "file": "src/buffer.rs",
+    "line": 27,
+    "category": "unchecked-arithmetic",
+    "severity": "medium",
+    "title": "Backpressure check uses unchecked addition that can overflow and bypass HIGH_WATER"
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "drain budget subtraction can underflow when handler reentrantly feeds more bytes"
+  }
+]
+```

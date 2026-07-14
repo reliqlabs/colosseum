@@ -1,0 +1,46 @@
+```json
+[
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one removes the most recently used entry from the back of the queue instead of the least recently used entry from the front."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "get records expired entries as hits and never records the required miss."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle does not compare the handle generation with the entry generation, so handles issued before clear can resolve after reinsertion."
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "now_ms reuses a cached timestamp for eight calls instead of reading fresh time for every expiry decision."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "Every eviction appends a tombstone, but normal cache operations never drain the tombstone log."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "low",
+    "title": "Computing the expiration deadline with unchecked u64 addition can panic or wrap for large TTL values."
+  }
+]
+```

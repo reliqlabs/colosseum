@@ -1,0 +1,68 @@
+I'll read the intent and all source files, then check each clause P1-P6 against the code.
+All files read. Here's my analysis against each clause:
+
+**P1 (checksum)**: `checksum.rs:5` uses initial value `0x0000`; P1 mandates `0xFFFF`. Every CRC is wrong, breaking K3 interop.
+
+**P2 (bounds)**: `frame.rs:11` sets `MAX_PAYLOAD = 65536`; P2 says "at most 65535." Off-by-one. Separately, `parse.rs:44` slices `data[HEADER_LEN..HEADER_LEN+len]` without checking `data.len() >= frame_len` first. P2 explicitly requires "parse validates the length field against the buffered data before any slicing or offset movement." Any partial frame panics.
+
+**P3 (backpressure)**: `buffer.rs:27` checks `available + chunk.len() > HIGH_WATER` and rejects before appending. Correct.
+
+**P4 (malformed frames)**: `parse.rs:50` returns `Ok(None)` on checksum failure instead of `Err(FrameError::Corrupt)`. Corrupt frame is silently consumed and the caller can't distinguish "need more bytes" from "corrupt." In `drain`, `Ok(None)` triggers `break`, so one corrupt frame halts all subsequent processing. Additionally, `parse.rs:49` consumes `frame_len` (trusting the length field) instead of calling `resync` like the magic-failure path does. P4 says "resynchronizes at the next magic sequence" for both magic and checksum failures. Finally, `parse.rs:68` (`Err(_) => continue`) silently discards every error in the drain path.
+
+**P5 (arithmetic)**: `parse.rs:65` does `budget -= consumed` as usize subtraction. Under K2 reentrant feeding, the handler can append bytes, so a subsequent frame's `consumed` can exceed the remaining `budget`, causing debug panic / release wrap.
+
+**P6 (partial frames)**: `compact` and `consume` preserve unread bytes. No defect found here in isolation (the panic from the missing bounds check in P2 is the threat to P6, already captured).
+
+```json
+[
+  {
+    "file": "src/checksum.rs",
+    "line": 5,
+    "category": "default-mismatch",
+    "severity": "critical",
+    "title": "CRC-16 initial value is 0x0000 but INTENT P1 requires 0xFFFF, so every checksum is computed with the wrong parameterization and frames are non-interoperable with conformant peers (K3)."
+  },
+  {
+    "file": "src/frame.rs",
+    "line": 11,
+    "category": "off-by-one",
+    "severity": "high",
+    "title": "MAX_PAYLOAD is 65536 but INTENT P2 caps payload length at 65535, so encode accepts a 65536-byte payload and parse accepts len=65536, both one byte over the contract."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 44,
+    "category": "missing-bounds-check",
+    "severity": "critical",
+    "title": "next_frame slices data[HEADER_LEN..HEADER_LEN+len] and reads the trailer without first checking data.len() >= frame_len, panicking on any partial frame; P2 requires validating the length against buffered data before any slicing."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 50,
+    "category": "error-swallowed",
+    "severity": "critical",
+    "title": "Checksum mismatch returns Ok(None) instead of Err(FrameError::Corrupt), silently dropping the corrupt frame and making the caller see a corrupt frame as 'need more bytes', violating P4's requirement to surface FrameError."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 68,
+    "category": "error-swallowed",
+    "severity": "high",
+    "title": "drain discards every FrameError via Err(_) => continue, never surfacing corrupt-frame errors to the caller and silently dropping malformed input in violation of P4."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 65,
+    "category": "unchecked-arithmetic",
+    "severity": "high",
+    "title": "drain's budget -= consumed is unchecked usize subtraction that underflows when a reentrant handler (K2) feeds bytes producing a frame larger than the remaining budget, panicking in debug builds and wrapping in release."
+  },
+  {
+    "file": "src/parse.rs",
+    "line": 49,
+    "category": "invariant-violation",
+    "severity": "medium",
+    "title": "On checksum failure the parser consumes frame_len, trusting the possibly-corrupt length field, instead of rescanning for the next magic sequence as P4 requires for both magic and checksum failures."
+  }
+]
+```

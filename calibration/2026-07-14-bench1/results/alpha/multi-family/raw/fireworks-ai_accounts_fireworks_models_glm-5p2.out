@@ -1,0 +1,63 @@
+I've read `INTENT.md` and all five source files. Let me trace each clause against the code before reporting.
+
+Key cross-checks I performed:
+- `order` direction: `cache.rs:37` documents front=LRU, back=MRU; `touch`/`insert` `push_back` (MRU→back); `evict_one` `pop_back` → evicts MRU.
+- `get` vs `get_by_handle` stats ordering: `get` records hit at line 100 *before* the expiry check at 102; `get_by_handle` records hit *after* the expiry check at 124. Inconsistent.
+- `get_by_handle` uses only `handle.key`; `handle.generation` and `entry_generation` are never compared anywhere.
+- `Clock::now_ms` only re-samples every 8 reads (`SAMPLE_WINDOW`), directly contradicting A2's "read fresh for each decision."
+- `tombstones` is pushed in `evict_one` but `compact_tombstones` is never called from any internal path; only `clear` resets it.
+- `now_ms() + ttl_ms` is unchecked u64 addition.
+
+```json
+[
+  {
+    "file": "src/evict.rs",
+    "line": 8,
+    "category": "logic-inversion",
+    "severity": "critical",
+    "title": "evict_one pops the back of the recency queue (most-recently-used) instead of the front (least-recently-used), so capacity eviction removes the MRU entry rather than the LRU entry required by A3."
+  },
+  {
+    "file": "src/clock.rs",
+    "line": 25,
+    "category": "invariant-violation",
+    "severity": "critical",
+    "title": "now_ms returns a cached timestamp for up to 8 consecutive reads instead of consulting the source on every call, violating A2's fresh-time requirement and allowing expired entries to be judged live."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 116,
+    "category": "missing-validation",
+    "severity": "critical",
+    "title": "get_by_handle resolves a handle by key presence alone and never compares handle.generation against the entry's generation, so a handle issued before clear still resolves after the same key is reinserted, violating A4."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 100,
+    "category": "invariant-violation",
+    "severity": "high",
+    "title": "get increments hits before checking expiry, so an expired lookup that returns None is recorded as a hit instead of a miss, violating A5's rule that hits count only live-value lookups."
+  },
+  {
+    "file": "src/evict.rs",
+    "line": 16,
+    "category": "resource-leak",
+    "severity": "high",
+    "title": "tombstones is appended on every eviction but compact_tombstones is never invoked during normal operation, so the vec grows without bound between clears, violating A6."
+  },
+  {
+    "file": "src/cache.rs",
+    "line": 73,
+    "category": "unchecked-arithmetic",
+    "severity": "medium",
+    "title": "expires_at_ms is computed as now_ms() + ttl_ms with unchecked u64 addition that silently wraps in release builds, corrupting the expiry deadline for large ttl values."
+  }
+]
+```
+
+Notes on what I attacked and ruled out:
+- **A1 (capacity count):** `insert` evicts exactly one before adding when full and the key is new; `map.len()` stays ≤ capacity in normal operation. I could not produce a clean desync trigger for `evict_one`'s `None => return` guards (they'd require a prior order/map desync, which the single-threaded, non-reentrant paths don't create), so I did not flag an A1 count violation.
+- **A7 (callback consistency):** `evict_one` calls the callback after `order.pop_back`, `map.remove`, and `tombstones.push`, so cache state is consistent when the callback fires. No finding.
+- **`remaining_ms`, `entry_generation`, `Handle::generation`:** pub API, externally callable, so not `dead-code` despite zero internal use. `entry_generation`'s unused status is the symptom of the A4 finding, already reported.
+- **`capacity == 0`:** `new` asserts nonzero; degenerate input rejected. No finding.
+- **race-condition / injection / missing-bounds-check / off-by-one / default-mismatch:** no grounded evidence (single-threaded per K1; no interpreters; all `map[key]` indexed behind `contains_key`; sampling window count is internally consistent; no documented defaults to mismatch).
