@@ -8,9 +8,9 @@ R22 — reference project end-to-end (exit criterion 9).
 
 The known-good `jobq` project (tests/fixtures/r22/project) passes every
 gate: the tested pyramid profile, Gate A reference integrity, quint
-verify over B1-B4 plus the W1 witness search, ITF conformance replay
-through the real library, and Gate B over G1 records GENERATED LIVE from
-those very runs (no canned evidence). Known-bad mutations, each applied
+verify over B1-B5 at capacities 2 and 4 plus the W1/W2 witness searches,
+ITF conformance replay through the real library, and Gate B over G1
+records GENERATED LIVE from those very runs (no canned evidence). Known-bad mutations, each applied
 to its own temp copy, fail at exactly their intended gate while at least
 one other gate stays green — failure is localized, never diffuse.
 
@@ -39,8 +39,12 @@ REPLAY = REPO / "scripts" / "itf_replay.py"
 FAILURES: list[str] = []
 
 VERIFY_CMD = ["quint", "verify", "--invariant=inv_all", "--max-steps=12"]
+VERIFY_C4_CMD = ["quint", "verify", "--main=jobq_c4", "--invariant=inv_all",
+                 "--max-steps=12"]
 WITNESS_CMD = ["quint", "run", "--invariant=witness_w1_negated",
                "--max-steps=8", "--max-samples=200", "--seed=0x1"]
+WITNESS_W2_CMD = ["quint", "run", "--invariant=witness_b1_failed_negated",
+                  "--max-steps=8", "--max-samples=200", "--seed=0x1"]
 
 
 def check(label: str, ok: bool, detail: str = "") -> None:
@@ -79,8 +83,11 @@ def project_snapshot(project: Path) -> str:
 
 
 def make_records(project: Path, quint_version: str, verify_out: str,
-                 witness_out: str, spec_rel: str) -> list[dict]:
-    """G1 records constructed from the runs this suite actually performed."""
+                 witness_out: str, witness2_out: str,
+                 spec_rel: str) -> list[dict]:
+    """G1 records constructed from the runs this suite actually performed.
+    verify_out is the concatenated output of BOTH capacity instances (2 and
+    4); the command binding lists both invocations."""
     snapshot = project_snapshot(project)
     intent_hash = sha256_file(project / "INTENT.md")
     manifest_hash = sha256_file(project / ".colosseum" / "obligations.json")
@@ -90,45 +97,51 @@ def make_records(project: Path, quint_version: str, verify_out: str,
         "intent_hash": intent_hash,
         "obligation_manifest_hash": manifest_hash,
         "profile": "bounded",
-        "required_targets": ["B1", "B2", "B3", "B4", "W1"],
+        "required_targets": ["B1", "B2", "B3", "B4", "B5", "W1", "W2"],
         "environment_policy": "r22-fixture-local",
         "toolchain_digests": digests,
         "parser_schema_version": f"quint-cli-{quint_version}",
     }
+    verify_command = (" ".join(VERIFY_CMD + [spec_rel]) + "; "
+                      + " ".join(VERIFY_C4_CMD + [spec_rel]))
     records = []
-    for cid in ("B1", "B2", "B3", "B4"):
+    for cid in ("B1", "B2", "B3", "B4", "B5"):
         records.append({
             "claim_id": cid,
             "required": True,
             "evidence_class": "bounded-checked",
             "result": "PASS",
-            "scope": "inv_all under bound 12, Apalache via quint verify",
+            "scope": "inv_all under bound 12, capacities 2 and 4, Apalache via quint verify",
             "bindings": {
                 **common,
-                "command": " ".join(VERIFY_CMD + [spec_rel]),
-                "configuration": {"max_steps": 12},
+                "command": verify_command,
+                "configuration": {"max_steps": 12, "capacities": [2, 4]},
                 "seeds": None,
                 "raw_output_hash": hashlib.sha256(verify_out.encode()).hexdigest(),
                 "run_id": f"r22-verify-{cid}",
             },
             "waiver": None,
         })
-    records.append({
-        "claim_id": "W1",
-        "required": True,
-        "evidence_class": "test-witnessed",
-        "result": "PASS",
-        "scope": "witness trace reaching done>0, seeded run (0x1, 200 samples, depth 8)",
-        "bindings": {
-            **common,
-            "command": " ".join(WITNESS_CMD + [spec_rel]),
-            "configuration": {"max_steps": 8, "max_samples": 200},
-            "seeds": "0x1",
-            "raw_output_hash": hashlib.sha256(witness_out.encode()).hexdigest(),
-            "run_id": "r22-witness-W1",
-        },
-        "waiver": None,
-    })
+    for cid, cmd, out, prop in (
+        ("W1", WITNESS_CMD, witness_out, "done>0"),
+        ("W2", WITNESS_W2_CMD, witness2_out, "failed>0"),
+    ):
+        records.append({
+            "claim_id": cid,
+            "required": True,
+            "evidence_class": "test-witnessed",
+            "result": "PASS",
+            "scope": f"witness trace reaching {prop}, seeded run (0x1, 200 samples, depth 8)",
+            "bindings": {
+                **common,
+                "command": " ".join(cmd + [spec_rel]),
+                "configuration": {"max_steps": 8, "max_samples": 200},
+                "seeds": "0x1",
+                "raw_output_hash": hashlib.sha256(out.encode()).hexdigest(),
+                "run_id": f"r22-witness-{cid}",
+            },
+            "waiver": None,
+        })
     return records
 
 
@@ -211,13 +224,24 @@ def main() -> int:
 
         p = run(VERIFY_CMD + [str(spec)])
         verify_out = p.stdout + p.stderr
-        check("good: quint verify inv_all passes (depth 12)", p.returncode == 0,
-              verify_out[-300:])
+        check("good: quint verify inv_all passes (capacity 2, depth 12)",
+              p.returncode == 0, verify_out[-300:])
+
+        p = run(VERIFY_C4_CMD + [str(spec)])
+        verify_c4_out = p.stdout + p.stderr
+        check("good: quint verify inv_all passes (capacity 4, depth 12)",
+              p.returncode == 0, verify_c4_out[-300:])
+        verify_out += verify_c4_out
 
         p = run(WITNESS_CMD + [str(spec)])
         witness_out = p.stdout + p.stderr
         check("good: witness search exhibits done>0 (violation of negation)",
               p.returncode != 0 and "violat" in witness_out.lower())
+
+        p = run(WITNESS_W2_CMD + [str(spec)])
+        witness2_out = p.stdout + p.stderr
+        check("good: witness search exhibits failed>0 (violation of negation)",
+              p.returncode != 0 and "violat" in witness2_out.lower())
 
         p = run(["cargo", "build", "--quiet"], cwd=good / "adapter")
         check("good: adapter builds against the real library", p.returncode == 0,
@@ -233,7 +257,7 @@ def main() -> int:
         # Gate B over records generated from the runs above.
         spec_rel = "specs/jobq.qnt"
         records = make_records(project, quint_version, verify_out,
-                               witness_out, spec_rel)
+                               witness_out, witness2_out, spec_rel)
         p = gate_b(records, manifest, tmp, "good")
         out = p.stdout + p.stderr
         check("good: Gate B verdict is scoped VERIFIED[...]",
