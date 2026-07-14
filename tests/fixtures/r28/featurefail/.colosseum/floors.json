@@ -1,0 +1,15 @@
+{
+  "schema": "colosseum-floors/v1",
+  "features": {
+    "matrix": [
+      { "name": "default", "features": [] },
+      { "name": "broken", "features": ["broken"] }
+    ]
+  },
+  "property_tests": {
+    "min_per_module": 1
+  },
+  "fuzz": {
+    "surfaces": []
+  }
+}

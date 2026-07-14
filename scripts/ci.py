@@ -18,6 +18,8 @@ CHECKS (in order)
   roster-drift      scripts/gen_roster_docs.py --check
   doc-links         scripts/check_doc_links.py
   dispatch-config   scripts/check_dispatch_config.py --selftest
+  fixture-tracking  no untracked files under tests/fixtures (a fixture the
+                    working tree has but git does not ships broken clones)
   regression        tests/run_all.py  (Part IV suite: parser/version
                     fixtures, MCP smoke, race, injection, all r*.py)
 
@@ -44,6 +46,13 @@ CHECKS: list[tuple[str, list[str], bool]] = [
     ("roster-drift", ["uv", "run", "--script", str(REPO / "scripts/gen_roster_docs.py"), "--check"], False),
     ("doc-links", ["uv", "run", "--script", str(REPO / "scripts/check_doc_links.py")], False),
     ("dispatch-config", ["uv", "run", "--script", str(REPO / "scripts/check_dispatch_config.py"), "--selftest"], False),
+    # Untracked fixture files pass local CI (which sees the working tree)
+    # but break every fresh clone; the global .colosseum/ gitignore hid the
+    # r22/r28 fixture manifests exactly this way. Empty output = pass.
+    ("fixture-tracking", ["bash", "-c",
+                          f"cd {REPO} && u=$(git ls-files --others --exclude-standard tests/fixtures) && "
+                          "if [ -n \"$u\" ]; then echo \"untracked fixture files (fresh clones will miss them):\"; "
+                          "echo \"$u\"; exit 1; fi"], False),
     ("regression", ["uv", "run", "--script", str(REPO / "tests/run_all.py")], True),
 ]
 

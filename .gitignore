@@ -53,6 +53,12 @@ build/
 # --- Runtime / cache directories ---
 .crucible/
 .colosseum/
+# Fixture .colosseum dirs ARE repo content (the global rule above hid them
+# from git; fresh clones failed the r22/r28 suites). Run artifacts are
+# re-ignored below.
+!tests/fixtures/**/.colosseum/
+!tests/fixtures/**/.colosseum/**
+tests/fixtures/**/.colosseum/verify/
 _apalache-out/
 
 # NOTE: the historical archive/ directory is INTENTIONALLY tracked.

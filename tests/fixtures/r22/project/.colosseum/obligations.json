@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "invariants": [
+    { "id": "B1", "name": "inv_b1" },
+    { "id": "B2", "name": "inv_b2" },
+    { "id": "B3", "name": "inv_b3" },
+    { "id": "B4", "name": "inv_b4" },
+    { "id": "B5", "name": "inv_mono" }
+  ],
+  "witnesses": [
+    { "id": "W1", "name": "witness_w1" },
+    { "id": "W2", "name": "witness_b1_failed" }
+  ]
+}

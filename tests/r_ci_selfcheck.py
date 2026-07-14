@@ -55,7 +55,7 @@ def main() -> int:
     ci = load(CI, "ci")
     names = {c[0] for c in ci.CHECKS}
     for expected in ("frontmatter", "agent-lint", "roster-drift", "doc-links",
-                     "dispatch-config", "regression"):
+                     "dispatch-config", "fixture-tracking", "regression"):
         check(f"ci.py registers check '{expected}'", expected in names)
     check("ci.py: exactly one regression check maps INCOMPLETE",
           sum(1 for c in ci.CHECKS if c[2]) == 1)
