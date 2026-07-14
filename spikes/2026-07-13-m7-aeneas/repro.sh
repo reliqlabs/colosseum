@@ -19,11 +19,13 @@ echo "== 1. charon: Rust -> LLBC (no source edits needed) =="
 echo "== 2. aeneas: LLBC -> Lean =="
 "$AENEAS" -backend lean "$SB/jobq.llbc" -dest "$SB/lean-out"
 # hand-written proof lives outside lean-out/ (which aeneas regenerates); stage it
-cp "$SB/JobqProofs.lean" "$SB/lean-out/JobqProofs.lean"
+cp "$SB/JobqProofs.lean" "$SB/JobqRefinement.lean" "$SB/NonVacuity.lean" "$SB/lean-out/"
 
 echo "== 3. typecheck extracted model + B1 proof =="
 export LEAN_PATH="$SB/lean-out:$DEP_LEAN_PATH"
 ( cd "$SB/lean-out" \
   && "$LEAN" -o Jobq.olean Jobq.lean \
   && "$LEAN" -o JobqProofs.olean JobqProofs.lean \
-  && echo "OK: Jobq.lean and JobqProofs.lean typecheck (B1 proved, sorry-free)" )
+  && "$LEAN" -o JobqRefinement.olean JobqRefinement.lean \
+  && "$LEAN" -o NonVacuity.olean NonVacuity.lean \
+  && echo "OK: model + B1 proof + refinement (17 in JobqRefinement + 1 non-vacuity = 18) typecheck sorry-free" )

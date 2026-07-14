@@ -1,6 +1,6 @@
 # Roadmap: status and remaining work
 
-Last updated: 2026-07-13. This is the handoff document. It records where the
+Last updated: 2026-07-14. This is the handoff document. It records where the
 2026-07-11 remediation plan of record stands, what remains before the repo may
 call itself dependable by its own exit criteria, and who each remaining item
 waits on. A new maintainer or session should be able to resume from this file
@@ -114,24 +114,36 @@ run, what to return, and how results get recorded
 "validated" gate as a conjunction of a merged replication and published
 benchmark results).
 
-### W5. M7 refinement proofs (owner: maintainer/agent; heavy proof work)
+### W5. M7 refinement proofs — refinement PROVED 2026-07-14; emission gated
 
-Feasibility spike DONE 2026-07-13 (`docs/m7-feasibility.md` narrative,
-`spikes/2026-07-13-m7-aeneas/` Lean source + repro; heavy build outputs held
-outside the repo, paths in the `m7-aeneas-toolchain` memory):
-jobq extracts to Lean with zero crate changes (Charon + Aeneas), the
-extracted model typechecks, and B1 is PROVED sorry-free over the extracted
-`fail` (standard axioms only; conditional on the u32 well-formedness bound).
-Verdict: feasible-with-scaffolding. What remains for
-a real refinement claim: manual Quint-to-Lean transcription of the
-transition relation (~8 defs), a refinement relation bridging int/U32 and
-capacity constant/field (~2 defs), init + per-action forward-simulation
-lemmas (~8-10; two-sided adds ~10 with guard alignment), an explicit
-u32-boundedness hypothesis, and a Quint-line citation gate so the
-transcription cannot drift silently. Only after that lands does the
-`REFINEMENT_VERIFIED` emission path get built; today the label is emitted
-nowhere by design (G3, R26). The doctor still reports Verus not installed;
-install it if the Verus layer should participate.
+Feasibility spike DONE 2026-07-13, refinement proof DONE 2026-07-14
+(`docs/m7-feasibility.md` narrative, `spikes/2026-07-13-m7-aeneas/` Lean
+source + repro; heavy build outputs held outside the repo, paths in the
+`m7-aeneas-toolchain` memory). jobq extracts to Lean with zero crate
+changes (Charon + Aeneas) and `JobqRefinement.lean` now PROVES the
+extracted model refines the strengthened Quint transition relation,
+forward direction, at CAPACITY=2: 18 theorems, sorry-free, standard axioms
+only (`[propext, Classical.choice, Quot.sound]`, independently
+re-verified). The five spec invariants are proved inductive over the
+transcribed `QStep`, `R` is the `U32.val`-as-Int simulation relation, and
+per-action forward-simulation lemmas give `rust_refines_spec` so
+`rust_b1..b4` transfer to every reachable extracted state
+(`NonVacuity.lean` rules out vacuity). The finite-arithmetic gap (F2) is
+carried as scope, not resolved: lemmas are ok-conditioned via
+`UScalar.add_equiv`/`sub_equiv`, so totality at u32::MAX is not claimed
+(F2 stays OPEN).
+
+What remains before `REFINEMENT_VERIFIED` is ever emitted: (1) a
+Quint-line citation gate binding each action definition in
+`JobqRefinement.lean` to the action's line range in `jobq.qnt`, so the
+hand-written transcription cannot drift from the spec silently — this is
+the blocker; (2) the label, when built, must be scoped, e.g.
+`REFINEMENT_VERIFIED[forward, CAPACITY=2, ok-conditioned, finite-arith
+excluded per F2]`, never bare (G3, R26). Optional extensions: two-sided
+refinement (reverse simulation + guard alignment, ~10 lemmas), other
+capacities, and resolving F2 with checked-arithmetic Quint modeling. The
+doctor still reports Verus not installed; install it if the Verus layer
+should participate.
 
 ### W6. Housekeeping (owner: user unless noted)
 

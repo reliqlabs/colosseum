@@ -1,10 +1,13 @@
-# M7 feasibility: Aeneas extraction + Lean proof over jobq
+# M7: Aeneas extraction + Lean refinement proof over jobq
 
-Status: feasibility spike, 2026-07-13. Establishes that the proved-tier
-exec-axis layer (Rust to Lean via Charon/Aeneas, then a machine-checked
-theorem) is reachable for a real Colosseum reference project. It does NOT
-yet close M7: no refinement of the extracted model against the Quint spec
-has been proved, so `REFINEMENT_VERIFIED` is still emitted nowhere (G3, R26).
+Status: refinement PROVED, 2026-07-14 (feasibility spike 2026-07-13). The
+extracted jobq model is proved to refine the Quint transition relation,
+forward direction, at CAPACITY=2, so the model-checked invariants transfer
+to the actual extracted code with a machine-checked, sorry-free proof. The
+`REFINEMENT_VERIFIED` emission path is still NOT built (G3, R26): the
+transcription of the spec into Lean is hand-written and nothing yet binds
+it mechanically to `jobq.qnt`. The proof exists; the label is gated on a
+Quint-line citation binding (see "Emission path" below).
 
 ## What ran
 
@@ -51,13 +54,41 @@ closing M7.
   extracted model refines the Quint transition relation. M7's
   `REFINEMENT_VERIFIED` bar requires the latter and remains unmet by design.
 
-## Path to closing M7
+## The refinement proof (2026-07-14)
 
-1. State the refinement relation between `specs/jobq.qnt` and the extracted
-   `Jobq.lean` explicitly (a simulation relation on the shared scalar state).
-2. Prove each Quint action is matched by the corresponding extracted
-   operation under that relation, sorry-free.
-3. Resolve the finite-arithmetic gap (F2) so the relation holds without an
-   unproven bound, or carry the bound as a stated, justified assumption.
-4. Only then build the `REFINEMENT_VERIFIED` emission path, scoped to the
-   relation proved.
+`JobqRefinement.lean` (18 theorems, sorry-free, standard axioms only)
+closes steps 1-2 of the path below and carries the F2 bound as a stated
+scope rather than resolving it:
+
+1. `QState`/`QStep`/`QInit` transcribe the five jobqP actions and guards
+   from `specs/jobq.qnt` into Lean; the five spec invariants (b1, b2
+   conservation, b3 biconditional, b4, nonneg) are proved INDUCTIVE over
+   `QStep`, so the transfer rests on a Lean induction rather than on
+   Apalache's bounded run.
+2. `R` is the field-wise `U32.val`-as-Int simulation relation, capacity
+   pinned to 2. `init_sim` plus one forward-simulation lemma per action
+   (submit/start/complete/fail, fail covering retry and exhausted
+   branches) give `rust_refines_spec`; the transfers `rust_b1..b4` then
+   hold unconditionally over every reachable extracted state.
+   `NonVacuity.lean` exhibits a concrete run reaching done=1 so the
+   transfers are not vacuous.
+3. The finite-arithmetic gap (F2) is carried as scope, not resolved: the
+   simulation lemmas use `UScalar.add_equiv`/`sub_equiv`, ok-conditioned,
+   so a successful return witnesses no overflow. Totality at u32::MAX is
+   NOT proved (it is false), matching F2, which stays OPEN.
+
+Independently re-verified: recompiled from clean (exit 0, zero
+sorry/native_decide/admit) and `#print axioms` on all five transfer
+theorems returns `[propext, Classical.choice, Quot.sound]`.
+
+### Emission path (still gated)
+
+The proof is forward-direction only, CAPACITY=2, ok-conditioned, F2
+excluded, and the `QStep` transcription is hand-written with nothing
+mechanically binding it to the spec. So the honest label is scoped, e.g.
+`REFINEMENT_VERIFIED[forward, CAPACITY=2, ok-conditioned, finite-arith
+excluded per F2]`, and it is emitted NOWHERE until a Quint-line citation
+gate (analogous to the code ledger's `@sha256` binding) ties each action
+definition in `JobqRefinement.lean` to the action's line range in
+`jobq.qnt`. Building that gate is the tracked ROADMAP item; the proof
+artifact stands as recorded provenance in the meantime.
