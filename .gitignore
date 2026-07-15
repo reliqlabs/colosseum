@@ -42,6 +42,13 @@ nul
 *.secret
 secrets.toml
 
+# --- Private review narrative (NOT for the public remote) ---
+# scratchpad/ holds the 5-round adversarial review artifacts (evaluation
+# reports, adjudications, the roadmap source). It lives in the working tree
+# but must never be pushed. Everything actionable from it is already in the
+# tracked ROADMAP; the raw narrative stays local. See the archive/ note below.
+scratchpad/
+
 # --- Build outputs from extraction pipelines that produce artifacts
 #     adjacent to source (Aeneas extraction, Lean lake build, etc.) ---
 extracted-lean/
