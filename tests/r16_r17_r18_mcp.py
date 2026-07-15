@@ -173,8 +173,11 @@ def r17(kani_mod, verus_mod) -> None:
         skip("verus live verification (present but not exercised in this suite)")
 
     # cargo-kani live: run one trivial harness end-to-end if it fits the budget.
-    if shutil.which("cargo-kani") is None and shutil.which("cargo") is None:
-        skip("cargo-kani live run (toolchain absent); discovery asserted above")
+    # Probe for cargo-kani itself, not plain cargo: a runner that ships cargo
+    # (e.g. stock ubuntu CI) but not the kani subcommand would otherwise fall
+    # through and fail the run instead of skipping it.
+    if shutil.which("cargo-kani") is None:
+        skip("cargo-kani live run (cargo-kani not installed); discovery asserted above")
         return
     budget = float(os.environ.get("R17_KANI_TIMEOUT_S", "180"))
     with tempfile.TemporaryDirectory(prefix="r17-kani-") as td:

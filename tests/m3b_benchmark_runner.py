@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -46,7 +47,12 @@ FIX = REPO / "tests" / "fixtures" / "m3b"
 STUB = FIX / "stub_dispatch.py"
 CORPUS = FIX / "corpus.json"
 TARGETS = FIX / "target"
-TEMPLATE = f"python3 {STUB} --model {{model}} {{prompt}}"
+# Invoke the stub with THIS interpreter (always on disk), not a bare `python3`
+# that a bare CI runner may not expose on PATH inside `uv run`. Without this the
+# full run returns INCOMPLETE, writes no summary.json, and the load below used
+# to crash. Quoted because benchmark_run.py shlex-splits the template.
+TEMPLATE = (f"{shlex.quote(sys.executable)} {shlex.quote(str(STUB))} "
+            "--model {model} {prompt}")
 
 FAILURES: list[str] = []
 
@@ -125,6 +131,15 @@ def main() -> int:
         r = run(out, calls=calls, prompts=prompts)
         check("full run exits 0", r.returncode == 0,
               f"rc={r.returncode} stderr={r.stderr[-400:]}")
+        if not (out / "summary.json").exists():
+            # The full run produced no summary (e.g. the stub interpreter is
+            # unavailable here). That is INCOMPLETE, not a pass and not a
+            # crash: degrade cleanly instead of a FileNotFoundError traceback.
+            print(f"  [SKIP] full run wrote no summary.json (rc={r.returncode}); "
+                  "benchmark not exercisable in this environment")
+            if r.stderr.strip():
+                print("          " + r.stderr.strip()[-300:].replace("\n", "\n          "))
+            return 2 if r.returncode == 3 else 1
         summ = load(out / "summary.json")
         check("summary verdict COMPLETE", summ.get("verdict") == "COMPLETE",
               summ.get("verdict"))

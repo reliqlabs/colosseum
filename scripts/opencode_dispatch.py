@@ -65,8 +65,9 @@ CONFIG SCHEMA
       env_passthrough?   - env var names forwarded to opencode child
                            processes in addition to the built-in allowlist
                            (e.g. provider API keys); default []
-      opencode_version_pin? - if set, preflight blocks when
-                           `opencode --version` differs
+      opencode_version_pin? - if set, a real dispatch is blocked when
+                           `opencode --version` differs (dispatch-readiness
+                           gate, not the preflight scan)
       default_variant?   - variant passed as `--variant` to every voice that
                            lacks its own `variant` field; default "max".
                            Per-voice `variant` overrides it. Set a voice's
@@ -264,25 +265,16 @@ def remove_ephemeral_worktree(project_root: Path, agent_root: Path) -> None:
 
 
 def run_preflight(cfg: dict, agent_root: Path, meta: dict, outdir: Path) -> None:
-    """Scan the agent-visible tree, record the report, and exit nonzero on
-    any violation. Nothing is dispatched past a failing preflight."""
+    """Scan the agent-visible tree for secrets/escaping symlinks, record the
+    report, and exit nonzero on any violation. This is a property of the
+    files an agent would see, so it runs for every mode including
+    --preflight-only. Dispatch readiness (the opencode binary + version pin)
+    is a separate gate checked only when a real dispatch is about to run;
+    see ensure_dispatch_ready."""
     violations = preflight_scan(agent_root)
-
-    # R3: a missing dispatch binary is INCOMPLETE, never a quiet no-op.
-    if shutil.which("opencode") is None:
-        violations.append("opencode binary not found on PATH — verdict: INCOMPLETE, "
-                          "no dispatch executed")
-        opencode_version = "absent"
-    else:
-        ver = subprocess.run(["opencode", "--version"], capture_output=True, text=True)
-        opencode_version = ver.stdout.strip() if ver.returncode == 0 else "unknown"
-    pin = cfg.get("opencode_version_pin")
-    if pin and opencode_version != pin:
-        violations.append(f"opencode version {opencode_version} != pinned {pin}")
 
     report = {
         **meta,
-        "opencode_version": opencode_version,
         "env_passthrough": list(cfg["env_passthrough"]),
         "violations": violations,
     }
@@ -294,6 +286,35 @@ def run_preflight(cfg: dict, agent_root: Path, meta: dict, outdir: Path) -> None
         sys.exit(f"FATAL: preflight blocked dispatch ({len(violations)} violation(s)); "
                  f"see {outdir / 'preflight.json'}")
     print(f"Preflight OK ({meta['mode']} mode) — report at {outdir / 'preflight.json'}")
+
+
+def ensure_dispatch_ready(cfg: dict, outdir: Path) -> None:
+    """Gate a real dispatch on the opencode binary being present (and, if
+    pinned, the right version). Called after preflight passes and after the
+    voice/slice selection is validated, immediately before any subagent
+    runs. A missing binary is INCOMPLETE, never a quiet no-op (R3) — but it
+    is NOT a preflight concern: --preflight-only and config-validation paths
+    never reach here, so they no longer require a binary they never invoke."""
+    if shutil.which("opencode") is None:
+        opencode_version = "absent"
+        violations = ["opencode binary not found on PATH — verdict: INCOMPLETE, "
+                      "no dispatch executed"]
+    else:
+        ver = subprocess.run(["opencode", "--version"], capture_output=True, text=True)
+        opencode_version = ver.stdout.strip() if ver.returncode == 0 else "unknown"
+        violations = []
+    pin = cfg.get("opencode_version_pin")
+    if pin and opencode_version != pin:
+        violations.append(f"opencode version {opencode_version} != pinned {pin}")
+
+    (outdir / "dispatch-readiness.json").write_text(json.dumps(
+        {"opencode_version": opencode_version, "violations": violations}, indent=2) + "\n")
+
+    if violations:
+        for v in violations:
+            print(f"DISPATCH BLOCKED: {v}", file=sys.stderr)
+        sys.exit(f"FATAL: dispatch not ready ({len(violations)} violation(s)); "
+                 f"see {outdir / 'dispatch-readiness.json'}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -687,6 +708,12 @@ async def main() -> int:
         if not voices_cfg or not slices_cfg:
             sys.exit("FATAL: selection matched zero voices or slices — "
                      "a 0-call run is not a successful run")
+
+        # Dispatch readiness (opencode binary + version pin) is gated only now
+        # that a real dispatch is committed — after preflight and selection
+        # validation. --preflight-only and invalid-selection runs never reach
+        # here, so they don't require a binary they never invoke.
+        ensure_dispatch_ready(cfg, outdir)
 
         log_path = outdir / "dispatch.log"
         with log_path.open("a") as logf:
