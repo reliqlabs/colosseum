@@ -27,6 +27,12 @@ env/
 #     prototypes that might live here) ---
 target/
 Cargo.lock.bak
+# tests/fixtures/m3b/target is a review-TARGET fixture (INTENT + src the
+# benchmark reviews), not a Cargo build dir; the global target/ rule above hid
+# it and fresh clones failed m3b. Track it. (Real crate build dirs like
+# tests/fixtures/r22/adapter/target stay ignored — they sit next to a Cargo.toml.)
+!tests/fixtures/m3b/target/
+!tests/fixtures/m3b/target/**
 
 # --- Editor / OS scratch ---
 *.swp
