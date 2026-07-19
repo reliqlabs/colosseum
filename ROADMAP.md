@@ -1,6 +1,6 @@
 # Roadmap: status and remaining work
 
-Last updated: 2026-07-14. This is the handoff document. It records where the
+Last updated: 2026-07-19. This is the handoff document. It records where the
 2026-07-11 remediation plan of record stands, what remains before the repo may
 call itself dependable by its own exit criteria, and who each remaining item
 waits on. A new maintainer or session should be able to resume from this file
@@ -20,8 +20,11 @@ committed on `main`, one commit per item:
 | M3 live calibration | `calibration/2026-07-13-r1`: blinded seeded-defect run, six scoreable voices | done |
 
 Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
-dispatch-config, and the full regression suite (`tests/run_all.py`, ~24
-suites). Green as of this writing.
+dispatch-config, fixture-tracking, and the full regression suite
+(`tests/run_all.py`, ~24 suites). Green locally as of this writing. The
+GitHub Actions mirror (`colosseum-ci` on `main`) is green since 2026-07-14;
+on its toolchain-less runner the toolchain-dependent suites degrade to a
+tolerated INCOMPLETE rather than failing (see the CI section below).
 
 The default adversarial panel is pinned as
 `canonical-4@sha256:08831d0ce9f2086b` (operator decision 2026-07-13):
@@ -100,8 +103,10 @@ content-hash; prior panels stay pinnable.
 
 The gate for "validated" returning to the README. Needs:
 
-1. The repo pushed somewhere an external party can reach (main is currently
-   local-only).
+1. DONE 2026-07-14: `main` is pushed to github.com:reliqlabs/colosseum and
+   CI is green there, so a replicator's fresh clone matches what local CI
+   gates (two broken-clone bugs found and fixed on the way; see the CI
+   section).
 2. An independent person/team who follows INSTALL.md + QUICKSTART.md on their
    machine (`colosseum_doctor` validates their environment), runs the workflow
    on a target, and returns their evidence trail.
@@ -156,7 +161,9 @@ should participate.
   opencode Google credential); then calibrate on the W2 corpus.
 - `colosseum_doctor` OAuth false-warn: FIXED 2026-07-13 (checks all three
   opencode credential paths, not just env vars).
-- Push `main` (one command once a remote/destination is chosen).
+- Push `main`: DONE 2026-07-14 (github.com:reliqlabs/colosseum). The
+  `scratchpad/` private review narrative is gitignored so a stray
+  `git add -A` can never sweep it into a push.
 
 ### jobq spec strengthening — DONE 2026-07-14 except F2 (commit 61e6588)
 
@@ -190,12 +197,42 @@ ignore for `tests/fixtures/`, tracked the seven manifests, and added a
 green off the clone) so an untracked fixture can never ship a broken clone
 again.
 
+### GitHub Actions CI — green since 2026-07-14 (commits 4de698d, 82477ae)
+
+The `colosseum-ci` workflow had failed on every push since it was added on
+2026-07-12: four suites hard-failed on the toolchain-less runner instead of
+degrading to the INCOMPLETE the workflow was designed to tolerate. Local
+`ci.py` never saw it because this machine has the tools. Fixes:
+
+- `opencode_dispatch.py`: the opencode-binary check lived inside the
+  preflight scan, so `--preflight-only` runs (which never dispatch) and the
+  `--voices`/`--slices` validation paths wrongly required the binary. Split
+  into an `ensure_dispatch_ready()` gate that runs only once a real
+  dispatch is committed. R3 (real dispatch, binary absent -> INCOMPLETE) is
+  preserved; the preflight scan is file-safety only.
+- `m3b`: stub invoked via `sys.executable` instead of a bare `python3` that
+  `uv run` on a bare runner may not expose; a missing summary degrades to
+  SKIP instead of a traceback.
+- `r16/r17/r18`: probe for `cargo-kani` itself, not plain `cargo` (stock
+  runners ship cargo without kani).
+
+Getting past those exposed a SECOND broken-clone bug of the c363545 class:
+`tests/fixtures/m3b/target` (a review-TARGET fixture, not a build dir) was
+swallowed by the global Rust `target/` ignore, so fresh clones had no
+benchmark target. The fixture is now tracked, and the fixture-tracking
+check was replaced by `scripts/check_fixture_tracking.py` (self-tested),
+which also flags ignore-HIDDEN fixtures — the blind spot both clone bugs
+shared, since `git ls-files --others --exclude-standard` never lists
+ignored files. Real build/run artifacts (a `target/` next to a Cargo.toml,
+`.colosseum/verify/`) stay tolerated. Verified off a fresh clone and on
+the live runner; both workflow jobs green.
+
 ## Suggested sequence
 
-W1 first (unblocks the most: dogfood exemplar, benchmark target, proof target,
-criterion 7). Then the W2 corpus and arms, then W3 from its data. W4 runs in
-parallel from the moment the repo is pushed. W5 targets W1's critical
-invariant opportunistically. W6 items land whenever their inputs appear.
+W1, W2, and W5 are done; W3 waits on a discriminating W2-iteration corpus.
+The repo is pushed and CI is green, so W4 now waits only on an external
+party picking up `docs/replication-protocol.md`. Remaining W6 items land
+whenever their inputs appear (account fix, ds4 endpoint, Google credential).
 
 ## Provenance
 
