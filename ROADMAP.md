@@ -18,7 +18,7 @@ committed on `main`, one commit per item:
 | P1 (mechanisms) | C1-C10: two-gate ledger (G1/G2), conformance bridge (G3), critique loop (G4), voice registry, MCP hardening, skill sweep, intent template, baseline floors, dogfood evidence, repository CI | done |
 | P2 instruments | M1 coverage dashboard, M2 self-measurement, M3 recall scorer + pre-registered benchmark protocol, M5 boundary skill / system-intent / ledger versioning | done |
 | M3 live calibration | `calibration/2026-07-13-r1`: blinded seeded-defect run, six scoreable voices | done |
-| OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, live-tree preflight, failure-isolated evidence, initializer/doctor support (R29/R30) | implemented on `feature/omp-integration`; route calibration pending |
+| OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, fail-closed session-root gate, live-tree preflight, failure-isolated evidence, initializer/doctor support (R29/R30) | committed on `feature/omp-integration`; project-rooted one-voice transport E2E passed (`calibration/2026-07-22-omp-native-e2e/`); project-installed helper resolution, canonical 4-voice run, and route calibration pending |
 
 Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
 dispatch-config, fixture-tracking, and the full regression suite
@@ -39,9 +39,19 @@ OMP now has a native multi-voice transport through its `eval` `agent()` bridge.
 The exact ModelRegistry routes and their content hash are generated into
 `.colosseum/dispatch.json`; `omp_fanout.py` preflights the live tree, binds the
 target hash, runs bounded per-model adversary agents, and preserves partial
-evidence. This changes orchestration and evidence capture, not any existing G1
-verification claim. Every OMP route is explicitly `pending` calibration, so
-OpenCode/Claude Code calibration must not be transferred to native runs.
+evidence. Native dispatch is fail-closed on the session root: it refuses unless
+the caller opts in AND the OMP session cwd (from the documented `PI_SESSION_FILE`
+header) equals `project_root`, and it stamps `isolation:"unverified"` because the
+subagent filesystem is not confined. A project-rooted single-voice transport E2E
+passed via headless `omp -p` (COMPLETE 1/1, ~$1.43;
+`calibration/2026-07-22-omp-native-e2e/`): the gate matched, preflight scanned
+clean, and the project's `.omp/agents` wrapper dispatched. Still pending: the
+project-installed `.omp/skills` helper resolution path (the smoke loaded the repo
+copy via a global symlink), the canonical 4-voice route (external providers), and
+route calibration. This changes orchestration and evidence capture, not any
+existing G1 verification claim. Every OMP route is explicitly `pending`
+calibration, so OpenCode/Claude Code calibration must not be transferred to
+native runs.
 
 ## Exit criteria scoreboard
 
