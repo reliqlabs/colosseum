@@ -158,6 +158,37 @@ def main() -> int:
         check("non-git root: message points at --unsafe-in-place",
               "--unsafe-in-place" in (r.stderr + r.stdout))
 
+        # 7. the shipped opencode_dispatch.py copy (which names the marker as a
+        #    constant) must not self-trigger once committed into a worktree.
+        proj = make_fixture(tmp / "c7")
+        dst = proj / ".colosseum" / "scripts" / "opencode_dispatch.py"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(DISPATCH.read_text())
+        commit_all(proj, "seed shipped dispatcher")
+        r = preflight(write_config(proj))
+        check("shipped dispatcher: preflight passes (no self-trigger)",
+              r.returncode == 0, f"exit={r.returncode}: {(r.stderr or r.stdout)[-300:]}")
+        check("shipped dispatcher: not flagged as private-key material",
+              "private-key material" not in (r.stderr + r.stdout))
+
+        # 8. an unreadable file must fail closed (recorded), not silently skipped.
+        import os as _os
+        if hasattr(_os, "geteuid") and _os.geteuid() != 0:
+            proj = make_fixture(tmp / "c8")
+            opaque = proj / "opaque.bin"
+            opaque.write_bytes(b"\x00" * 32)
+            cfg_path = write_config(proj)
+            _os.chmod(opaque, 0)
+            try:
+                r = preflight(cfg_path, "--unsafe-in-place")
+                out = r.stderr + r.stdout
+                check("unreadable file: in-place preflight blocks",
+                      r.returncode != 0, f"exit={r.returncode}")
+                check("unreadable file: violation names it",
+                      "unreadable file" in out and "opaque.bin" in out, out[-300:])
+            finally:
+                _os.chmod(opaque, 0o644)
+
     print()
     if FAILURES:
         print(f"R12: {len(FAILURES)} failure(s)")

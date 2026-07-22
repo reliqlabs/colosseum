@@ -159,6 +159,12 @@ SECRET_NAME_PATTERNS = (
     ".env", ".env.*", "*.secret", "secrets.*", "id_rsa*", "*.pem", "*.p12",
 )
 
+# Anchored on the full PEM/PGP opening armor, not a bare "PRIVATE KEY" substring:
+# scanner constants and docs that merely name the marker lack the -----BEGIN
+# prefix, so they no longer self-trigger once committed into a project worktree.
+_PEM_PRIVATE_KEY_RE = re.compile(
+    rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----")
+
 # Environment variables the opencode child process may inherit. Everything
 # else is dropped; forward provider keys deliberately via env_passthrough.
 ENV_ALLOWLIST = frozenset({
@@ -200,10 +206,12 @@ def preflight_scan(root: Path) -> list[str]:
             violations.append(f"secret-named file: {rel}")
             continue
         try:
-            head = path.open("rb").read(4096)
+            with path.open("rb") as handle:
+                head = handle.read(8 * 1024 * 1024)
         except OSError:
+            violations.append(f"unreadable file (cannot scan for secrets): {rel}")
             continue
-        if b"PRIVATE KEY-----" in head:
+        if _PEM_PRIVATE_KEY_RE.search(head):
             violations.append(f"private-key material: {rel}")
     return violations
 
