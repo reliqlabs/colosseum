@@ -35,7 +35,7 @@ Ask the user for, or determine from context:
 - **The triggering commit / change record** — the commit or change-record path that introduced the multi-tx admin feature. Required input.
 - **Code root for the new feature** — typically `<project>/crates/contract/src/`. Used to confirm the transition signatures the Quint model must mirror.
 
-If the project has no Quint spec, stop. This skill operates on a Quint model; neither `colosseum-intent` (produces the intent document, not a spec) nor `colosseum-compose` (produces the trust ledger, not a spec) writes one. Dispatch the `colosseum-quint-spec-generator` subagent first — via the Agent tool in Claude Code, or `opencode run --agent quint-spec-generator` (canonical body at `agents/quint-spec-generator-body.md`) — against the project's intent document, then return here. Lifecycle-adversary without Quint is hand-waved trace enumeration — too easy to miss interleavings.
+If the project has no Quint spec, stop. This skill operates on a Quint model; neither `colosseum-intent` nor `colosseum-compose` writes one. Dispatch `colosseum-quint-spec-generator` first through OMP `task`, the Claude Code Agent tool, or `opencode run --agent quint-spec-generator` (canonical body at `agents/quint-spec-generator-body.md`). Run it against the project's intent document, then return here. Lifecycle-adversary without Quint reduces to hand-written trace enumeration and can miss interleavings.
 
 ## Step 2: Enumerate the new admin transitions
 

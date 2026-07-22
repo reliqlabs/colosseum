@@ -114,4 +114,4 @@ End the session with:
 - The absolute path of the saved file
 - The frontmatter `version` and `status` the document was saved with
 - A short summary of the sections produced and any `TBD:` markers that remain
-- A suggested next Colosseum step (typically: tracer-bullet prototype, then dispatch the `colosseum-quint-spec-generator` subagent — via the Agent tool in Claude Code, or `opencode run --agent quint-spec-generator` — against this intent document to produce the system-level Quint spec; no SKILL wraps that step, see README.md's Agentic backbone table)
+- A suggested next Colosseum step (typically: tracer-bullet prototype, then dispatch `colosseum-quint-spec-generator` through OMP `task`, the Claude Code Agent tool, or `opencode run --agent quint-spec-generator`; no skill wraps that step, see README.md's Agentic backbone table)

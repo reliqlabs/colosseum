@@ -6,7 +6,7 @@ Operational tooling that supports the methodology but is not itself part of any 
 
 **Purpose.** The dispatch path described in `colosseum/skills/colosseum-adversarial/SKILL.md`. Drives the `spec-adversary` OpenCode agent against a target spec across a roster of voices (gateway-routed `burnt/*` frontier voices, direct-provider `openai/*`, `google/*`, and `fireworks-ai/*` voices, and local `lmstudio/*` and `ds4/*` voices), one (voice, slice) pair per `opencode run` invocation. Captures stdout, detects truncated stubs, retries on failure, aggregates per-voice files plus a summary.
 
-**This is the only dispatch surface for non-Claude voices.** External models are called exclusively through OpenCode so each voice gets an agentic ReAct loop with file access. There is no single-shot MCP dispatch path; the former `external-model-mcp` was removed.
+**This is the calibrated reference and compatibility surface.** OMP may route the same registered non-Claude voices through its native agent bridge. Both transports run the repository-aware adversary; neither uses a single-shot MCP dispatch path.
 
 **Usage.** Copy this script to `<project>/.colosseum/scripts/opencode_dispatch.py` and supply a per-project config at `<project>/.colosseum/dispatch.json`:
 
@@ -27,22 +27,49 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). The canonical panel (`canonical-4`, operator decision 2026-07-13) is `claude-agent` (Fable 5, or the strongest available Opus), `gpt-5.6-sol`, `glm-5.2`, and `kimi-k2.6`, all with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); `gpt-oss-120b` and `nemotron-3-120b-a12b` are calibrated candidates; `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-| Voice id | Model | Family | Harness | Status | Calibration |
-|---|---|---|---|---|---|
-| `claude-agent` | `in-harness` | Anthropic | claude-code | canonical-panel | cited |
-| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | canonical-panel | cited |
-| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | OpenAI | opencode | canonical-panel | cited |
-| `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | DeepSeek | opencode | candidate | pending |
-| `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | Google | opencode | candidate | pending |
-| `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | OpenAI-OSS | opencode | candidate | cited |
-| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | NVIDIA | opencode | candidate | cited |
-| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | Zhipu | opencode | canonical-panel | cited |
-| `leanstral-2603` | `lmstudio/leanstral-2603` | Mistral | opencode | local-specialist | n/a |
-| `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | Zhipu | opencode | excluded | cited |
-| `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | theorem-prover-specialist | opencode | excluded | cited |
+| Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration |
+|---|---|---|---|---|---|---|---|
+| `claude-agent` | `in-harness` | `anthropic/claude-fable-5` | Anthropic | claude-code | canonical-panel | cited | pending |
+| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | canonical-panel | cited | pending |
+| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | `openai-codex/gpt-5.6-sol` | OpenAI | opencode | canonical-panel | cited | pending |
+| `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | n/a | DeepSeek | opencode | candidate | pending | n/a |
+| `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | n/a | Google | opencode | candidate | pending | n/a |
+| `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | n/a | OpenAI-OSS | opencode | candidate | cited | n/a |
+| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | n/a | NVIDIA | opencode | candidate | cited | n/a |
+| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | `fireworks/glm-5.2` | Zhipu | opencode | canonical-panel | cited | pending |
+| `leanstral-2603` | `lmstudio/leanstral-2603` | n/a | Mistral | opencode | local-specialist | n/a | n/a |
+| `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | n/a | Zhipu | opencode | excluded | cited | n/a |
+| `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | n/a | theorem-prover-specialist | opencode | excluded | cited | n/a |
 
-Calibration `cited` = a fitness run is referenced in the voice's `calibration` field; `pending` = only dispatchability is known (not yet panel-eligible); `n/a` = local specialist / excluded. Full evidence and caveats live in `registry/voices.json`.
+Reference calibration applies only to the recorded OpenCode or Claude Code route. OMP calibration is tracked separately; `pending` native routes are experimental and cannot inherit the reference claim.
 <!-- END GENERATED: voice-roster -->
+
+## OMP-native adversarial fan-out
+
+`skills/colosseum-adversarial/omp_fanout.py` is the OMP-native coordinator.
+Load it in an OMP Python `eval` cell, resolve explicit voice IDs from
+`.colosseum/dispatch.json` with `load_omp_native_config()`, then call
+`run_omp_fanout(agent_fn=agent, parallel_fn=parallel, allow_unverified_isolation=True, ...)`.
+
+Each model call runs the generated `colosseum-spec-adversary` agent with its own
+ModelRegistry override. The helper preflights the live project tree, binds the
+target-spec hash, catches failures per voice, and persists prompts, raw output,
+errors, handles, timing, route metadata, and a terminal `summary.json` under a
+new `.colosseum/attacks/<run>/` directory. A one-voice failure produces
+`PARTIAL`; an all-failed wave produces `INCOMPLETE`.
+
+Native dispatch is fail-closed on the session root: it refuses unless
+`allow_unverified_isolation=True` and OMP was launched inside `project_root`
+(checked against the documented `PI_SESSION_FILE` session-header `cwd`), before
+any `agent()` call. Unlike the OpenCode Z2 worktree it does not confine the
+subagent filesystem, so every run stamps `isolation:"unverified"` in
+`meta.json`/`summary.json`; that label is a precondition record, not a
+containment guarantee.
+
+The initializer additively introduces a missing `omp_native` block without
+rewriting existing project config. `--force` performs a full canonical reset.
+OMP route calibration is independent from the OpenCode/Claude Code reference
+evidence and currently `pending`. Transport fallback is never automatic.
 
 ## `check_ledger_references.py` — reference-integrity gate (Gate A)
 
@@ -79,7 +106,7 @@ coverage_dashboard.py --records <project>/.colosseum/evidence/ --manifest <oblig
 
 ## `recall_score.py` — seeded-defect recall scorer (P2 measurement instrument)
 
-Given a seeded-defect corpus (planted flaws as ground truth) and per-voice detections (or a findings JSON), computes per-voice recall, union/panel recall, and the shared-blind-spot set (seeded defects no voice caught, the direct measure of correlated blindness). Match rule: basename + category + line within tolerance; a right-place wrong-category hit does not count. The scorer is the instrument for the blinded benchmark in `docs/benchmark-protocol.md`; that benchmark has not been run and this tool invents no numbers.
+Given a seeded-defect corpus and per-voice detections, computes per-voice recall, panel recall, and the seeded defects no voice caught. Match rule: basename, category, and line within tolerance; a right-place wrong-category hit does not count. The published prospective run is under `calibration/2026-07-14-bench1/`.
 
 ```bash
 recall_score.py --corpus <corpus.json> --detections <per-voice.json|findings.json> [--json]
@@ -87,7 +114,7 @@ recall_score.py --corpus <corpus.json> --detections <per-voice.json|findings.jso
 
 ## `benchmark_run.py` — pre-registered ablation-arm runner (P2 measurement instrument)
 
-Runs the five arms fixed in `docs/benchmark-protocol.md` (ordinary review, single model, repeated same-model, multi-family panel, adversarial panel with one critique round) against one seeded target and scores each arm with `recall_score.py`. This is the benchmark RUN the protocol lists as pending. Every model call goes through one dispatch abstraction: a command template (default `opencode run --model {model} --agent spec-adversary {prompt}`, cwd = the `--targets` dir) overridable with `--dispatch-cmd` so tests substitute a stub; no other code path invokes a model. The corpus is never read by the runner and never enters a prompt or the target dir; it is passed by path to `recall_score.py` at scoring time only. Voice outputs are parsed with the fenced-json convention (last `json` block wins, bare-array fallback); an errored dispatch is logged and excluded from detections, never scored as a zero. Arm 5's critique round shows each voice the deduped, authorship-blinded union of the other voices' round-1 findings; round 2 is recorded and scored separately. `--dry-run` prints the dispatch plan and exits without dispatching. Exit 0 = all requested arms scored; 2 = usage/config error; 3 = INCOMPLETE (dispatcher missing, an arm with zero successful dispatches, or `recall_score` could not score it). Token/cost fields in `summary.json` are null unless a dispatch supplies token data.
+Runs the five pre-registered arms against a seeded target and scores each with `recall_score.py`. Every model call uses one dispatch template, overridable with `--dispatch-cmd` for fixtures. The corpus never enters a prompt or target directory. Errored dispatches are recorded and excluded, never scored as zero. Arm 5 gives each voice the deduplicated, authorship-blinded findings from other voices before round 2. `--dry-run` prints the plan. Exit 0 means all arms scored; 2 is a usage error; 3 is INCOMPLETE. The published prospective run is under `calibration/2026-07-14-bench1/`.
 
 ```bash
 benchmark_run.py --corpus <corpus.json> --targets <dir-with-REVIEW-INSTRUCTIONS.md> \
@@ -113,12 +140,31 @@ Validates the `ledger_schema_version` field of a ledger envelope (`{"ledger_sche
 check_ledger_version.py --ledger <project>/.colosseum/ledger.json [--json]
 ```
 
+## `colosseum_init.py` — scaffold a project for a harness
+
+Creates the `.colosseum/` evidence directories, copies the dispatch and Gate A/B
+scripts with executable modes intact, installs the OpenCode agents, and writes
+the project dispatch configuration. `--harness omp` additionally installs all
+skills, the three generated OMP agents, and the six MCP definitions under the
+project's `.omp/` directory:
+
+```bash
+export COLOSSEUM=/absolute/path/to/colosseum
+colosseum/scripts/colosseum_init.py <project> --harness omp
+```
+
+Normal reruns preserve local agent, skill, and conflicting MCP definitions while
+filling missing MCP servers. `--force` restores Colosseum-owned agents, skills,
+scripts, and MCP entries but preserves unrelated MCP servers.
+
 ## `install-agents.py` — install the canonical agent bodies into a target harness
 
-Builds per-harness agent wrappers (Claude Code subagent or OpenCode subagent) from the canonical bodies under `colosseum/agents/*-body.md`. Run before the first OpenCode dispatch in a new project:
+Builds per-harness agent wrappers for Claude Code, OpenCode, and OMP from the
+canonical bodies under `colosseum/agents/*-body.md`.
 
 ```bash
 colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/
+colosseum/scripts/install-agents.py install --harness omp --target <project>/.omp/agents/
 colosseum/scripts/install-agents.py build   # regenerate all wrappers in-repo
 colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bodies (0 = clean)
 ```
@@ -205,8 +251,8 @@ colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bo
 # glm-4.7-flash and the goedel class are excluded — see the roster table above).
 colosseum_run.py init \
     /path/to/.colosseum/intent.md \
-    --voices=claude-agent,gpt-5.6-sol-pro,kimi-k2.6,deepseek-v4-flash,gemini-3.1-pro-preview \
-    --owners=claude-agent:claude-code,gpt-5.6-sol-pro:opencode,kimi-k2.6:opencode,deepseek-v4-flash:opencode,gemini-3.1-pro-preview:opencode
+    --voices=claude-agent,gpt-5.6-sol,glm-5.2,kimi-k2.6 \
+    --owners=claude-agent:claude-code,gpt-5.6-sol:opencode,glm-5.2:opencode,kimi-k2.6:opencode
 
 # Phase 2a — Claude Code harness dispatches its assigned voice(s):
 #   • spawns the Agent subagent with full tool access

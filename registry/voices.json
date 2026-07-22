@@ -16,7 +16,9 @@
       "endpoint": "local base URL to TCP/HTTP-probe for reachability (ds4, lmstudio), or null for hosted/in-harness voices.",
       "added": "ISO date the voice entered the registry.",
       "retired": "ISO date + reason when status became 'excluded' or the voice left service; null otherwise.",
-      "notes": "auth caveats, gateway quirks, latency, successor models, anything a runner needs before pinning."
+      "notes": "auth caveats, gateway quirks, latency, successor models, anything a runner needs before pinning.",
+      "omp_model": "optional OMP ModelRegistry pattern for the same nominal voice. Absent means no OMP-native route is registered. This is a separate harness route, not evidence that the OpenCode calibration transfers.",
+      "omp_calibration": "required when omp_model is present. Evidence for this exact OMP-native route, or the literal 'pending'. A pending OMP route may be exercised experimentally but MUST NOT be called calibrated."
     },
     "status_values": {
       "canonical-panel": "in the default milestone panel; REQUIRES non-pending calibration.",
@@ -35,6 +37,8 @@
     {
       "id": "claude-agent",
       "model": "in-harness",
+      "omp_model": "anthropic/claude-fable-5",
+      "omp_calibration": "pending",
       "family": "Anthropic",
       "harness": "claude-code",
       "provider": null,
@@ -50,6 +54,8 @@
     {
       "id": "kimi-k2.6",
       "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "omp_model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+      "omp_calibration": "pending",
       "family": "Moonshot",
       "harness": "opencode",
       "provider": "burnt",
@@ -65,6 +71,8 @@
     {
       "id": "gpt-5.6-sol",
       "model": "openai/gpt-5.6-sol",
+      "omp_model": "openai-codex/gpt-5.6-sol",
+      "omp_calibration": "pending",
       "family": "OpenAI",
       "harness": "opencode",
       "provider": "openai",
@@ -142,6 +150,8 @@
     {
       "id": "glm-5.2",
       "model": "fireworks-ai/accounts/fireworks/models/glm-5p2",
+      "omp_model": "fireworks/glm-5.2",
+      "omp_calibration": "pending",
       "family": "Zhipu",
       "harness": "opencode",
       "provider": "fireworks-ai",

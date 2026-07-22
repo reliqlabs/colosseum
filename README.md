@@ -36,9 +36,16 @@ Colosseum composes five complementary trust mechanisms. None alone is sufficient
 
 **2. Multi-model adversarial generation.** One model produces, another attacks. Different model families have different blind spots; combining them gives additive coverage. Crucially, *adversarial beats consensus* — multiple models agreeing can converge on shared wrongness, but an adversary's job is to find faults. This is the sharper version of "multi-model."
 
-The `colosseum-adversarial` SKILL dispatches attacks and spec authoring through one mechanism: **OpenCode CLI dispatch**. Each non-Claude voice runs via `opencode run --agent <agent-name> --model <provider/model> --variant max`, with OpenCode handling provider connections to OpenAI direct (`openai/gpt-5.6-sol-pro`), Google direct (`google/gemini-3.1-pro-preview`), an operator-curated gateway routing non-Western frontier voices via Cloudflare AI Workers (`burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `burnt/cloudflare-100/@cf/openai/gpt-oss-120b`; the roster also exposes `@cf/zai-org/glm-4.7-flash`, which is excluded from adversarial dispatch per calibration), a local DeepSeek V4 Flash runner (`ds4/deepseek-v4-flash`), and local LM Studio models (`lmstudio/...`). Pins are verified-at-date (2026-07-11) and drift; probe before milestone runs. The Claude voice runs natively in-harness via the Agent subagent (`claude-agent`), since the gateway no longer exposes Anthropic routes. Project-local agents under `<project>/.opencode/agent/` build from canonical bodies at `colosseum/agents/*-body.md` (rebuilt via `scripts/install-agents.py build`). There is no single-shot MCP dispatch path: external models are called only through OpenCode so they get an agentic ReAct loop with file access, not a one-shot completion.
+The `colosseum-adversarial` skill has two agentic multi-voice transports. In OMP,
+`eval` fans the generated read-only adversary agent across ModelRegistry routes
+with per-call model overrides and bounded `parallel()` execution. OpenCode
+remains the calibrated reference and compatibility transport. Both resolve
+explicit voice IDs from `registry/voices.json`; single-shot completion and MCP
+fan-out helpers are forbidden.
 
-Routine milestones default to Claude + local + 1–2 gateway voices; system-scale milestones require frontier-tier voices across multiple families. The full loop runs: fan-out → synthesis → cross-critique → defense → fix → re-cross-critique → encoding-discipline back-propagation to intent.
+Single-voice review is the routine default. Use a multi-family panel when the
+change warrants its dispatch cost, then run synthesis, cross-critique, defense,
+fix, re-cross-critique, and encoding-discipline back-propagation.
 
 **3. Mechanistic constraints in the substrate.** Pre-LLM-era tools — types, ownership, linters, sanitizers — are underrated when paired with LLM output. Rust's type system rejects whole classes of bugs silently. Cheap, deterministic, no model required.
 
@@ -92,7 +99,7 @@ The process moves through stages. Each stage produces an artifact that anchors t
 7. **Implementation.** Rust written against the validated specs. Designed for verifiability: pure cores, narrow effects, explicit state.
 8. **Verification.** The pyramid runs continuously. Types first, then lints, then property tests, then fuzz, then Kani, then Verus, then Aeneas → Lean.
 9. **Failure classification.** When verification fails: spec wrong, code wrong, prover stuck, tool mismatch, state-space blowup, or infrastructure — `INDETERMINATE` when the evidence cannot decide. Route accordingly. Loud failure beats silent success.
-10. **Coverage dashboard.** Per function: proven, tested-only, or unverified. Trust is calibrated to coverage, not to vibes. (Tooling deferred; until it lands, the stage-8 trust ledger is the operational coverage record.)
+10. **Coverage dashboard.** `scripts/coverage_dashboard.py` reduces typed G1 evidence to per-claim proven, tested-only, failed, incomplete, or missing status. The trust ledger remains the composition record; the dashboard makes its evidence coverage visible.
 
 ## What this is and isn't
 
@@ -126,8 +133,8 @@ Initial target stack (Rust ecosystem):
 | Protocol spec | Quint | State-machine and temporal properties |
 | Proof specialist | Goedel Prover V2 | Lean tactic proposal (local) |
 | Lean integration | `lean-lsp-mcp` | Proof state, mathlib search, diagnostics |
-| Orchestration | Claude Code (primary harness) | Planning, error recovery, failure routing, single-voice agent dispatch via the Agent tool |
-| Multi-voice dispatch | OpenCode CLI (`opencode run --agent ... --model ... --variant max`) | Project-local agent dispatch across direct providers + gateway + local LM Studio + local DeepSeek; used for adversarial fan-out, cross-critique, defense rounds, re-cross-critique. **Canonical orchestrator: `colosseum/scripts/opencode_dispatch.py`** (copy to `<project>/.colosseum/scripts/`). The only dispatch path — external models always run agentically through OpenCode, never via single-shot MCP calls |
+| Orchestration | OMP or Claude Code | Planning, error recovery, failure routing, and in-harness subagent dispatch through OMP `task` or the Claude Code Agent tool |
+| Multi-voice dispatch | OMP `eval` agent bridge or OpenCode CLI | OMP-native fan-out runs one repository-aware `colosseum-spec-adversary` per ModelRegistry route through `parallel()`; `skills/colosseum-adversarial/omp_fanout.py` persists failure-isolated artifacts. OpenCode remains the calibrated reference and compatibility path through `scripts/opencode_dispatch.py`. Neither path uses single-shot completion calls |
 
 Model selection follows the same principle as tool selection: cheapest model that can handle the job, with adversarial pairing on critical outputs.
 
@@ -153,7 +160,7 @@ Each project's evidence base lives under its own `.colosseum/` directory (`attac
 
 ## Status
 
-Methodology in active development. The current shape — five pillars, the verification pyramid, the ten-stage workflow — is stable. SKILLs and MCPs are wired end-to-end on macOS Apple Silicon; new improvements arrive from dogfood projects and land in the SKILLs once they've been exercised in anger.
+Methodology in active development. The current shape — five pillars, the verification pyramid, the ten-stage workflow — is stable. Skills and MCPs are wired end-to-end on macOS Apple Silicon for OMP and Claude Code; new improvements arrive from dogfood projects and land in the skills once exercised on a real target.
 
 Improvement proposals awaiting validation live in [methodology-improvements.md](./methodology-improvements.md). The external literature they draw on is catalogued in [references.md](./references.md). Naming and vocabulary conventions are in [CONCEPTS.md](./CONCEPTS.md).
 
@@ -168,11 +175,12 @@ Improvement proposals awaiting validation live in [methodology-improvements.md](
 | `quint-mcp` | MCP server | `mcp/quint-mcp/` |
 | `lm-studio-mcp` | MCP server (local model health/listing; adversarial dispatch of local voices is via OpenCode's `lmstudio/` provider) | `mcp/lm-studio-mcp/` |
 | `colosseum-spec-adversary` | Subagent (spec attack; canonical body + per-harness wrappers) | `agents/spec-adversary-body.md` |
-| `colosseum-quint-spec-generator` | Subagent (Quint spec authoring loop; invoked directly via the Agent tool or `opencode run --agent quint-spec-generator` at workflow stage 4 — no SKILL wraps it) | `agents/quint-spec-generator-body.md` |
-| `colosseum-failure-classifier` | Subagent (verification-failure triage) | `agents/colosseum-failure-classifier.md` |
+| `colosseum-quint-spec-generator` | Subagent (Quint spec authoring loop; invoked via OMP `task`, the Claude Code Agent tool, or `opencode run --agent quint-spec-generator` at workflow stage 4; no skill wraps it) | `agents/quint-spec-generator-body.md` |
+| `colosseum-failure-classifier` | Subagent (verification-failure triage; generated Claude Code and OMP wrappers) | `agents/failure-classifier-body.md` |
 | `colosseum-intent` | SKILL (intent elicitation, forward) | `skills/colosseum-intent/` |
 | `colosseum-reverse-intent` | SKILL (intent distillation from existing code) | `skills/colosseum-reverse-intent/` |
 | `colosseum-adversarial` | SKILL (multi-voice spec attack + Quint trace generation) | `skills/colosseum-adversarial/` |
+| `omp_fanout.py` | OMP-native adversarial coordinator (route validation, preflight, failure isolation, artifact capture) | `skills/colosseum-adversarial/omp_fanout.py` |
 | `colosseum-code-adversarial` | SKILL (read implementation against intent through six lenses) | `skills/colosseum-code-adversarial/` |
 | `colosseum-lifecycle-adversary` | SKILL (multi-tx admin-feature red-team via Quint) | `skills/colosseum-lifecycle-adversary/` |
 | `colosseum-verify` | SKILL (run the verification pyramid) | `skills/colosseum-verify/` |
@@ -180,6 +188,6 @@ Improvement proposals awaiting validation live in [methodology-improvements.md](
 | `colosseum-change` | SKILL (upstream-first change loop) | `skills/colosseum-change/` |
 | `install-agents.py` | Build tool (regenerate per-harness wrappers from canonical bodies) | `scripts/install-agents.py` |
 | `colosseum_run.py` | Manifest dispatch coordinator (reference shape; per-project scripts use the same schema) | `scripts/colosseum_run.py` |
-| Coverage dashboard CLI | Deterministic tool | deferred |
+| `coverage_dashboard.py` | Deterministic G1 coverage view | `scripts/coverage_dashboard.py` |
 
 This README is the working specification of the process itself.

@@ -1,6 +1,6 @@
 ---
 name: colosseum-adversarial
-description: "Run the Colosseum spec adversary against a specification, single-voice or multi-voice. Reads the spec and the intent document. All non-Claude voices dispatch through the OpenCode CLI (opencode run --agent spec-adversary --model <provider/voice>), orchestrated by the per-project copy of opencode_dispatch.py whose canonical template lives in colosseum/scripts/. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent. There is NO MCP single-shot dispatch path; external models are called only through OpenCode so each gets an agentic ReAct loop with file access. Captures every structured report verbatim under .colosseum/attacks/ and summarizes overlap and divergence. Includes a separate Quint-adversarial trace-generation step that drives the model checker against named invariants, distinct from intent-adversarial prose critique. Use when a draft spec needs scrutiny before commitment, to re-attack a revised spec, or to mechanically check Quint invariants at milestones."
+description: "Run the Colosseum spec adversary against a specification, single-voice or multi-voice. Reads the spec and intent. OMP can fan agentic voices across its ModelRegistry through eval agent(), while OpenCode remains the calibrated reference and compatibility transport. External models never use an MCP or completion() single-shot path. Use before committing a spec or after revising one."
 ---
 
 You are orchestrating an adversarial review of a specification. The methodology rests on the claim that *the unit of trust is surviving adversarial scrutiny*, not consensus. Your job is the orchestration: locate the artifacts, dispatch one or more adversaries, capture their output verbatim, persist it, and report overlap + divergence.
@@ -9,14 +9,19 @@ You are not the adversary. You do not produce the attacks. You do not soften the
 
 ## Single-voice vs multi-voice
 
-This skill supports two modes:
+This skill supports two review sizes and three agentic transports:
 
-- **Single-voice (default)** — invoke the `colosseum-spec-adversary` subagent (Claude). Fast, free under the Claude Code subscription, no setup.
-- **Multi-voice** — invoke Claude *and* fan the same attack out to non-Claude voices via the OpenCode CLI orchestrator (gateway-routed frontier voices like `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, direct-provider voices like `openai/gpt-5.6-sol-pro` and `google/gemini-3.1-pro-preview`, and local voices like `lmstudio/qwen/qwen3.6-27b` or `ds4/deepseek-v4-flash`). Genuine family diversity, much closer to the methodology's "adversarial beats consensus" claim. Slower; cloud calls cost money.
+- **Single-voice (default)**: invoke `colosseum-spec-adversary` through OMP `task` or the Claude Code Agent tool. Record the concrete provider/model.
+- **Multi-voice**: in OMP, use the native `eval` `agent()` bridge with a per-call model override and bounded `parallel()` fan-out. OpenCode remains the calibrated reference and compatibility transport.
 
-The user selects via the `voices` parameter (a roster of explicit voice IDs, NOT bucket names — see Step 1 below). Default is `["claude-agent"]`. Recommended for routine spec milestones: `["claude-agent", "lmstudio/<one-loaded-local>"]` (Claude + local floor; free). Recommended for high-stakes spec milestones: 5–7 voices spanning `burnt/` + `lmstudio/` for family diversity (Anthropic / OpenAI-OSS / Moonshot / NVIDIA / Google / Alibaba / Mistral).
+The user selects explicit voice IDs, not buckets. The canonical profile's
+existing calibration applies to its recorded OpenCode or Claude Code route. An
+OMP-native route is a separate inference path and remains uncalibrated until a
+fitness run cites that exact route.
 
-**Anti-pattern to avoid.** Do NOT reach for any `query_*` / `fan_out_*` single-shot MCP tool as the dispatch path. Those MCP completion tools were removed from the methodology precisely because agents kept defaulting to them (their schemas surface conveniently in the harness's deferred-tool list) and because single-shot calls do no agentic work. Every non-Claude voice runs through OpenCode (Mode 1, Step 4 below) so it gets a ReAct loop with file access. If OpenCode is missing, install it; do not substitute a single-shot call.
+**Forbidden shortcut.** Do not use OMP `completion()`, `frontier-fanout`,
+`query_*`, `fan_out_*`, or any other single-shot completion path. Every voice
+must run the `colosseum-spec-adversary` agent with repository file access.
 
 ## Step 1: Locate the artifacts
 
@@ -26,25 +31,29 @@ Ask the user for, or determine from context:
 - **Path to the intent document** — the human-anchored source of truth the spec is supposed to encode. Check `<project>/.colosseum/intent.md` first (canonical per CONCEPTS.md "Project layout"), then `<project>/intent.md`, then ask.
 - **Optional context** — paths to existing tests, related specs, prior attack reports, type signatures, anything that strengthens grounding.
 - **Project root** — where `.colosseum/attacks/` should be created. Infer from the spec's location if not given.
-- **Voices to dispatch** — a roster of explicit voice IDs, NOT bucket names. Three ID shapes are valid:
-  - `claude-agent` — the Claude voice; runs in-harness via the `colosseum-spec-adversary` Agent subagent (Mode 2 below). This is the only voice that does NOT go through OpenCode.
-  - `burnt/<gateway-route>` — gateway-routed frontier voice via OpenCode (Mode 1). Current gateway roster (verify against `curl <gateway-base>/models` since the operator's roster drifts): `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b`, `burnt/cloudflare-100/@cf/openai/gpt-oss-120b`, `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash`. Note: the gateway no longer exposes Claude or Gemini routes — use direct `openai/`, `google/`, and in-harness `claude-agent` for those families instead.
-  - `lmstudio/<local-model-id>` — local LM Studio voice via OpenCode (Mode 1). Examples: `lmstudio/qwen/qwen3.6-27b`, `lmstudio/google/gemma-4-26b-a4b`, `lmstudio/mistral-small-4-119b-2603`.
+- **Voices to dispatch** — explicit registry voice IDs, never provider buckets or
+  raw model strings. `registry/voices.json` is authoritative. The canonical
+  `canonical-4` profile is:
+  1. `claude-agent`
+  2. `gpt-5.6-sol`
+  3. `glm-5.2`
+  4. `kimi-k2.6`
 
-  **Canonical 5-voice panel** (the default for non-trivial specs; each voice is the strongest variant of its family verified dispatchable at pin time — 2026-07-11 — with max thinking enabled, invoked at `--variant max` where supported; pins drift, so re-verify before milestone runs):
-  1. `claude-agent` — the harness session's Claude model, strongest available (Mode 2 in-harness Agent subagent)
-  2. `openai/gpt-5.6-sol-pro` — OpenAI frontier tier via OpenCode direct openai provider. Verified dispatchable under ChatGPT-account (Codex) auth; that auth mode rejects `openai/gpt-5.6-pro` and the retired `gpt-5.1-thinking`. API-key installs may prefer `openai/gpt-5.6-pro`. Pro-tier reasoning latency is high; budget per-call timeouts accordingly.
-  3. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot Kimi K2.6 via OpenCode through the Burnt gateway
-  4. `ds4/deepseek-v4-flash` — DeepSeek V4 Flash via OpenCode through the local ds4 provider (DwarfStar4 at `http://127.0.0.1:8000`)
-  5. `google/gemini-3.1-pro-preview` — current Gemini Pro via OpenCode direct google provider (requires `GOOGLE_GENERATIVE_AI_API_KEY`; unset means every Gemini dispatch fails with an unregistered-caller error)
+  The profile records a transport-specific route for each voice. OMP resolves
+  IDs through `.colosseum/dispatch.json`'s `omp_native.voices`; OpenCode resolves
+  the same IDs through `voices`. Never infer that equal nominal models imply
+  equal calibration.
 
-  For Lean-specific verification work, substitute the local Leanstral voice for one of the general voices (`lmstudio/leanstral-2603` — upstream discontinued 2026-06-30 in favor of Leanstral 1.5; already-downloaded weights still run, new installs should load Leanstral 1.5); do NOT include Leanstral in general adversarial spec review.
+  Use a smaller explicit subset for routine work. Reserve the full profile for
+  spec milestones or experiments that need the full panel. For Lean-specific
+  work, the separately registered `leanstral-2603` local specialist may replace
+  one general voice after adding and calibrating an OMP route; do not use a
+  theorem-prover specialist for general adversarial review.
 
-  Smaller routine panels (`["claude-agent", "ds4/deepseek-v4-flash"]` is the cheapest viable multi-voice ensemble — free, two families). Ask the user if not specified for a non-trivial spec — the multi-voice option is load-bearing and should not be silently bypassed.
-
-  Verify the exact `openai/...` and `google/...` model strings before dispatch — but note that `opencode models <provider>` lists catalog entries the provider may no longer accept (`gpt-5.1-thinking` stayed in the catalog months after the API stopped taking it). The check that counts is a one-shot probe: `opencode run --model <id> "Reply with exactly: ok"`. Provider model IDs drift; the canonical panel above pins names that need re-verification at each milestone.
-
-  **Do NOT accept bucket names** (`"openai"`, `"google"`, `"local"`, `"gateway"`) in the roster. They are ambiguous about which provider and model OpenCode should dispatch. If the user gives you a bucket name, translate it to an explicit `provider/model` voice ID before proceeding.
+  Reject bucket names such as `openai`, `google`, `local`, or `gateway`.
+  Provider inventory drifts. Confirm OMP patterns in `/model`; probe OpenCode
+  pins with `opencode run --model <id> "Reply with exactly: ok"` before a
+  milestone.
 
 If either the spec or the intent is missing, stop and ask. An adversary with no intent reference produces vague complaints rather than grounded attacks.
 
@@ -82,25 +91,111 @@ Begin by reading TARGET_SPEC at the named ranges, then produce your attack
 report per the Output structure in your system prompt.
 ```
 
-The methodology every voice operates under is the shared agent body at `agents/spec-adversary-body.md` (the canonical source that `install-agents.py` compiles into each harness wrapper), so all voices attack under identical instructions without any per-call inlining. The Claude voice (Mode 2) receives the same message shape through the Agent tool.
+Every transport uses the shared body at `agents/spec-adversary-body.md`, compiled into its harness wrapper by `install-agents.py`. OMP-native fan-out selects the generated project agent and overrides only its model per voice.
 
 ## Step 4: Dispatch the intent-adversarial voices
 
 Dispatch happens in parallel — every requested voice attacks concurrently.
 
-**Two dispatch modes. There is no MCP single-shot path.** Every non-Claude voice runs through OpenCode (Mode 1); the Claude voice runs in-harness (Mode 2). Single-shot MCP completions were removed from the methodology: they don't do agentic work (no ReAct loop, no file access, exposed to gateway timeout caps), and verified-rcv calibration showed OpenCode dispatch produces strictly better output (more attacks per voice, less hedging, no truncation). If `opencode --version` fails on the host, the fix is to install OpenCode (INSTALL §7), not to fall back to a single-shot call.
+**Three agentic transports. There is no single-shot path.**
 
-| Mode | When to use | Key property |
+| Transport | When to use | Calibration and runtime property |
 |---|---|---|
-| **1. OpenCode + spec-adversary agent (ReAct)** | Every non-Claude voice — gateway-routed (`burnt/...`), direct-provider (`openai/...`, `google/...`), and local (`lmstudio/...`, `ds4/...`). | Multi-turn ReAct loop with file access; breaks one model invocation into N HTTP requests, each under any gateway wall-time cap. |
-| **2. Claude Code Agent subagent** | The Claude voice slot in a multi-voice ensemble. | Direct in-harness; full file access; no gateway hop. |
+| **OMP-native `agent()` fan-out** | Preferred integration when OMP reaches every requested model. | One read-only project agent per voice, model selected per call, bounded parallelism, `agent://` artifacts. Route calibration is independent and currently pending. |
+| **OpenCode + `spec-adversary`** | Calibrated reference, non-OMP clients, or a model available only through OpenCode. | Multi-turn ReAct with file access, retries, finish reasons, token data, and the established benchmark path. |
+| **Claude Code Agent subagent** | In-harness Claude seat from Claude Code. | Direct file access and existing `claude-agent` calibration. |
 
-**Two orchestration shapes** layered on top of the modes above:
+OMP-native and OpenCode are explicit alternatives for a voice. Never start one
+and silently fall back to the other. A changed transport changes the recorded
+inference route and its calibration status.
 
-- **In-process** — the running Claude Code session dispatches the Claude voice as a child Agent and shells out to OpenCode for the non-Claude voices, blocks until all return, then synthesizes. No `run.json` is involved; `opencode_dispatch.py`'s own `summary.json` + verdict is the record of the non-Claude fan-out.
-- **Harness-agnostic manifest** (`scripts/colosseum_run.py`) — voices live in different harnesses (Claude voice in Claude Code via Mode 2, non-Claude voices in OpenCode via Mode 1). Each harness reads + updates a shared `run.json` manifest; the manifest is the state machine for THIS shape only. `opencode_dispatch.py` never touches `run.json`: after a dispatch batch returns, the orchestrator that invoked it marks each voice `complete`/`error` via `colosseum_run.py`. See `colosseum/scripts/README.md` for the schema, lifecycle, and CLI usage.
+Use `scripts/colosseum_run.py` when voices are split across harnesses. A wholly
+OMP-native run uses `omp_fanout.py`'s summary as its state record. OpenCode's
+`opencode_dispatch.py` retains its own `summary.json`.
 
-### Mode 1: OpenCode + spec-adversary agent (ReAct) — every non-Claude voice
+### OMP-native agent fan-out
+
+The generated `.omp/agents/colosseum-spec-adversary.md` wrapper is read-only and
+runs at maximum supported thinking. `.colosseum/dispatch.json` contains an
+`omp_native` block generated from `registry/voices.json`; each route names its
+exact OMP ModelRegistry pattern and separate calibration state.
+
+First confirm every requested pattern is reachable in OMP's `/model` picker.
+Then run the helper from an OMP Python `eval` cell:
+
+```python
+omp_fanout_ns = {}
+exec(read("skill://colosseum-adversarial/omp_fanout.py"), omp_fanout_ns)
+omp_route = omp_fanout_ns["load_omp_native_config"](
+    ".colosseum/dispatch.json",
+    selected_ids=["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"],
+)
+omp_result = omp_fanout_ns["run_omp_fanout"](
+    agent_fn=agent,
+    parallel_fn=parallel,
+    voices=omp_route["voices"],
+    project_root=omp_route["project_root"],
+    target_spec=omp_route["target_spec"],
+    prompt=attack_prompt,
+    run_dir=run_dir,
+    agent_name=omp_route["agent"],
+    metadata={
+        "profile": omp_route["profile"],
+        "route_hash": omp_route["route_hash"],
+        "calibration": omp_route["calibration"],
+        "phase": "attack",
+    },
+    allow_unverified_isolation=True,
+)
+display(omp_result)
+```
+
+The helper starts one `agent()` call per voice with
+`agent="colosseum-spec-adversary"`, the route's `model` override, a stable
+label, and `handle=True`. It writes prompts and model output verbatim, then
+writes `summary.json` last. Each parallel thunk catches its own exception, so a
+failed voice becomes an error record while surviving reports remain available.
+Verdicts match the OpenCode coordinator: `COMPLETE`, `PARTIAL`, or
+`INCOMPLETE`.
+
+**Session-root gate (fail closed).** Native dispatch refuses unless (1) the
+caller passes `allow_unverified_isolation=True` and (2) OMP was launched inside
+`project_root`. The helper reads the session cwd from the documented
+`PI_SESSION_FILE` header (`omp://session.md`: the first `type: "session"`
+entry's absolute `cwd`) and refuses, before any `agent()` call, when it is
+missing, malformed, or does not match `project_root`. Unlike the OpenCode Z2
+worktree, this path does **not** confine the subagent filesystem: a matching
+root only ensures relative reads and agent discovery resolve in the project.
+Every run stamps `isolation: {"status": "unverified", …}` into
+`meta.json`/`summary.json`; never upgrade that label to a containment claim
+until OMP exposes a mechanical isolation boundary.
+
+`parallel()` is bounded by OMP's `task.maxConcurrency`. Every result retains an
+`agent://` handle for inspection during the live session and a content hash for
+the permanent raw file. OMP's bridge does not currently expose a provider
+finish reason, so native summaries record it as `null`, never infer `stop`.
+
+Before creating prompts, the helper scans the live agent-visible project tree
+for secret-named files, private-key material, and escaping symlinks. A violation
+creates only a blocked `preflight.json`; no model is called. The target spec
+must resolve inside the project, its SHA-256 is bound into the preflight record,
+and the run directory must be a new child of `.colosseum/attacks/`.
+The helper re-hashes the target after the wave. Concurrent target drift forces
+the run verdict to `INCOMPLETE` even when every voice returned a report.
+
+For cross-critique or defense, pass `prompt_by_voice={voice_id: prompt}` instead
+of one shared `prompt` and use a new run directory with `metadata.phase` set to
+`critique`, `defense`, or `re-critique`. This gives each wave the same
+failure-isolated artifact contract.
+
+All currently registered OMP routes have `omp_calibration: pending`. They are
+usable for experimental runs but must be reported as uncalibrated. OpenCode
+remains the canonical milestone transport until the blinded benchmark covers
+OMP-native routes.
+
+### OpenCode + spec-adversary agent (ReAct)
+
+Use the OpenCode transport when calibration or provider reachability requires it.
 
 Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adversary.md` (a generated wrapper; the canonical body is `colosseum/agents/spec-adversary-body.md`, compiled by `install-agents.py build` — never hand-edit the wrapper) → installed via `colosseum/scripts/install-agents.py install --harness opencode --target <project>/.opencode/agent/` into the project's `.opencode/agent/` directory. The agent reads the target spec on demand via OpenCode's Read tool (`permission.read: allow`); the invocation message names a `TARGET_SPEC` path plus an optional `TARGET_SLICE` for per-section dispatch.
 
@@ -135,7 +230,7 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 - **Excluded** (do NOT dispatch): `glm-4.7-flash`, `goedel-prover-v2-32b` — see `registry/voices.json` for the calibration evidence behind each exclusion.
 <!-- END GENERATED: voice-roster -->
 
-The gateway no longer exposes Anthropic routes; the Claude voice always runs in-harness via Mode 2.
+The gateway no longer exposes Anthropic routes; Claude runs through OMP-native fan-out or the Claude Code Agent transport.
 
 **Required configuration in `opencode.jsonc`**: set `limit.output ≥ 65536` (recommend `131072`) per gateway model so Turn 2's analysis response budget never hits a cap mid-report. With the default 16K cap, thorough reasoning models truncate mid-sentence and the orchestrator's retry loop fires; raising to 64K+ makes that pattern disappear.
 
@@ -150,17 +245,21 @@ ReAct mode caught **5 attacks on state-invariants** (S5/S6/S9/S10 + Block 6 set-
 
 **Failure mode to expect** (under-budgeted): "first attempt fails, retry succeeds" pattern when output cap is at 16K. The model writes its complete report up to the cap and gets cut off; the orchestrator's retry hits a more concise sampling path. Raising the cap eliminates the retries.
 
-### Mode 2: Claude Code Agent subagent — the Claude voice
+### Claude Code in-harness subagent
 
-Invoke the `colosseum-spec-adversary` subagent (at `colosseum/agents/colosseum-spec-adversary.md`) via the Agent tool. The same canonical body powers it; the Claude Code frontmatter (`tools: Read, Grep, Glob, Bash`) gives it full file-access.
+Invoke `colosseum-spec-adversary` through the Claude Code Agent tool. Its wrapper
+exposes read-only file access plus safe diagnostics through Bash.
 
-Claude operates with native tool access; the inlined prompt body is supplemental, not the only input. This subagent can re-read files, check related code, run diagnostics. No gateway hop, no Bug 3 / Bug 4 exposure.
+The `claude-agent` canonical seat requires the calibrated Claude Code route.
+An OMP-native Claude call records its concrete `omp_model` and pending native
+calibration rather than borrowing the Claude Code calibration.
 
-This is the canonical Claude voice for multi-model ensembles. Run it via the Agent tool in parallel with the OpenCode voices; results are captured as the Agent tool's returned text.
+### No single-shot fallback
 
-### There is no Mode 3 (no MCP single-shot fallback)
-
-Single-shot MCP dispatch was removed from the methodology. External models are called only through OpenCode, so every voice gets an agentic ReAct loop with file access. The gateway/provider MCP dispatch tools (`query_gateway`, `query_openai`, `query_google`, `fan_out_query`) no longer exist — if you find yourself searching the deferred-tool list for them, **stop**. The lm-studio server's `fan_out_local`/`query_local` tools DO still exist, but they are a local-model query helper, never an adversarial-dispatch path: do not use them to run a voice in this skill. The only dispatch paths are Mode 1 (OpenCode) and Mode 2 (the Claude Agent subagent).
+External voices run only through the OMP `agent()` bridge or OpenCode. OMP
+`completion()`, `frontier-fanout`, and the lm-studio MCP's `fan_out_local` and
+`query_local` helpers are not adversarial dispatch paths because they do not run
+the repository-aware adversary agent.
 
 If OpenCode is not installed on the host, install it (INSTALL §7) before running a multi-voice pass. There is no degraded single-shot mode to fall back to.
 
@@ -268,29 +367,26 @@ Both produce trace deliverables in the same format. Use whichever skill matches 
 
 ## Step 6: Persist verbatim
 
-Create the directory `<project>/.colosseum/attacks/<spec-basename>-<ISO-timestamp>/` if multi-model, or use the flat `.colosseum/attacks/<spec-basename>-<ISO-timestamp>.md` file if single-model.
+Use a new `<project>/.colosseum/attacks/<spec-basename>-<ISO-timestamp>/`
+directory for every multi-model run. Never overwrite or edit a per-model report.
 
-Multi-model layout:
+OMP-native layout is written by `omp_fanout.py`:
 
 ```
-.colosseum/attacks/<spec-basename>-<ISO-timestamp>/
-├── meta.md                  # header with paths, round number, voices dispatched
-│                            # — REQUIRED per voice: full model id (e.g.
-│                            # `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`,
-│                            # not just "kimi"), provider family (Anthropic /
-│                            # OpenAI / Google / Moonshot / NVIDIA / Mistral /
-│                            # Alibaba / etc.), and finish_reason ({stop,
-│                            # length, error}). Gateway ids drift between
-│                            # sessions, so the exact pin is what makes the
-│                            # run reproducible.
-├── claude-agent.md          # the Claude voice's verbatim report (Mode 2)
-├── opencode-<voice-id>.md   # one per OpenCode voice, slug from the voice id
-│                            # (e.g. `opencode-kimi-k2.6.md`,
-│                            # `opencode-gpt-5.6-sol-pro.md`); produced by
-│                            # opencode_dispatch.py's per-voice aggregation
-└── synthesis.md             # YOUR overlap/divergence summary (clearly marked
-                             # as orchestrator output, NOT a model output)
+.colosseum/attacks/<run>/
+├── preflight.json           # project path, target path + hash, scan verdict
+├── meta.json                # route, phase, agent, requested voices
+├── prompts/<voice-id>.md    # exact prompt per voice
+├── raw/omp-<voice-id>.md    # verbatim successful report
+├── raw/omp-<voice-id>.error.txt
+└── summary.json             # COMPLETE / PARTIAL / INCOMPLETE + per-voice metadata
 ```
+
+OpenCode writes its documented `per-section/`, `opencode-<voice-id>.md`,
+`dispatch.log`, `preflight.json`, and `summary.json` layout. Mixed-harness runs
+use `colosseum_run.py` for the shared `run.json` state record and retain each
+transport's native artifacts. Synthesis is always orchestrator output and goes
+in `synthesis.md`, never into a raw report.
 
 Single-model layout (unchanged from prior version):
 
@@ -298,7 +394,7 @@ Single-model layout (unchanged from prior version):
 .colosseum/attacks/<spec-basename>-<ISO-timestamp>.md
 ```
 
-Each per-model file starts with a small metadata header:
+For manually persisted or OpenCode-aggregated reports, each per-model file starts with a small metadata header:
 
 ```markdown
 # Adversarial review: <spec-basename>  —  <provider> (<model id>)
@@ -307,12 +403,14 @@ Each per-model file starts with a small metadata header:
 - Intent document: <absolute path>
 - Reviewed at: <ISO timestamp>
 - Round: <N>
-- Model id: <exact id, e.g. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6`, `openai/gpt-5.6-sol-pro`, `lmstudio/qwen/qwen3.6-27b`>
-- Provider family: <Anthropic / Google / OpenAI / Mistral / Alibaba / Moonshot / NVIDIA / DeepSeek / etc.>
-- Inference seat: <claude-agent (in-harness) / opencode-gateway / opencode-direct / opencode-lmstudio / opencode-ds4>
+- Voice id: <registry id, e.g. `kimi-k2.6` or `gpt-5.6-sol`>
+- Model id: <exact transport model, e.g. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` or `openai-codex/gpt-5.6-sol`>
+- Provider family: <Anthropic / Google / OpenAI / Mistral / Moonshot / NVIDIA / DeepSeek / etc.>
+- Inference seat: <omp-native / claude-code / opencode-gateway / opencode-direct / opencode-lmstudio / opencode-ds4>
+- Calibration: <exact route evidence citation | pending>
 - Elapsed (s): <float>
-- Finish reason: <stop | length | error | tool_use>
-- variant: <max | high | none>
+- Finish reason: <stop | length | error | tool_use | null when the transport does not expose it>
+- Variant or thinking level: <max | high | none>
 
 ---
 
@@ -434,13 +532,13 @@ that the intent requires? Ground every claim in quoted text.
 
 Independent rediscovery corroborates and raises priority; it does not close. Inlining the suspected conclusion converts the reviewer into a confirmation oracle and voids the round.
 
-**Dispatch.** Canonical template: `colosseum/scripts/critique_dispatch.py` (promoted from the verified-rcv prototypes) — config-driven cross-critique pairs, defense triples, and re-critique rounds through `opencode run`, at max reasoning variant, with the blinding rules baked into the prompt builders. Record each round as its own run: `colosseum_run.py init --phase critique|defense|re-critique` stamps the phase into `run.json` so rounds are distinguishable in the project history.
+**Dispatch.** OpenCode uses `colosseum/scripts/critique_dispatch.py` for config-driven cross-critique pairs, defense triples, and re-critique rounds with blinding in its prompt builders. OMP-native runs pass the same blinded per-reviewer prompts through `omp_fanout.py`'s `prompt_by_voice` argument and use a fresh run directory per phase. When a run spans transports, `colosseum_run.py init --phase critique|defense|re-critique` stamps the phase into shared `run.json` state.
 
 ## Step 8: Summarize for the user
 
 After persisting, report:
 
-- One-line per-voice verdict summary using explicit voice IDs (NOT bucket names): `claude-agent: BREAKS (3 critical, 5 serious) | openai/gpt-5.6-sol-pro: BREAKS (2 critical) | burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6: SURVIVES | ds4/deepseek-v4-flash: BREAKS (1 critical) | google/gemini-3.1-pro-preview: BREAKS (2 critical)`
+- One-line per-voice verdict summary using explicit registry IDs: `claude-agent: BREAKS (3 critical, 5 serious) | gpt-5.6-sol: BREAKS (2 critical) | kimi-k2.6: SURVIVES | glm-5.2: BREAKS (1 critical)`
 - **Shared-finding count** — bugs surfaced by ≥2 models (high signal)
 - **Unique-finding count** per model — blind-spot escapes
 - The absolute path to the saved report directory (or single file)

@@ -10,9 +10,7 @@ Each agent in the AGENTS table below names its own canonical body (a
 frontmatter-free `*-body.md` under `colosseum/agents/`) and, per harness, the
 frontmatter and dist path for its wrapper. A dist (wrapper) file is built by
 stripping the body's leading editor-instruction comment and prepending that
-harness's frontmatter. Current agents: `spec-adversary` (spec-adversary-body.md)
-and `quint-spec-generator` (quint-spec-generator-body.md), each with a
-Claude Code and an OpenCode wrapper.
+harness's frontmatter. Current harnesses are Claude Code, OpenCode, and OMP.
 
 USAGE
 
@@ -30,6 +28,9 @@ USAGE
 
     install-agents.py install --harness claude-code --target ~/.claude/agents/ [--agent <name>]
         Copy an agent's Claude Code dist file into a Claude Code agents directory.
+
+    install-agents.py install --harness omp --target <project>/.omp/agents/ [--agent <name>]
+        Copy an agent's OMP dist file into a project's native OMP agents directory.
 
 To add an agent, extend AGENTS below with its canonical_body and per-harness
 frontmatter + dist_path.
@@ -93,6 +94,18 @@ permission:
 ---
 """,
             },
+            "omp": {
+                "dist_path": "omp/colosseum-spec-adversary.md",
+                "frontmatter": """\
+---
+name: colosseum-spec-adversary
+description: Adversarial reviewer for specifications. Reads the target specification and its intent, then returns grounded under-specification, over-specification, ambiguity, coverage, contradiction, edge-case, and composition findings. Use before committing a Quint module, Lean theorem statement, Verus annotation, type invariant, or property-test specification.
+tools: [read, grep, glob]
+read-summarize: false
+thinking-level: max
+---
+""",
+            },
         },
     },
     "quint-spec-generator": {
@@ -145,6 +158,43 @@ permission:
   websearch: deny
   external_directory: deny
   doom_loop: deny
+---
+""",
+            },
+            "omp": {
+                "dist_path": "omp/colosseum-quint-spec-generator.md",
+                "frontmatter": """\
+---
+name: colosseum-quint-spec-generator
+description: Generate a Quint protocol specification from a validated intent document. Writes only the requested specification output, runs Quint checks, and reports model-checking and reachability results. Use after intent validation and before implementation.
+tools: [read, grep, glob, bash, write, edit]
+read-summarize: false
+---
+""",
+            },
+        },
+    },
+    "failure-classifier": {
+        "canonical_body": "failure-classifier-body.md",
+        "harnesses": {
+            "claude-code": {
+                "dist_path": "colosseum-failure-classifier.md",
+                "frontmatter": """\
+---
+name: colosseum-failure-classifier
+description: Classify a verification failure as spec-wrong, code-wrong, prover-stuck, tool-mismatch, state-space-blowup, infrastructure, or INDETERMINATE. Returns grounded reasoning and one next action. Use whenever a verification-pyramid layer fails.
+tools: Read, Grep, Glob, Bash
+---
+""",
+            },
+            "omp": {
+                "dist_path": "omp/colosseum-failure-classifier.md",
+                "frontmatter": """\
+---
+name: colosseum-failure-classifier
+description: Classify a verification failure as spec-wrong, code-wrong, prover-stuck, tool-mismatch, state-space-blowup, infrastructure, or INDETERMINATE. Returns grounded reasoning and one next action. Use whenever a verification-pyramid layer fails.
+tools: [read, grep, glob, bash]
+read-summarize: false
 ---
 """,
             },
@@ -248,7 +298,7 @@ def main() -> int:
     sub.add_parser("build")
     sub.add_parser("lint")
     sp_install = sub.add_parser("install")
-    sp_install.add_argument("--harness", required=True, choices=["claude-code", "opencode"])
+    sp_install.add_argument("--harness", required=True, choices=["claude-code", "opencode", "omp"])
     sp_install.add_argument("--target", required=True, type=Path)
     sp_install.add_argument("--agent", default="spec-adversary")
     args = ap.parse_args()

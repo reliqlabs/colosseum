@@ -4,27 +4,22 @@
 # dependencies = []
 # ///
 """
-colosseum_init — scaffold a project for the Colosseum adversarial/verify loop (C4).
+colosseum_init - scaffold a project for the Colosseum adversarial/verify loop (C4).
 
-    colosseum_init.py <project-path> [--target-spec PATH] [--force]
+    colosseum_init.py <project-path> [--target-spec PATH]
+        [--harness claude-code|omp] [--force]
 
-Creates the standard project layout and drops in the canonical dispatch machinery:
+Every harness receives the canonical `.colosseum/` evidence directories,
+OpenCode adversarial agents, and dispatch machinery. `--harness omp` also
+installs project-local OMP agents and skills, then merges the Colosseum MCP
+servers into `.omp/mcp.json`.
 
-    <project>/.colosseum/
-        attacks/     verify/     evidence/     scripts/
-        scripts/opencode_dispatch.py     (copied from the repo canonical)
-        dispatch.json                    (from dispatch.config.example.json,
-                                          project_root + target_spec filled in)
-    <project>/.opencode/agent/
-        spec-adversary.md    quint-spec-generator.md   (via install-agents.py)
+Idempotent: an existing owned file or directory is never clobbered without
+`--force`. OMP MCP installation is additive: unrelated server definitions are
+preserved, missing Colosseum servers are added, and `--force` replaces only
+conflicting Colosseum server definitions.
 
-Idempotent: an existing file is never clobbered without --force; a re-run skips
-what is already present and fills in what is missing. --force overwrites.
-
-After scaffolding it prints the two manual steps init deliberately does not take:
-registering the Claude Code agents into ~/.claude/agents, and running the doctor.
-
-Exit 0 on success, 1 on a scaffold error (e.g. install-agents failed).
+Exit 0 on success, 1 on a scaffold error.
 """
 from __future__ import annotations
 
@@ -36,10 +31,23 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-DISPATCH_SRC = REPO / "scripts" / "opencode_dispatch.py"
+PROJECT_SCRIPT_NAMES = (
+    "opencode_dispatch.py",
+    "check_ledger_references.py",
+    "check_evidence_records.py",
+)
 CONFIG_EXAMPLE = REPO / "scripts" / "dispatch.config.example.json"
+OMP_MCP_TEMPLATE = REPO / "templates" / "omp-mcp.json"
 INSTALL_AGENTS = REPO / "scripts" / "install-agents.py"
-OPENCODE_AGENTS = ("spec-adversary", "quint-spec-generator")
+OPENCODE_AGENT_FILES = {
+    "spec-adversary": "spec-adversary.md",
+    "quint-spec-generator": "quint-spec-generator.md",
+}
+OMP_AGENT_FILES = {
+    "spec-adversary": "colosseum-spec-adversary.md",
+    "quint-spec-generator": "colosseum-quint-spec-generator.md",
+    "failure-classifier": "colosseum-failure-classifier.md",
+}
 
 
 def _put(path: Path, content: str, force: bool, results: list[tuple[str, Path]]) -> None:
@@ -52,6 +60,17 @@ def _put(path: Path, content: str, force: bool, results: list[tuple[str, Path]])
     results.append(("overwrote" if existed else "wrote", path))
 
 
+def _copy_owned_file(source: Path, dest: Path, force: bool,
+                     results: list[tuple[str, Path]]) -> None:
+    existed = dest.exists()
+    if existed and not force:
+        results.append(("skip", dest))
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, dest)
+    results.append(("overwrote" if existed else "wrote", dest))
+
+
 def build_dispatch_json(project: Path, target_spec: Path) -> str:
     cfg = json.loads(CONFIG_EXAMPLE.read_text())
     cfg["project_root"] = str(project)
@@ -59,24 +78,135 @@ def build_dispatch_json(project: Path, target_spec: Path) -> str:
     return json.dumps(cfg, indent=2, ensure_ascii=False) + "\n"
 
 
-def install_opencode_agents(project: Path, force: bool,
+def install_dispatch_config(project: Path, target_spec: Path, force: bool,
                             results: list[tuple[str, Path]]) -> list[str]:
+    """Install the shared config, additively introducing OMP-native routes."""
     errors: list[str] = []
-    agent_dir = project / ".opencode" / "agent"
-    for agent in OPENCODE_AGENTS:
-        dest = agent_dir / f"{agent}.md"
+    dest = project / ".colosseum" / "dispatch.json"
+    canonical = json.loads(build_dispatch_json(project, target_spec))
+    if not dest.exists():
+        dest.write_text(json.dumps(canonical, indent=2, ensure_ascii=False) + "\n")
+        results.append(("wrote", dest))
+        return errors
+    if force:
+        dest.write_text(json.dumps(canonical, indent=2, ensure_ascii=False) + "\n")
+        results.append(("overwrote", dest))
+        return errors
+    try:
+        current = json.loads(dest.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        results.append(("skip", dest))
+        print(f"WARN: {dest}: invalid JSON ({exc}); preserved; use --force to replace it",
+              file=sys.stderr)
+        return errors
+
+    changed = False
+    for key in ("omp_native", "_comment_omp_native"):
+        if key not in current:
+            current[key] = canonical[key]
+            changed = True
+    if changed:
+        dest.write_text(json.dumps(current, indent=2, ensure_ascii=False) + "\n")
+        results.append(("updated", dest))
+    else:
+        results.append(("skip", dest))
+    return errors
+
+
+def install_agents(project: Path, harness: str, relative_dir: Path,
+                   agent_files: dict[str, str], force: bool,
+                   results: list[tuple[str, Path]]) -> list[str]:
+    errors: list[str] = []
+    agent_dir = project / relative_dir
+    for agent, filename in agent_files.items():
+        dest = agent_dir / filename
         existed = dest.exists()
         if existed and not force:
             results.append(("skip", dest))
             continue
         proc = subprocess.run(
             ["uv", "run", "--script", str(INSTALL_AGENTS), "install",
-             "--harness", "opencode", "--target", str(agent_dir), "--agent", agent],
+             "--harness", harness, "--target", str(agent_dir), "--agent", agent],
             capture_output=True, text=True)
         if proc.returncode != 0:
-            errors.append(f"install-agents {agent}: {(proc.stderr or proc.stdout).strip()}")
+            errors.append(f"install-agents {harness}/{agent}: "
+                          f"{(proc.stderr or proc.stdout).strip()}")
         else:
             results.append(("overwrote" if existed else "wrote", dest))
+    return errors
+
+
+def _remove_owned_path(path: Path) -> None:
+    if path.is_symlink() or not path.is_dir():
+        path.unlink()
+    else:
+        shutil.rmtree(path)
+
+
+def install_omp_skills(project: Path, force: bool,
+                       results: list[tuple[str, Path]]) -> None:
+    skills_dir = project / ".omp" / "skills"
+    for source in sorted((REPO / "skills").glob("colosseum-*")):
+        if not (source / "SKILL.md").is_file():
+            continue
+        dest = skills_dir / source.name
+        existed = dest.exists() or dest.is_symlink()
+        if existed and not force:
+            results.append(("skip", dest))
+            continue
+        if existed:
+            _remove_owned_path(dest)
+        shutil.copytree(source, dest)
+        results.append(("overwrote" if existed else "wrote", dest))
+
+
+def install_omp_mcp(project: Path, force: bool,
+                    results: list[tuple[str, Path]]) -> list[str]:
+    errors: list[str] = []
+    dest = project / ".omp" / "mcp.json"
+    canonical = json.loads(OMP_MCP_TEMPLATE.read_text())
+    existed = dest.exists()
+    if not existed:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(json.dumps(canonical, indent=2) + "\n")
+        results.append(("wrote", dest))
+        return errors
+
+    try:
+        current = json.loads(dest.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        if not force:
+            errors.append(f"{dest}: invalid JSON ({exc}); use --force to replace it")
+            return errors
+        dest.write_text(json.dumps(canonical, indent=2) + "\n")
+        results.append(("overwrote", dest))
+        return errors
+
+    servers = current.get("mcpServers")
+    if not isinstance(servers, dict):
+        if not force:
+            errors.append(f"{dest}: mcpServers is not an object; use --force to replace it")
+            return errors
+        current["mcpServers"] = {}
+        servers = current["mcpServers"]
+
+    changed = False
+    if "$schema" not in current:
+        current["$schema"] = canonical["$schema"]
+        changed = True
+    for name, config in canonical["mcpServers"].items():
+        if name not in servers:
+            servers[name] = config
+            changed = True
+        elif force and servers[name] != config:
+            servers[name] = config
+            changed = True
+
+    if changed:
+        dest.write_text(json.dumps(current, indent=2) + "\n")
+        results.append(("updated" if existed else "wrote", dest))
+    else:
+        results.append(("skip", dest))
     return errors
 
 
@@ -86,12 +216,21 @@ def main() -> int:
     ap.add_argument("--target-spec", type=Path, default=None,
                     help="path to the spec/intent to attack "
                          "(default: <project>/.colosseum/intent.md)")
-    ap.add_argument("--force", action="store_true", help="overwrite existing files")
+    ap.add_argument("--harness", choices=("claude-code", "omp"),
+                    default="claude-code",
+                    help="primary in-harness agent runtime (default: claude-code)")
+    ap.add_argument("--force", action="store_true",
+                    help="replace owned files and conflicting Colosseum OMP entries")
     args = ap.parse_args()
 
     project = args.project.resolve()
-    if not DISPATCH_SRC.exists() or not CONFIG_EXAMPLE.exists():
-        print(f"FATAL: repo canonical files missing under {REPO / 'scripts'}", file=sys.stderr)
+    project_scripts = [REPO / "scripts" / name for name in PROJECT_SCRIPT_NAMES]
+    required = [*project_scripts, CONFIG_EXAMPLE, INSTALL_AGENTS]
+    if args.harness == "omp":
+        required.append(OMP_MCP_TEMPLATE)
+    missing = [path for path in required if not path.exists()]
+    if missing:
+        print(f"FATAL: canonical files missing: {missing}", file=sys.stderr)
         return 1
     project.mkdir(parents=True, exist_ok=True)
     target_spec = (args.target_spec.resolve() if args.target_spec
@@ -103,14 +242,22 @@ def main() -> int:
     for sub in ("attacks", "verify", "evidence", "scripts"):
         (project / ".colosseum" / sub).mkdir(parents=True, exist_ok=True)
 
-    # Canonical dispatch script + project config.
-    _put(project / ".colosseum" / "scripts" / "opencode_dispatch.py",
-         DISPATCH_SRC.read_text(), args.force, results)
-    _put(project / ".colosseum" / "dispatch.json",
-         build_dispatch_json(project, target_spec), args.force, results)
+    # Canonical project scripts + dispatch config.
+    for source in project_scripts:
+        _copy_owned_file(source, project / ".colosseum" / "scripts" / source.name,
+                         args.force, results)
+    errors = install_dispatch_config(project, target_spec, args.force, results)
 
-    # Both OpenCode agents.
-    errors = install_opencode_agents(project, args.force, results)
+    # OpenCode remains the calibrated reference and compatibility transport.
+    errors.extend(install_agents(
+        project, "opencode", Path(".opencode/agent"),
+        OPENCODE_AGENT_FILES, args.force, results))
+    if args.harness == "omp":
+        errors.extend(install_agents(
+            project, "omp", Path(".omp/agents"),
+            OMP_AGENT_FILES, args.force, results))
+        install_omp_skills(project, args.force, results)
+        errors.extend(install_omp_mcp(project, args.force, results))
 
     # Report.
     for action, path in results:
@@ -126,15 +273,27 @@ def main() -> int:
     if not args.target_spec:
         print(f"  target_spec defaults to {target_spec} — author it "
               f"(colosseum-intent / colosseum-reverse-intent) or re-run with --target-spec.")
-    print("\nNext steps (init does NOT do these):")
-    print(f"  1. Register the Claude Code agents (the claude-agent voice + failure classifier):")
-    print(f"       {INSTALL_AGENTS.relative_to(REPO) if INSTALL_AGENTS.is_relative_to(REPO) else INSTALL_AGENTS} "
-          f"install --harness claude-code --target ~/.claude/agents/")
-    print(f"       (and symlink the skills per INSTALL.md §9)")
-    print(f"  2. Edit .colosseum/dispatch.json: set run_tag_prefix, the voices roster "
-          f"(from registry/voices.json), and the slice plan.")
-    print(f"  3. Run the doctor against this project:")
-    print(f"       scripts/colosseum_doctor.py --project {project}")
+    print("\nNext steps:")
+    if args.harness == "omp":
+        print(f"  1. Export COLOSSEUM={REPO} before starting OMP; also export "
+              "VERUS_BIN, CHARON_BIN, and AENEAS_BIN for those optional layers.")
+        print("  2. Start OMP in the project, run `/mcp reload`, then `/mcp test` "
+              "for each installed server.")
+        print("  3. Invoke skills as `/skill:colosseum-intent`, "
+              "`/skill:colosseum-verify`, and similar.")
+        next_step = 4
+    else:
+        print("  1. Register the Claude Code agents and symlink the skills per INSTALL.md §9.")
+        next_step = 2
+    if args.harness == "omp":
+        print(f"  {next_step}. Confirm omp_native patterns in `/model`; edit "
+              "run_tag_prefix and slices in .colosseum/dispatch.json.")
+    else:
+        print(f"  {next_step}. Edit .colosseum/dispatch.json: set run_tag_prefix, "
+              "voices, and slices.")
+    print(f"  {next_step + 1}. Run the doctor against this project:")
+    doctor_flags = " --skip-home-drift" if args.harness == "omp" else ""
+    print(f"       scripts/colosseum_doctor.py --project {project}{doctor_flags}")
 
     return 1 if errors else 0
 

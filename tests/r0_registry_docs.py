@@ -84,6 +84,20 @@ def main() -> int:
             check(f"pending voice {v['id']} is not canonical-panel",
                   status in ("candidate", "local-specialist", "excluded"), status)
     check("at least one canonical-panel voice exists", n_canon >= 1, f"{n_canon} found")
+    omp_mapped = [v for v in reg["voices"] if v.get("omp_model")]
+    for v in omp_mapped:
+        check(f"OMP route {v['id']} has separate calibration",
+              isinstance(v.get("omp_calibration"), str) and bool(v["omp_calibration"]))
+    canonical = gen.profile_by_name(reg, "canonical-4")
+    canonical_voices = [gen.voice_by_id(reg, pv["id"]) for pv in canonical["voices"]]
+    check("every canonical voice has an OMP-native route",
+          all(v.get("omp_model") for v in canonical_voices))
+
+    native_route = gen.render_omp_native_config(reg)
+    check("OMP-native route hash recomputes",
+          native_route["route_hash"] == gen.omp_route_hash(native_route))
+    check("OMP-native route remains explicitly uncalibrated",
+          native_route["calibration"] == "pending")
 
     # A deliberately-broken clone must be caught (the invariant validates something).
     bad = json.loads(REGISTRY.read_text())
@@ -122,15 +136,45 @@ def main() -> int:
         check("dispatch.json voices come from the registry (canonical-4 opencode set)",
               [v["id"] for v in cfg["voices"]]
               == ["gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
+        check("dispatch.json carries canonical OMP-native membership",
+              [v["id"] for v in cfg["omp_native"]["voices"]]
+              == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
+        check("dispatch.json OMP route hash is content-addressed",
+              cfg["omp_native"]["route_hash"]
+              == gen.omp_route_hash(cfg["omp_native"]))
 
-        # Idempotence: corrupt a file, re-run without --force -> untouched (skipped).
+        # Additive migration: preserve project config while filling a missing
+        # OMP-native block.
         djson = proj / ".colosseum" / "dispatch.json"
-        djson.write_text('{"corrupted": true}\n')
+        migrated = json.loads(djson.read_text())
+        migrated.pop("omp_native")
+        migrated.pop("_comment_omp_native")
+        migrated["project_local"] = {"keep": True}
+        djson.write_text(json.dumps(migrated) + "\n")
+        pm = run(["uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+                  str(proj)])
+        migrated = json.loads(djson.read_text())
+        check("init additively installs missing OMP-native routes",
+              pm.returncode == 0 and "omp_native" in migrated)
+        check("OMP-native migration preserves project config",
+              migrated.get("project_local") == {"keep": True})
+
+        # Idempotence: once the native block exists, preserve project changes.
+        migrated["project_local"] = {"changed": True}
+        djson.write_text(json.dumps(migrated) + "\n")
+        before = djson.read_text()
         p2 = run(["uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"), str(proj)])
         check("init run 2 (no --force) exits 0", p2.returncode == 0, p2.stderr[-200:])
-        check("init run 2 did not clobber the existing file", "skip" in p2.stdout)
-        check("idempotent run left the corrupted file untouched",
-              json.loads(djson.read_text()) == {"corrupted": True})
+        check("idempotent run preserves the complete project config",
+              djson.read_text() == before)
+
+        djson.write_text("{invalid\n")
+        p_bad = run(["uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+                     str(proj)])
+        check("invalid project config is preserved with a warning",
+              p_bad.returncode == 0
+              and djson.read_text() == "{invalid\n"
+              and "WARN:" in p_bad.stderr)
 
         # --force restores canonical content.
         p3 = run(["uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),

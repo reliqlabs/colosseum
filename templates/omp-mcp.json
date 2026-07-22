@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "mcpServers": {
+    "kani": {
+      "type": "stdio",
+      "command": "${COLOSSEUM}/mcp/kani-mcp/kani_mcp.py"
+    },
+    "quint": {
+      "type": "stdio",
+      "command": "${COLOSSEUM}/mcp/quint-mcp/quint_mcp.py"
+    },
+    "verus": {
+      "type": "stdio",
+      "command": "${COLOSSEUM}/mcp/verus-mcp/verus_mcp.py",
+      "env": {
+        "VERUS_BIN": "${VERUS_BIN}"
+      }
+    },
+    "aeneas": {
+      "type": "stdio",
+      "command": "${COLOSSEUM}/mcp/aeneas-mcp/aeneas_mcp.py",
+      "env": {
+        "CHARON_BIN": "${CHARON_BIN}",
+        "AENEAS_BIN": "${AENEAS_BIN}"
+      }
+    },
+    "goedel": {
+      "type": "stdio",
+      "command": "${COLOSSEUM}/mcp/goedel-mcp/goedel_mcp.py"
+    },
+    "lm-studio": {
+      "type": "stdio",
+      "command": "${COLOSSEUM}/mcp/lm-studio-mcp/lm_studio_mcp.py"
+    }
+  }
+}

@@ -51,6 +51,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="r13-") as td:
         repo = Path(td)
         (repo / "agents" / "opencode").mkdir(parents=True)
+        (repo / "agents" / "omp").mkdir(parents=True)
 
         bad = repo / "skills" / "bad-colon" / "SKILL.md"
         bad.parent.mkdir(parents=True)
@@ -77,6 +78,13 @@ def main() -> int:
               code == 1 and "permission block" in out)
         check("self-test: deprecated tools booleans caught",
               "deprecated tools booleans" in out)
+
+        omp_wrapper = repo / "agents" / "omp" / "old-agent.md"
+        omp_wrapper.write_text(
+            "---\nname: old-agent\ndescription: fine\ntools: [Read, Grep]\n---\nbody\n")
+        code, out = run_validator(repo)
+        check("self-test: uppercase OMP tool ids caught",
+              code == 1 and "lowercase OMP tool ids" in out)
 
     print()
     if FAILURES:

@@ -19,6 +19,7 @@ must pass:
                  by design)
   agents/opencode/ `permission` block present, deprecated `tools` absent
                  (the Z1 deny-first contract)
+  agents/omp/    `name` present and `tools` is a lowercase OMP tool-id list
 
 USAGE
     validate_frontmatter.py [--repo <path>]
@@ -82,6 +83,17 @@ def validate(path: Path, kind: str, failures: list[str]) -> None:
             fail("opencode agent missing deny-first permission block (Z1)")
         if "tools" in data:
             fail("opencode agent still uses deprecated tools booleans")
+    elif kind == "omp-agent":
+        if not isinstance(data.get("name"), str):
+            fail("OMP agent name missing")
+        tools = data.get("tools")
+        if not isinstance(tools, list) or not tools or not all(
+                isinstance(tool, str) for tool in tools):
+            fail("OMP agent tools must be a non-empty string list")
+        elif any(not re.match(r"^[a-z][a-z0-9_-]*$", tool) for tool in tools):
+            fail("OMP agent tools must use lowercase OMP tool ids")
+        if "read-summarize" in data and not isinstance(data["read-summarize"], bool):
+            fail("OMP agent read-summarize must be boolean")
 
 
 def main() -> int:
@@ -103,6 +115,9 @@ def main() -> int:
     for path in sorted((repo / "agents" / "opencode").glob("*.md")):
         n += 1
         validate(path, "opencode-agent", failures)
+    for path in sorted((repo / "agents" / "omp").glob("*.md")):
+        n += 1
+        validate(path, "omp-agent", failures)
 
     print(f"validated {n} file(s)")
     for f in failures:

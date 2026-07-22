@@ -18,10 +18,10 @@ between explicit markers, leaving the surrounding prose untouched:
                    (a first-time conversion adds them by hand); a missing
                    marker pair is an error, never a silent skip.
 
-  dispatch.config.example.json   the `voices` array and the
-                   `_comment_excluded_voices` string are regenerated from the
-                   registry; every other key is preserved. The file is
-                   re-serialized deterministically so `--check` is stable.
+  dispatch.config.example.json   the OpenCode `voices` array, OMP-native
+                   routes, and roster comments are regenerated from the
+                   registry; every other key is preserved.
+                   The file is re-serialized deterministically so `--check` is stable.
 
 It also maintains the derived `content_hash` on each registry profile
 (recomputed from the profile's voice id+variant set), updating it in place
@@ -80,6 +80,20 @@ def profile_content_hash(profile: dict) -> str:
             ({"id": v["id"], "variant": v.get("variant", "max")} for v in profile["voices"]),
             key=lambda d: d["id"],
         )
+    }
+    blob = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def omp_route_hash(route: dict) -> str:
+    """Content-address the exact OMP agent, thinking level, and model routes."""
+    normalized = {
+        "agent": route["agent"],
+        "thinking_level": route["thinking_level"],
+        "voices": sorted(
+            ({"id": v["id"], "model": v["model"]} for v in route["voices"]),
+            key=lambda d: d["id"],
+        ),
     }
     blob = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(blob.encode()).hexdigest()[:16]
@@ -185,18 +199,23 @@ def render_code_adversarial_frontier(reg: dict) -> str:
 
 def render_scripts_readme_roster(reg: dict) -> str:
     """scripts/README.md — full reference table."""
-    rows = ["| Voice id | Model | Family | Harness | Status | Calibration |",
-            "|---|---|---|---|---|---|"]
+    rows = [
+        "| Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
     for v in reg["voices"]:
         cal = "pending" if v["calibration"] == "pending" else (
             "n/a" if v["calibration"].startswith("n/a") else "cited")
-        rows.append(f"| `{v['id']}` | `{v['model']}` | {v['family']} | {v['harness']} "
-                    f"| {v['status']} | {cal} |")
+        omp_model = f"`{v['omp_model']}`" if v.get("omp_model") else "n/a"
+        omp_cal = v.get("omp_calibration", "n/a")
+        rows.append(
+            f"| `{v['id']}` | `{v['model']}` | {omp_model} | {v['family']} | "
+            f"{v['harness']} | {v['status']} | {cal} | {omp_cal} |")
     rows.append("")
-    rows.append("Calibration `cited` = a fitness run is referenced in the voice's `calibration` "
-                "field; `pending` = only dispatchability is known (not yet panel-eligible); "
-                "`n/a` = local specialist / excluded. Full evidence and caveats live in "
-                "`registry/voices.json`.")
+    rows.append(
+        "Reference calibration applies only to the recorded OpenCode or Claude Code "
+        "route. OMP calibration is tracked separately; `pending` native routes are "
+        "experimental and cannot inherit the reference claim.")
     return "\n".join(rows)
 
 
@@ -204,22 +223,23 @@ def render_install_roster(reg: dict) -> str:
     """INSTALL.md §7.2 — canonical panel reference (model strings + auth)."""
     prof = profile_by_name(reg, "canonical-4")
     lines = [f"**Canonical panel (`{prof['name']}@{prof['content_hash']}`).** The milestone "
-             f"panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); "
-             f"the rest dispatch through OpenCode:", ""]
+             "membership has calibrated OpenCode/Claude Code routes and separately tracked "
+             "OMP-native routes:", ""]
     for pv in prof["voices"]:
         v = voice_by_id(reg, pv["id"])
         if v["harness"] != "opencode":
-            lines.append(f"- `{v['id']}` — in-harness Claude Agent subagent (Mode 2); no "
-                         f"opencode.jsonc entry. {_status_label(v)}")
+            lines.append(f"- `{v['id']}` — calibrated in-harness Claude Code Agent route; "
+                         f"OMP `{v['omp_model']}` is separately {v['omp_calibration']}.")
             continue
         env = f" Set {', '.join('`'+e+'`' for e in v['requires_env'])}." if v["requires_env"] else ""
         ep = f" Local endpoint `{v['endpoint']}` must be reachable." if v.get("endpoint") else ""
         lines.append(f"- `{v['model']}` — {v['family']}, {_SEAT[v['provider']]}. "
                      f"{_status_label(v)}.{env}{ep}")
     lines.append("")
-    lines.append("Roster generated from `registry/voices.json`; verify pins with a one-shot "
-                 "probe (`opencode run --model <id> \"Reply with exactly: ok\"`) before milestone "
-                 "runs — a catalog listing is not confirmation.")
+    lines.append("OMP-native model patterns and route calibration are generated into "
+                 "`.colosseum/dispatch.json`. Confirm each pattern in OMP's `/model` picker "
+                 "before a run. OpenCode pins should still be probed with "
+                 "`opencode run --model <id> \"Reply with exactly: ok\"`.")
     return "\n".join(lines)
 
 
@@ -250,6 +270,38 @@ def render_dispatch_voices(reg: dict) -> list[dict]:
         note = f"{v['family']} via {_SEAT[v['provider']]}. status={v['status']}. {v['notes']}"
         out.append({"id": v["id"], "model": v["model"], "note": note})
     return out
+
+
+def render_omp_native_config(reg: dict) -> dict:
+    """Exact OMP ModelRegistry routes for the canonical profile.
+
+    OMP route calibration is deliberately independent from the voice's
+    OpenCode/Claude Code calibration.
+    """
+    prof = profile_by_name(reg, "canonical-4")
+    voices = []
+    for pv in prof["voices"]:
+        voice = voice_by_id(reg, pv["id"])
+        model = voice.get("omp_model")
+        calibration = voice.get("omp_calibration")
+        if not model or not calibration:
+            sys.exit(f"FATAL: canonical voice {voice['id']!r} has no complete OMP route")
+        voices.append({
+            "id": voice["id"],
+            "model": model,
+            "family": voice["family"],
+            "calibration": calibration,
+        })
+    route = {
+        "profile": f"{prof['name']}@{prof['content_hash']}",
+        "agent": "colosseum-spec-adversary",
+        "thinking_level": "max",
+        "calibration": ("pending" if any(v["calibration"] == "pending" for v in voices)
+                        else "cited"),
+        "voices": voices,
+    }
+    route["route_hash"] = omp_route_hash(route)
+    return route
 
 
 def render_dispatch_excluded_comment(reg: dict) -> str:
@@ -292,8 +344,23 @@ def replace_marked_block(text: str, rendered: str, site: str) -> str:
 
 def render_dispatch_config(reg: dict, current_text: str) -> str:
     cfg = json.loads(current_text)
+    prof = profile_by_name(reg, "canonical-4")
+    cfg["_comment_top"] = (
+        "Shared adversarial dispatch config. opencode_dispatch.py reads the OpenCode "
+        "voices and slice plan; OMP-native fan-out reads omp_native.")
+    cfg["_comment_canonical_panel"] = (
+        f"Canonical membership {prof['name']}@{prof['content_hash']}. Existing fitness "
+        "evidence is transport-specific; see registry/voices.json.")
     cfg["voices"] = render_dispatch_voices(reg)
+    cfg["_comment_claude_voice"] = (
+        "claude-agent runs through the calibrated Claude Code Agent route or the "
+        "separately tracked OMP-native route. It never runs through opencode_dispatch.py.")
     cfg["_comment_excluded_voices"] = render_dispatch_excluded_comment(reg)
+    cfg["omp_native"] = render_omp_native_config(reg)
+    cfg["_comment_omp_native"] = (
+        "Generated from registry/voices.json. Run from OMP with the "
+        "colosseum-adversarial skill's omp_fanout.py helper. A pending calibration "
+        "must be reported as uncalibrated; never borrow OpenCode fitness evidence.")
     return json.dumps(cfg, indent=2, ensure_ascii=False) + "\n"
 
 

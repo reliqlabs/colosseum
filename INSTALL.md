@@ -1,6 +1,6 @@
 # Installing Colosseum
 
-Colosseum composes several existing verification tools through MCP wrappers. Nothing here is a self-contained product — installing Colosseum means installing the underlying tools and wiring them up so Claude Code (or any MCP-compatible client) can call them.
+Colosseum composes several existing verification tools through MCP wrappers. Nothing here is a self-contained product — installing Colosseum means installing the underlying tools and wiring them into OMP, Claude Code, or another MCP-compatible client.
 
 The setup is **incremental**: each tool is optional, and each MCP's health check reports gracefully if its underlying tool is missing. Install the layers you need; skip the ones you don't.
 
@@ -53,12 +53,13 @@ opam init --auto-setup        # if you haven't already
 opam install dune menhir zarith easy_logging core yojson    # aeneas deps
 ```
 
-### 1.5 Claude Code CLI
+### 1.5 Coding-agent harness
 
-The primary MCP-compatible client Colosseum is designed against:
+Colosseum supports OMP and Claude Code. Install at least one:
 
 ```bash
-# See https://claude.com/claude-code for current install instructions
+omp --version
+# or see https://claude.com/claude-code for current Claude Code instructions
 ```
 
 ---
@@ -190,9 +191,31 @@ After updating `lakefile.lean`, run `lake update && lake build` to fetch and com
 
 ---
 
-## 5. Register the MCPs with Claude Code
+## 5. Register the MCPs
 
-Each MCP is a Python script that wraps one underlying tool. Register them all (or just the ones for tools you installed):
+Each MCP is an executable Python script that wraps one underlying tool. OMP
+uses project-local configuration; Claude Code can register them at user scope.
+
+### 5.1 OMP
+
+The OMP initializer writes and additively maintains `<project>/.omp/mcp.json`:
+
+```bash
+export COLOSSEUM=/Users/you/path/to/colosseum
+export VERUS_BIN=/Users/you/path/to/tools/verus-bin/verus
+export CHARON_BIN=/Users/you/path/to/tools/charon/bin/charon
+export AENEAS_BIN=/Users/you/path/to/tools/aeneas/bin/aeneas
+
+$COLOSSEUM/scripts/colosseum_init.py <project> --harness omp
+```
+
+The generated config uses `${COLOSSEUM}` and the three optional tool variables,
+so export them before launching OMP. Run `/mcp reload`, `/mcp list`, and
+`/mcp test <name>` from OMP after installation.
+
+### 5.2 Claude Code
+
+Register all wrappers, or only those for tools you installed:
 
 ```bash
 COLOSSEUM=/Users/you/path/to/colosseum
@@ -222,6 +245,9 @@ claude mcp list
 
 Restart Claude Code so the new MCPs load into a session.
 
+OMP reloads the generated project MCP config with `/mcp reload`; Claude Code
+loads user MCP registrations at session start.
+
 ---
 
 ## 6. Optional: local model layer
@@ -240,9 +266,14 @@ The `lm-studio-mcp` and `goedel-mcp` MCPs will auto-detect. No re-registration n
 
 ---
 
-## 7. OpenCode CLI + providers (canonical adversarial dispatch path)
+## 7. OpenCode CLI + providers (calibrated reference transport)
 
-The dispatch path described in `skills/colosseum-adversarial/SKILL.md` runs `opencode run --agent spec-adversary --model <voice> --variant max` once per (voice, slice) pair. This is the **only** dispatch surface for non-Claude adversarial voices — external models are called through OpenCode so they get an agentic ReAct loop with file access, never a single-shot MCP completion.
+The reference path described in `skills/colosseum-adversarial/SKILL.md` runs
+`opencode run --agent spec-adversary --model <voice> --variant max` once per
+(voice, slice) pair. Use it outside OMP, for routes OMP cannot reach, or when a
+milestone requires the existing calibration evidence. OMP-native fan-out is a
+separate agentic transport; external models still run repository-aware agents,
+never single-shot MCP completions.
 
 ### 7.1 Install OpenCode CLI
 
@@ -253,7 +284,7 @@ opencode --version               # verify
 
 ### 7.2 Configure providers
 
-Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 5-voice panel needs these providers configured (the fifth voice, Claude, runs in-harness via the Agent subagent and needs no OpenCode entry):
+Provider definitions live in `~/.config/opencode/opencode.jsonc`. The three external seats in the canonical 4-voice reference profile need Burnt, OpenAI, and Fireworks; Claude runs in-harness and needs no OpenCode entry. Candidate and specialist routes below are optional:
 
 ```jsonc
 {
@@ -306,14 +337,19 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
       }
     },
 
+    // Zhipu canonical seat via Fireworks
+    "fireworks-ai": {
+      "options": { "apiKey": "{env:FIREWORKS_API_KEY}" }
+    },
+
     // OpenAI direct (canonical ChatGPT voice)
     "openai": {
       "npm": "@ai-sdk/openai",
       "name": "OpenAI (direct)",
       "options": { "apiKey": "{env:OPENAI_API_KEY}" },
       "models": {
-        "gpt-5.6-sol-pro": {
-          "name": "GPT-5.6 Sol Pro",
+        "gpt-5.6-sol": {
+          "name": "GPT-5.6 Sol",
           "tool_call": true,
           "reasoning": true,
           "limit": { "context": 400000, "output": 131072 },
@@ -362,28 +398,34 @@ Provider definitions live in `~/.config/opencode/opencode.jsonc`. The canonical 
 }
 ```
 
-Set `OPENAI_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` in your shell environment (or directly in `opencode.jsonc` if you prefer hardcoded keys to env interpolation; the OpenAI provider can alternatively authenticate via ChatGPT-account/Codex login, which supports a different model subset). `gpt-5.6-sol-pro` and `gemini-3.1-pro-preview` are pinned as of 2026-07-11 but provider model IDs drift — and `opencode models <provider>` lists catalog entries the provider may no longer accept, so a catalog listing is not confirmation.
+Set the provider keys used by your selected voices. ChatGPT-account/Codex login
+may replace `OPENAI_API_KEY`, but it supports a different model subset.
+Provider inventories are not reachability proof; model IDs drift.
 
-Verify with `opencode run --model openai/gpt-5.6-sol-pro "Reply with exactly: ok"` and similar one-shot probes per provider before relying on the dispatch script. A missing `GOOGLE_GENERATIVE_AI_API_KEY` fails every Gemini dispatch with an unregistered-caller error.
+Probe each selected OpenCode pin before relying on it, for example
+`opencode run --model openai/gpt-5.6-sol "Reply with exactly: ok"`. Missing
+provider credentials fail that voice's dispatch.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-**Canonical panel (`canonical-4@sha256:08831d0ce9f2086b`).** The milestone panel these providers serve. `claude-agent` runs in-harness (no OpenCode entry); the rest dispatch through OpenCode:
+**Canonical panel (`canonical-4@sha256:08831d0ce9f2086b`).** The milestone membership has calibrated OpenCode/Claude Code routes and separately tracked OMP-native routes:
 
-- `claude-agent` — in-harness Claude Agent subagent (Mode 2); no opencode.jsonc entry. **canonical-panel** (calibrated)
+- `claude-agent` — calibrated in-harness Claude Code Agent route; OMP `anthropic/claude-fable-5` is separately pending.
 - `openai/gpt-5.6-sol` — OpenAI, direct openai provider. **canonical-panel** (calibrated).
 - `fireworks-ai/accounts/fireworks/models/glm-5p2` — Zhipu, Fireworks. **canonical-panel** (calibrated).
 - `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated).
 
-Roster generated from `registry/voices.json`; verify pins with a one-shot probe (`opencode run --model <id> "Reply with exactly: ok"`) before milestone runs — a catalog listing is not confirmation.
+OMP-native model patterns and route calibration are generated into `.colosseum/dispatch.json`. Confirm each pattern in OMP's `/model` picker before a run. OpenCode pins should still be probed with `opencode run --model <id> "Reply with exactly: ok"`.
 <!-- END GENERATED: voice-roster -->
 
-> **No external-model MCP.** External models are called only through OpenCode (Section 7), so every adversarial voice gets an agentic ReAct loop with file access. There is no single-shot MCP dispatch channel: a `query_gateway` / `query_openai` / `query_google`-style MCP would do no agentic work and is intentionally absent. If OpenCode can't be installed on a host, that host can't run multi-voice adversarial passes — there is no degraded fallback.
+> **No external-model MCP.** OMP uses its native `agent()` bridge and OpenCode uses `opencode run`; both execute the repository-aware adversary. A `query_gateway` / `query_openai` / `query_google`-style MCP is intentionally absent because it would provide only single-shot completion. A voice may move between OMP and OpenCode only as an explicit, separately recorded transport choice.
 
 ---
 
 ## 8. Verify the full install
 
-From a fresh Claude Code session, call each MCP's health check. Expected: `ok: true` for tools you installed, graceful "not installed" for tools you skipped.
+From a fresh OMP or Claude Code session, call each MCP's health check. Expected:
+`ok: true` for installed tools and a graceful missing-tool result for skipped
+layers.
 
 ```
 mcp__kani__check_kani_health()
@@ -396,9 +438,39 @@ mcp__lm-studio__check_lmstudio_health()
 
 ---
 
-## 9. Optional: load the skills and agents into Claude Code
+## 9. Load the skills and agents
 
-The MCPs cover the verification tools. The Colosseum **skills** (`colosseum-intent`, `colosseum-reverse-intent`, `colosseum-adversarial`, `colosseum-lifecycle-adversary`, `colosseum-code-adversarial`, `colosseum-compose`, `colosseum-verify`, `colosseum-change`, `colosseum-boundary`) and **agents** (`colosseum-spec-adversary`, `colosseum-quint-spec-generator`, `colosseum-failure-classifier`) need to be made discoverable to Claude Code by symlinking into your user config:
+The MCPs cover verification tools. The Colosseum **skills**
+(`colosseum-intent`, `colosseum-reverse-intent`, `colosseum-adversarial`,
+`colosseum-lifecycle-adversary`, `colosseum-code-adversarial`,
+`colosseum-compose`, `colosseum-verify`, `colosseum-change`,
+`colosseum-boundary`) and **agents** (`colosseum-spec-adversary`,
+`colosseum-quint-spec-generator`, `colosseum-failure-classifier`) also need to
+be discoverable to the selected harness.
+
+### 9.1 OMP
+
+`colosseum_init.py --harness omp` copies every skill directory and generated OMP
+agent wrapper into the target project's `.omp/` directory. OMP skill commands
+use the `/skill:` namespace, for example `/skill:colosseum-verify`.
+
+Re-run without `--force` to fill missing MCP definitions while preserving local
+agent and skill copies. Re-run with `--force` to restore canonical Colosseum
+agents, skills, and MCP server definitions; unrelated MCP servers are preserved.
+The initializer also writes registry-derived `omp_native` routes into
+`.colosseum/dispatch.json`. On a normal rerun it adds that block only when
+missing and preserves all project-specific keys. `--force` replaces the full
+dispatch config with the current canonical template. Invalid JSON is preserved
+with a warning until the operator uses `--force`.
+
+Confirm the generated model patterns in OMP's `/model` picker. Invoke
+`/skill:colosseum-adversarial`; the installed `omp_fanout.py` helper runs
+bounded, failure-isolated agent calls and writes under `.colosseum/attacks/`.
+Every native route is currently calibration-pending.
+
+### 9.2 Claude Code
+
+Symlink the skills and agents into the user config:
 
 ```bash
 mkdir -p ~/.claude/skills ~/.claude/agents
@@ -406,7 +478,8 @@ ln -s $COLOSSEUM/skills/colosseum-* ~/.claude/skills/
 ln -s $COLOSSEUM/agents/colosseum-* ~/.claude/agents/
 ```
 
-Alternatively, for project-local use only, symlink into `.claude/skills/` and `.claude/agents/` within the project you're verifying.
+For project-local Claude Code use, symlink into `.claude/skills/` and
+`.claude/agents/` within the project being verified.
 
 ---
 
@@ -438,6 +511,6 @@ Colosseum is methodology + wrappers; the verification tools themselves are indep
 
 - Just want Kani + property tests? Install §1.1, §1.2, §1.5, §4.1, register `kani-mcp` from §5.
 - Just want the spec-axis (Quint)? §1.1, §1.2, §1.3, §1.5, §3.1, register `quint-mcp`.
-- Just want adversarial spec review? §1.1, §1.2, §1.5, plus §6 (local voices) and/or §7 (OpenCode + providers). There are no model MCPs to register — OpenCode is the only dispatch surface; `lm-studio-mcp` (§5) is optional ops support for local voices.
+- Just want adversarial spec review? For OMP-native dispatch, install OMP plus §9.1; it uses no model MCP and does not require OpenCode. For the calibrated reference or non-OMP dispatch, add §6 (local voices) and/or §7 (OpenCode + providers). `lm-studio-mcp` (§5) remains optional operations support.
 
 Each MCP's health check tells you what's installed; the pyramid skill (`colosseum-verify`) gracefully skips layers whose tools aren't available.

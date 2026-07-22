@@ -19,8 +19,8 @@ directly, then runs the headless runner end-to-end against fixture crates:
                   floors passed, run VERIFIED[tested] (exit 0)
   featurefail/    a floors.json feature combo fails cargo check -> floors
                   FAILED via the feature-matrix sub-check, run FAILED (exit 1)
-  fuzzunmeasured/ named surface has a target but cargo-fuzz is absent -> the
-                  fuzz-time floor is unmeasurable -> floors skipped,
+  fuzzunmeasured/ named surface has a target but the fuzz run is unavailable ->
+                  the fuzz-time floor is unmeasurable -> floors skipped,
                   run INCOMPLETE (exit 3)
   <defaults>      the R20 minicrate (no floors.json) exercises the default
                   floors: property bar met by its inline #[test], no matrix,
@@ -212,12 +212,14 @@ def test_runner() -> None:
               and subs.get("feature_matrix") == "not_applicable"
               and subs.get("fuzz_surfaces") == "not_applicable", f"{st} {subs}")
 
-        # cargo-fuzz absent: the fuzz-time floor is unmeasurable, not a pass.
+        # An unavailable fuzz run makes the fuzz-time floor unmeasurable, not a pass.
+        # Use the explicit skip control so this fixture is independent of whether
+        # cargo-fuzz happens to be installed on the host running the suite.
         fuzzun = tmp / "fuzzunmeasured"
         shutil.copytree(FIX / "fuzzunmeasured", fuzzun)
-        code, out = run(fuzzun, "tested")
+        code, out = run(fuzzun, "tested", "--skip", "fuzz")
         st, subs = floors_status(fuzzun)
-        check("fuzzunmeasured: cargo-fuzz absent -> run INCOMPLETE, exit 3",
+        check("fuzzunmeasured: unavailable fuzz run -> INCOMPLETE, exit 3",
               code == 3 and "INCOMPLETE" in out, f"exit={code}")
         check("fuzzunmeasured: floors skipped on the unmeasurable fuzz surface",
               st == "skipped" and subs.get("fuzz_surfaces") == "skipped",

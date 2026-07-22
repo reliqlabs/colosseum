@@ -156,6 +156,21 @@ def check_registry(rep: Report, gen, reg: dict) -> None:
                     "ok" if ok else "fail",
                     "canonical-panel requires non-pending calibration"
                     if not ok else "cited")
+        omp_model = v.get("omp_model")
+        omp_calibration = v.get("omp_calibration")
+        if omp_model or omp_calibration:
+            ok = (isinstance(omp_model, str) and bool(omp_model)
+                  and isinstance(omp_calibration, str) and bool(omp_calibration))
+            rep.add("registry", f"voice {v['id']} OMP route",
+                    "ok" if ok else "fail",
+                    f"model={omp_model!r} calibration={omp_calibration!r}")
+
+    canonical = gen.profile_by_name(reg, "canonical-4")
+    missing = [pv["id"] for pv in canonical["voices"]
+               if not gen.voice_by_id(reg, pv["id"]).get("omp_model")]
+    rep.add("registry", "canonical profile OMP routes",
+            "ok" if not missing else "fail",
+            "all mapped" if not missing else f"missing={missing}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -380,6 +395,72 @@ def _classify(rep: Report, category: str, name: str,
                     f"!= installed {ih and ih[:12]})")
 
 
+def _tree_sha(path: Path) -> str | None:
+    if not path.is_dir():
+        return None
+    digest = hashlib.sha256()
+    try:
+        files = sorted(candidate for candidate in path.rglob("*") if candidate.is_file())
+        for candidate in files:
+            digest.update(candidate.relative_to(path).as_posix().encode())
+            digest.update(b"\0")
+            digest.update(candidate.read_bytes())
+            digest.update(b"\0")
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def _classify_tree(rep: Report, category: str, name: str,
+                   canonical: Path | None, installed: Path | None) -> None:
+    if canonical is not None and (installed is None or not installed.is_dir()):
+        rep.add(category, name, "fail", "uninstalled")
+    elif canonical is None:
+        rep.add(category, name, "fail", f"extra (no canonical source): {installed}")
+    else:
+        canonical_hash = _tree_sha(canonical)
+        installed_hash = _tree_sha(installed)
+        if canonical_hash == installed_hash:
+            rep.add(category, name, "ok", "in sync")
+        else:
+            rep.add(category, name, "fail",
+                    f"drifted (canonical {canonical_hash and canonical_hash[:12]} "
+                    f"!= installed {installed_hash and installed_hash[:12]})")
+
+
+def check_omp_mcp(rep: Report, repo: Path, project: Path) -> None:
+    canonical_path = repo / "templates" / "omp-mcp.json"
+    installed_path = project / ".omp" / "mcp.json"
+    if not canonical_path.exists():
+        rep.add("drift/omp-mcp", ".omp/mcp.json", "fail",
+                f"canonical template missing: {canonical_path}")
+        return
+    if not installed_path.exists():
+        rep.add("drift/omp-mcp", ".omp/mcp.json", "fail", "uninstalled")
+        return
+    try:
+        canonical = json.loads(canonical_path.read_text())
+        installed = json.loads(installed_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        rep.add("drift/omp-mcp", ".omp/mcp.json", "fail", f"invalid JSON: {exc}")
+        return
+
+    if installed.get("$schema") != canonical.get("$schema"):
+        rep.add("drift/omp-mcp", ".omp/mcp.json $schema", "fail", "drifted")
+    else:
+        rep.add("drift/omp-mcp", ".omp/mcp.json $schema", "ok", "in sync")
+    installed_servers = installed.get("mcpServers")
+    if not isinstance(installed_servers, dict):
+        rep.add("drift/omp-mcp", ".omp/mcp.json mcpServers", "fail",
+                "missing or not an object")
+        return
+    for name, expected in canonical["mcpServers"].items():
+        actual = installed_servers.get(name)
+        rep.add("drift/omp-mcp", f".omp/mcp.json server {name}",
+                "ok" if actual == expected else "fail",
+                "in sync" if actual == expected else "missing or drifted")
+
+
 def check_home_drift(rep: Report, repo: Path) -> None:
     home = Path.home()
     # Claude Code agents.
@@ -403,13 +484,61 @@ def check_home_drift(rep: Report, repo: Path) -> None:
 
 def check_project_drift(rep: Report, repo: Path, project: Path) -> None:
     project = project.resolve()
-    _classify(rep, "drift/project", ".colosseum/scripts/opencode_dispatch.py",
-              repo / "scripts" / "opencode_dispatch.py",
-              project / ".colosseum" / "scripts" / "opencode_dispatch.py")
+    for name in (
+            "opencode_dispatch.py",
+            "check_ledger_references.py",
+            "check_evidence_records.py"):
+        _classify(rep, "drift/project", f".colosseum/scripts/{name}",
+                  repo / "scripts" / name,
+                  project / ".colosseum" / "scripts" / name)
     canon_agent_dir = repo / "agents" / "opencode"
     for canon in sorted(canon_agent_dir.glob("*.md")):
         _classify(rep, "drift/project", f".opencode/agent/{canon.name}",
                   canon, project / ".opencode" / "agent" / canon.name)
+
+    omp_root = project / ".omp"
+    if not omp_root.exists():
+        return
+
+    dispatch_path = project / ".colosseum" / "dispatch.json"
+    canonical_dispatch = repo / "scripts" / "dispatch.config.example.json"
+    try:
+        installed_route = json.loads(dispatch_path.read_text()).get("omp_native")
+        canonical_route = json.loads(canonical_dispatch.read_text()).get("omp_native")
+        ok = installed_route == canonical_route and installed_route is not None
+        detail = "in sync" if ok else "missing or drifted"
+    except (OSError, json.JSONDecodeError) as exc:
+        ok, detail = False, str(exc)
+    rep.add("drift/omp-dispatch", ".colosseum/dispatch.json omp_native",
+            "ok" if ok else "fail", detail)
+
+    canonical_agents = {
+        path.name: path for path in sorted((repo / "agents" / "omp").glob("*.md"))
+    }
+    installed_agents = omp_root / "agents"
+    for name, canonical in canonical_agents.items():
+        _classify(rep, "drift/omp-agents", f".omp/agents/{name}",
+                  canonical, installed_agents / name)
+    if installed_agents.exists():
+        for installed in sorted(installed_agents.glob("colosseum-*.md")):
+            if installed.name not in canonical_agents:
+                _classify(rep, "drift/omp-agents",
+                          f".omp/agents/{installed.name}", None, installed)
+
+    canonical_skills = {
+        path.name: path for path in sorted((repo / "skills").glob("colosseum-*"))
+        if (path / "SKILL.md").is_file()
+    }
+    installed_skills = omp_root / "skills"
+    for name, canonical in canonical_skills.items():
+        _classify_tree(rep, "drift/omp-skills", f".omp/skills/{name}",
+                       canonical, installed_skills / name)
+    if installed_skills.exists():
+        for installed in sorted(installed_skills.glob("colosseum-*")):
+            if installed.name not in canonical_skills and installed.is_dir():
+                _classify_tree(rep, "drift/omp-skills",
+                               f".omp/skills/{installed.name}", None, installed)
+    check_omp_mcp(rep, repo, project)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -437,7 +566,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", type=Path, default=REPO)
     ap.add_argument("--project", type=Path, default=None,
-                    help="also diff this project's .colosseum/.opencode copies")
+                    help="also diff this project's .colosseum/.opencode/.omp copies")
+    ap.add_argument("--skip-home-drift", action="store_true",
+                    help="skip user-level ~/.claude agent and skill drift checks")
     ap.add_argument("--strict", action="store_true",
                     help="promote plumbing/toolchain warnings to failures")
     ap.add_argument("--live", action="store_true",
@@ -459,7 +590,8 @@ def main() -> int:
     check_toolchain(rep, bom)
     check_registry(rep, gen, reg)
     check_plumbing(rep, gen, reg)
-    check_home_drift(rep, repo)
+    if not args.skip_home_drift:
+        check_home_drift(rep, repo)
     if args.project:
         check_project_drift(rep, repo, args.project)
     if args.live:

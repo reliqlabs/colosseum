@@ -1,6 +1,6 @@
 # Roadmap: status and remaining work
 
-Last updated: 2026-07-19. This is the handoff document. It records where the
+Last updated: 2026-07-20. This is the handoff document. It records where the
 2026-07-11 remediation plan of record stands, what remains before the repo may
 call itself dependable by its own exit criteria, and who each remaining item
 waits on. A new maintainer or session should be able to resume from this file
@@ -18,10 +18,11 @@ committed on `main`, one commit per item:
 | P1 (mechanisms) | C1-C10: two-gate ledger (G1/G2), conformance bridge (G3), critique loop (G4), voice registry, MCP hardening, skill sweep, intent template, baseline floors, dogfood evidence, repository CI | done |
 | P2 instruments | M1 coverage dashboard, M2 self-measurement, M3 recall scorer + pre-registered benchmark protocol, M5 boundary skill / system-intent / ledger versioning | done |
 | M3 live calibration | `calibration/2026-07-13-r1`: blinded seeded-defect run, six scoreable voices | done |
+| OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, live-tree preflight, failure-isolated evidence, initializer/doctor support (R29/R30) | implemented on `feature/omp-integration`; route calibration pending |
 
 Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
 dispatch-config, fixture-tracking, and the full regression suite
-(`tests/run_all.py`, ~24 suites). Green locally as of this writing. The
+(`tests/run_all.py`, 29 suites). Green locally as of this writing. The
 GitHub Actions mirror (`colosseum-ci` on `main`) is green since 2026-07-14;
 on its toolchain-less runner the toolchain-dependent suites degrade to a
 tolerated INCOMPLETE rather than failing (see the CI section below).
@@ -33,6 +34,14 @@ absent), `gpt-5.6-sol`, `glm-5.2` (Fireworks), `kimi-k2.6`. All four seats
 carry cited 8/8 seeded-recall calibration. `registry/voices.json` is the
 source of truth; roster docs are generated from it by
 `scripts/gen_roster_docs.py`.
+
+OMP now has a native multi-voice transport through its `eval` `agent()` bridge.
+The exact ModelRegistry routes and their content hash are generated into
+`.colosseum/dispatch.json`; `omp_fanout.py` preflights the live tree, binds the
+target hash, runs bounded per-model adversary agents, and preserves partial
+evidence. This changes orchestration and evidence capture, not any existing G1
+verification claim. Every OMP route is explicitly `pending` calibration, so
+OpenCode/Claude Code calibration must not be transferred to native runs.
 
 ## Exit criteria scoreboard
 

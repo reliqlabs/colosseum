@@ -1,9 +1,9 @@
 {
-  "_comment_top": "Example dispatch config for opencode_dispatch.py. Copy to <project>/.colosseum/dispatch.json and edit. Schema described in colosseum/scripts/opencode_dispatch.py.",
+  "_comment_top": "Shared adversarial dispatch config. opencode_dispatch.py reads the OpenCode voices and slice plan; OMP-native fan-out reads omp_native.",
   "project_root": "/absolute/path/to/your/project",
   "target_spec": "/absolute/path/to/your/project/intent.md",
   "run_tag_prefix": "intent-v1",
-  "_comment_canonical_panel": "CANONICAL 5-VOICE PANEL for adversarial spec review. Each voice is pinned to the strongest variant of its family verified dispatchable at pin time (2026-07-11) with max thinking enabled. Pins drift, and `opencode models` lists catalog entries the provider may reject — probe with `opencode run --model <id> \"Reply with exactly: ok\"` before milestone runs. The Claude voice runs in-harness via the colosseum-spec-adversary Agent subagent (NOT through this script) — dispatch claude-agent separately alongside opencode_dispatch.py. The four voices below are the OpenCode-dispatched roster. For Lean-specific tasks substitute the local Leanstral voice (lmstudio/leanstral-2603; upstream discontinued 2026-06-30, Leanstral 1.5 is the successor for new installs).",
+  "_comment_canonical_panel": "Canonical membership canonical-4@sha256:08831d0ce9f2086b. Existing fitness evidence is transport-specific; see registry/voices.json.",
   "voices": [
     {
       "id": "gpt-5.6-sol",
@@ -21,7 +21,7 @@
       "note": "Moonshot via Burnt gateway. status=canonical-panel. Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
     }
   ],
-  "_comment_claude_voice": "The fifth voice in the canonical panel is the strongest Claude available to the harness session, dispatched in-harness as `claude-agent` via the colosseum-spec-adversary Agent subagent. That voice does NOT run through opencode_dispatch.py — the Agent tool invocation happens from the Claude Code session that owns the adversarial pass. See SKILL Step 4 Mode 2.",
+  "_comment_claude_voice": "claude-agent runs through the calibrated Claude Code Agent route or the separately tracked OMP-native route. It never runs through opencode_dispatch.py.",
   "_comment_excluded_voices": "Voices known to fail adversarial spec review (see registry/voices.json for calibration evidence): glm-4.7-flash — degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent parallel runs (enumerated fake attacks #4-75+ on a single slice). At its ~30B 'flash' size class it is local-model tier, not gateway-frontier tier. goedel-prover-v2-32b — included in an 8-voice fan-out and produced ~8K tokens of degenerate tautology loops with abstract variable lists, 852s wall, output unusable. Theorem-prover specialists pattern-match a spec as a proof GOAL and attempt Lean/Coq tactics instead of attacking it. leanstral-2603 belongs in Lean-specific verification work, not general adversarial spec review — substitute only when the spec is a Lean theorem.",
   "_comment_dispatch_invocation": "opencode_dispatch.py passes --format json to each `opencode run` call and appends --variant automatically: the per-voice `variant` field if set, else `default_variant` below. The raw event stream is preserved per (voice, slice) as <slice>.events.jsonl; the extracted assistant text (never the JSON) feeds truncation detection and aggregation, with finish_reason and token usage recorded. No script modification needed.",
   "_comment_slices": "Slice plan. Each slice is one (voice, slice) call. headers[] are the markdown header ranges the agent should read from the target spec. attack_emphasis is the per-slice attack-category hint. Replace this example with your project's actual sections.",
@@ -68,5 +68,39 @@
   "env_passthrough": [
     "GOOGLE_GENERATIVE_AI_API_KEY"
   ],
-  "opencode_version_pin": null
+  "opencode_version_pin": null,
+  "omp_native": {
+    "profile": "canonical-4@sha256:08831d0ce9f2086b",
+    "agent": "colosseum-spec-adversary",
+    "thinking_level": "max",
+    "calibration": "pending",
+    "voices": [
+      {
+        "id": "claude-agent",
+        "model": "anthropic/claude-fable-5",
+        "family": "Anthropic",
+        "calibration": "pending"
+      },
+      {
+        "id": "gpt-5.6-sol",
+        "model": "openai-codex/gpt-5.6-sol",
+        "family": "OpenAI",
+        "calibration": "pending"
+      },
+      {
+        "id": "glm-5.2",
+        "model": "fireworks/glm-5.2",
+        "family": "Zhipu",
+        "calibration": "pending"
+      },
+      {
+        "id": "kimi-k2.6",
+        "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+        "family": "Moonshot",
+        "calibration": "pending"
+      }
+    ],
+    "route_hash": "sha256:cd3aa813c9ec5361"
+  },
+  "_comment_omp_native": "Generated from registry/voices.json. Run from OMP with the colosseum-adversarial skill's omp_fanout.py helper. A pending calibration must be reported as uncalibrated; never borrow OpenCode fitness evidence."
 }
