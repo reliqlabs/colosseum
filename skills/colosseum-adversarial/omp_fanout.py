@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Any
 
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
-_PRIVATE_KEY_MARKER = bytes.fromhex("50524956415445204b45592d2d2d2d2d")
-_PGP_PRIVATE_KEY_MARKER = b"PRIVATE KEY BLOCK"
+_PEM_PRIVATE_KEY_RE = re.compile(
+    rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----")
 _ROUTE_HASH_RE = re.compile(r"^sha256:[0-9a-f]{16}$")
 _RESERVED_SUMMARY = {
     "version", "harness", "started_at", "finished_at", "agent", "verdict",
@@ -38,27 +38,19 @@ def _sha256_file(path: Path) -> str:
 
 
 def _file_has_key_marker(path: Path, *, cap: int = 8 * 1024 * 1024) -> bool:
-    """Stream up to ``cap`` bytes hunting a PEM/PGP private-key header.
+    """True if the file carries a PEM/PGP private-key opening armor line.
 
-    Chunked with overlap so a marker straddling a read boundary is not missed.
-    OSError propagates to the caller: an unreadable file is treated as suspect,
-    never silently cleared.
+    Anchors on the full ``-----BEGIN ... PRIVATE KEY-----`` header (PGP uses
+    ``PRIVATE KEY BLOCK``), not a bare ``PRIVATE KEY`` substring. The armored
+    header keeps truncated or END-less keys detectable while not flagging source
+    that merely names the marker (scanner constants, docs) — such text lacks the
+    ``-----BEGIN`` armor prefix. Reads up to ``cap`` bytes; real key files carry
+    the header at the top. OSError propagates so an unreadable file is treated as
+    suspect, never silently cleared.
     """
-    markers = (_PRIVATE_KEY_MARKER, _PGP_PRIVATE_KEY_MARKER)
-    overlap = max(len(marker) for marker in markers) - 1
-    read = 0
-    tail = b""
     with path.open("rb") as handle:
-        while read < cap:
-            chunk = handle.read(65536)
-            if not chunk:
-                break
-            read += len(chunk)
-            window = tail + chunk
-            if any(marker in window for marker in markers):
-                return True
-            tail = window[-overlap:]
-    return False
+        head = handle.read(cap)
+    return _PEM_PRIVATE_KEY_RE.search(head) is not None
 
 
 def preflight_scan(root: str | Path) -> list[str]:

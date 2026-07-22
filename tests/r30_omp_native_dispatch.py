@@ -310,6 +310,11 @@ def main() -> int:
         v = mod.preflight_scan(sroot)
         check("pgp private-key block is caught",
               any("private-key material" in x and "backup.asc" in x for x in v), v)
+        (sroot / "scanner_src.py").write_text(
+            'M1 = b"PRIVATE KEY-----"\nM2 = b"PRIVATE KEY BLOCK"\n')
+        v = mod.preflight_scan(sroot)
+        check("marker constants without BEGIN armor are not flagged",
+              not any("scanner_src.py" in x for x in v), v)
         if hasattr(os, "geteuid") and os.geteuid() != 0:
             opaque = sroot / "opaque.bin"
             opaque.write_bytes(b"\x00" * 32)
