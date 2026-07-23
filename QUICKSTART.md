@@ -22,7 +22,9 @@ Each MCP's health check reports gracefully when its tool is missing, so a partia
 ## 1. Set up the project directory
 
 For OMP, the initializer installs project-local agents, all Colosseum skills,
-the six MCP definitions, OpenCode agents, and the evidence directory:
+the six MCP definitions, and the evidence directory. An `--harness omp` scaffold
+is OMP-only: it ships no `.opencode/` agents or `opencode_dispatch.py` (use
+`--harness claude-code` for the OpenCode reference transport):
 
 ```bash
 export COLOSSEUM=/absolute/path/to/colosseum

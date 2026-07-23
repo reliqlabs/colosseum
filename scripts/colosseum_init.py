@@ -32,9 +32,11 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 PROJECT_SCRIPT_NAMES = (
-    "opencode_dispatch.py",
     "check_ledger_references.py",
     "check_evidence_records.py",
+)
+OPENCODE_SCRIPT_NAMES = (
+    "opencode_dispatch.py",
 )
 CONFIG_EXAMPLE = REPO / "scripts" / "dispatch.config.example.json"
 OMP_MCP_TEMPLATE = REPO / "templates" / "omp-mcp.json"
@@ -224,7 +226,10 @@ def main() -> int:
     args = ap.parse_args()
 
     project = args.project.resolve()
+    ship_opencode = args.harness != "omp"
     project_scripts = [REPO / "scripts" / name for name in PROJECT_SCRIPT_NAMES]
+    if ship_opencode:
+        project_scripts += [REPO / "scripts" / name for name in OPENCODE_SCRIPT_NAMES]
     required = [*project_scripts, CONFIG_EXAMPLE, INSTALL_AGENTS]
     if args.harness == "omp":
         required.append(OMP_MCP_TEMPLATE)
@@ -248,10 +253,12 @@ def main() -> int:
                          args.force, results)
     errors = install_dispatch_config(project, target_spec, args.force, results)
 
-    # OpenCode remains the calibrated reference and compatibility transport.
-    errors.extend(install_agents(
-        project, "opencode", Path(".opencode/agent"),
-        OPENCODE_AGENT_FILES, args.force, results))
+    # OpenCode agents are the calibrated reference transport for non-OMP harnesses.
+    # An --harness omp scaffold is OMP-only and ships no .opencode/ artifacts.
+    if ship_opencode:
+        errors.extend(install_agents(
+            project, "opencode", Path(".opencode/agent"),
+            OPENCODE_AGENT_FILES, args.force, results))
     if args.harness == "omp":
         errors.extend(install_agents(
             project, "omp", Path(".omp/agents"),

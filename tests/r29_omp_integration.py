@@ -94,13 +94,11 @@ def main() -> int:
               installed_mcp.get("$schema") == canonical_mcp["$schema"])
         check("all Colosseum MCP servers installed",
               installed_mcp.get("mcpServers") == canonical_mcp["mcpServers"])
-        check("OpenCode agents remain installed for external voices",
-              (project / ".opencode" / "agent" / "spec-adversary.md").exists()
-              and (project / ".opencode" / "agent" / "quint-spec-generator.md").exists())
-        for name in (
-                "opencode_dispatch.py",
-                "check_ledger_references.py",
-                "check_evidence_records.py"):
+        check("OMP scaffold ships no .opencode artifacts",
+              not (project / ".opencode").exists())
+        check("OMP scaffold omits opencode_dispatch.py",
+              not (project / ".colosseum" / "scripts" / "opencode_dispatch.py").exists())
+        for name in ("check_ledger_references.py", "check_evidence_records.py"):
             script = project / ".colosseum" / "scripts" / name
             check(f"OMP init installs executable project script {name}",
                   script.exists() and os.access(script, os.X_OK))
