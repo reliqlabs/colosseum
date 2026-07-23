@@ -49,7 +49,11 @@ OMP_AGENT_FILES = {
     "spec-adversary": "colosseum-spec-adversary.md",
     "quint-spec-generator": "colosseum-quint-spec-generator.md",
     "failure-classifier": "colosseum-failure-classifier.md",
+    "panelist": "colosseum-panelist.md",
+    "panel-synthesizer": "colosseum-panel-synthesizer.md",
 }
+OMP_PANEL_PROFILE = REPO / "templates" / "omp-panel.json"
+OMP_PANEL_RESOLVER = REPO / "templates" / "omp-panel-resolver.ts"
 
 
 def _put(path: Path, content: str, force: bool, results: list[tuple[str, Path]]) -> None:
@@ -232,7 +236,7 @@ def main() -> int:
         project_scripts += [REPO / "scripts" / name for name in OPENCODE_SCRIPT_NAMES]
     required = [*project_scripts, CONFIG_EXAMPLE, INSTALL_AGENTS]
     if args.harness == "omp":
-        required.append(OMP_MCP_TEMPLATE)
+        required += [OMP_MCP_TEMPLATE, OMP_PANEL_PROFILE, OMP_PANEL_RESOLVER]
     missing = [path for path in required if not path.exists()]
     if missing:
         print(f"FATAL: canonical files missing: {missing}", file=sys.stderr)
@@ -244,7 +248,7 @@ def main() -> int:
     results: list[tuple[str, Path]] = []
 
     # Directory skeleton (mkdir is inherently idempotent).
-    for sub in ("attacks", "verify", "evidence", "scripts"):
+    for sub in ("attacks", "verify", "evidence", "scripts", "panels"):
         (project / ".colosseum" / sub).mkdir(parents=True, exist_ok=True)
 
     # Canonical project scripts + dispatch config.
@@ -265,6 +269,25 @@ def main() -> int:
             OMP_AGENT_FILES, args.force, results))
         install_omp_skills(project, args.force, results)
         errors.extend(install_omp_mcp(project, args.force, results))
+        _copy_owned_file(OMP_PANEL_PROFILE,
+                         project / ".colosseum" / "panel-profiles.json",
+                         args.force, results)
+        _copy_owned_file(OMP_PANEL_RESOLVER,
+                         project / ".omp" / "extensions" / "colosseum-panel-resolver.ts",
+                         args.force, results)
+
+    # Harness marker: lets the doctor apply the right drift class (an --harness
+    # omp scaffold ships no .opencode artifacts).
+    marker = project / ".colosseum" / "harness"
+    want = args.harness + "\n"
+    if not marker.exists():
+        marker.write_text(want)
+        results.append(("wrote", marker))
+    elif marker.read_text() != want and args.force:
+        marker.write_text(want)
+        results.append(("overwrote", marker))
+    else:
+        results.append(("skip", marker))
 
     # Report.
     for action, path in results:

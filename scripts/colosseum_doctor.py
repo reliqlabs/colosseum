@@ -484,17 +484,21 @@ def check_home_drift(rep: Report, repo: Path) -> None:
 
 def check_project_drift(rep: Report, repo: Path, project: Path) -> None:
     project = project.resolve()
-    for name in (
-            "opencode_dispatch.py",
-            "check_ledger_references.py",
-            "check_evidence_records.py"):
+    marker = project / ".colosseum" / "harness"
+    harness = marker.read_text().strip() if marker.exists() else "claude-code"
+    for name in ("check_ledger_references.py", "check_evidence_records.py"):
         _classify(rep, "drift/project", f".colosseum/scripts/{name}",
                   repo / "scripts" / name,
                   project / ".colosseum" / "scripts" / name)
-    canon_agent_dir = repo / "agents" / "opencode"
-    for canon in sorted(canon_agent_dir.glob("*.md")):
-        _classify(rep, "drift/project", f".opencode/agent/{canon.name}",
-                  canon, project / ".opencode" / "agent" / canon.name)
+    if harness != "omp":
+        # The OpenCode transport ships for non-omp harnesses only; an --harness
+        # omp scaffold is OMP-native and correctly has no .opencode artifacts.
+        _classify(rep, "drift/project", ".colosseum/scripts/opencode_dispatch.py",
+                  repo / "scripts" / "opencode_dispatch.py",
+                  project / ".colosseum" / "scripts" / "opencode_dispatch.py")
+        for canon in sorted((repo / "agents" / "opencode").glob("*.md")):
+            _classify(rep, "drift/project", f".opencode/agent/{canon.name}",
+                      canon, project / ".opencode" / "agent" / canon.name)
 
     omp_root = project / ".omp"
     if not omp_root.exists():
@@ -539,6 +543,13 @@ def check_project_drift(rep: Report, repo: Path, project: Path) -> None:
                 _classify_tree(rep, "drift/omp-skills",
                                f".omp/skills/{installed.name}", None, installed)
     check_omp_mcp(rep, repo, project)
+    # OMP-native deliberation panel artifacts.
+    _classify(rep, "drift/omp-panel", ".omp/extensions/colosseum-panel-resolver.ts",
+              repo / "templates" / "omp-panel-resolver.ts",
+              project / ".omp" / "extensions" / "colosseum-panel-resolver.ts")
+    _classify(rep, "drift/omp-panel", ".colosseum/panel-profiles.json",
+              repo / "templates" / "omp-panel.json",
+              project / ".colosseum" / "panel-profiles.json")
 
 
 # ─────────────────────────────────────────────────────────────────────────

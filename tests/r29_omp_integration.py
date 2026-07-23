@@ -109,6 +109,23 @@ def main() -> int:
               == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
         check("OMP native routes are explicitly uncalibrated",
               dispatch["omp_native"]["calibration"] == "pending")
+        check("OMP init installs the panel resolver extension",
+              (project / ".omp" / "extensions" / "colosseum-panel-resolver.ts").read_bytes()
+              == (REPO / "templates" / "omp-panel-resolver.ts").read_bytes())
+        check("OMP init installs the panel profile",
+              (project / ".colosseum" / "panel-profiles.json").read_bytes()
+              == (REPO / "templates" / "omp-panel.json").read_bytes())
+        check("OMP init creates the panels evidence dir",
+              (project / ".colosseum" / "panels").is_dir())
+        check("OMP init stamps the harness marker omp",
+              (project / ".colosseum" / "harness").read_text().strip() == "omp")
+        check("OMP init installs both panel agents",
+              (installed_agents / "colosseum-panelist.md").exists()
+              and (installed_agents / "colosseum-panel-synthesizer.md").exists())
+        check("OMP init installs the panel skill engine + contract + roster",
+              (installed_skills / "colosseum-panel" / "omp_panel.py").exists()
+              and (installed_skills / "colosseum-panel" / "panel_contract.py").exists()
+              and (installed_skills / "colosseum-panel" / "panel_roster.py").exists())
 
         adversary = (installed_agents / "colosseum-spec-adversary.md").read_text()
         check("OMP adversary is read-only",
@@ -172,15 +189,21 @@ def main() -> int:
             item for item in report.get("checks", [])
             if item.get("category", "").startswith("drift/omp")
         ]
+        # per-agent + per-skill + dispatch(1) + mcp(1) + per-mcp-server + panel(2)
         expected_checks = len(canonical_agents) + len(canonical_skills) + 2 + len(
             canonical_mcp["mcpServers"]
-        )
+        ) + 2
         check("OMP doctor checks every installed artifact",
               len(omp_checks) == expected_checks,
               f"expected={expected_checks} actual={len(omp_checks)}")
         check("OMP doctor reports clean project integration",
               bool(omp_checks) and all(item["status"] == "ok" for item in omp_checks),
               str([item for item in omp_checks if item["status"] != "ok"]))
+        project_fails = [item for item in report.get("checks", [])
+                         if item.get("category") == "drift/project"
+                         and item["status"] != "ok"]
+        check("OMP-only scaffold has no project-drift failures (harness-aware doctor)",
+              not project_fails, project_fails)
 
         dispatch["omp_native"]["voices"][0]["model"] = "drifted/model"
         dispatch_path.write_text(json.dumps(dispatch, indent=2) + "\n")

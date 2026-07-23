@@ -1,6 +1,6 @@
 # Roadmap: status and remaining work
 
-Last updated: 2026-07-20. This is the handoff document. It records where the
+Last updated: 2026-07-24. This is the handoff document. It records where the
 2026-07-11 remediation plan of record stands, what remains before the repo may
 call itself dependable by its own exit criteria, and who each remaining item
 waits on. A new maintainer or session should be able to resume from this file
@@ -19,10 +19,22 @@ committed on `main`, one commit per item:
 | P2 instruments | M1 coverage dashboard, M2 self-measurement, M3 recall scorer + pre-registered benchmark protocol, M5 boundary skill / system-intent / ledger versioning | done |
 | M3 live calibration | `calibration/2026-07-13-r1`: blinded seeded-defect run, six scoreable voices | done |
 | OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, fail-closed session-root gate, live-tree preflight, failure-isolated evidence, initializer/doctor support (R29/R30) | committed on `feature/omp-integration`; project-rooted one-voice transport E2E passed (`calibration/2026-07-22-omp-native-e2e/`); project-installed helper resolution, canonical 4-voice run, and route calibration pending |
+| OMP-native deliberation panel | Three-wave `colosseum-panel` skill (drafts → blinded cross-review → synthesis): family/coverage quorum, randomized-label blinding + deferred identity, brief + git target-drift gating (binary-safe, full-digest, `.colosseum`-excluded), harness-aware doctor, `project-plan` + `milestone-review` modes (R31, ~50 assertions incl. a real Gate B end-to-end; R32 resolver dispatch-identity contract executed under Bun) | committed on `feature/omp-integration`; **`project-plan` live-verified** project-rooted (`calibration/2026-07-23-omp-panel-e2e/`, 3-family COMPLETE) but uncalibrated; **`milestone-review` EXPERIMENTAL** — evidence-bound fail-closed guard + Gate B `--expect-intent`/`--snapshot-exact`/dup-rejection are correct and deterministically tested, but not yet run against a real project's itf_replay G1 records + live panel; roster-resolver extension live-verified in a real OMP session (`calibration/2026-07-24-resolver-live/`: `ctx.models.family` distinctness positive + negative, canonical `provider/id` dispatch identity, both active seats serving real inference at `:max`); active roster is Sol+GLM (min_families=2) with Fable/Kimi-k3 pending; full three-wave run on that roster and calibration pending |
 
 Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
 dispatch-config, fixture-tracking, and the full regression suite
-(`tests/run_all.py`, 29 suites). Green locally as of this writing. The
+(`tests/run_all.py`, 30 suites). RED locally as of this writing: 28/30 pass;
+`r0_registry_docs.py` and `r14_cli_contracts.py` both fail on one cause, the
+installed `opencode` being 1.18.4 against the `bom.json` pin of 1.18.3. The
+pin is unchanged in HEAD and the worktree, so this is local toolchain drift in
+the opencode harness, not a Colosseum regression. Both suites run to
+completion (collect-and-continue `check()`), and in each the version-string
+equality is the *only* failing assertion: under the live 1.18.4 binary every
+`opencode run` flag contract the BOM encodes (`--agent`, `--model`,
+`--format`, `--variant`) passes, as does everything after the failure. Two
+remedies clear it: reinstall the pinned 1.18.3, or bump `bom.json`
+deliberately. Flag-presence contracts passing is not behavioral equivalence,
+so a bump should still be a considered decision rather than a reflex. The
 GitHub Actions mirror (`colosseum-ci` on `main`) is green since 2026-07-14;
 on its toolchain-less runner the toolchain-dependent suites degrade to a
 tolerated INCOMPLETE rather than failing (see the CI section below).

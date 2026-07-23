@@ -186,6 +186,9 @@ Improvement proposals awaiting validation live in [methodology-improvements.md](
 | `colosseum-verify` | SKILL (run the verification pyramid) | `skills/colosseum-verify/` |
 | `colosseum-compose` | SKILL (trust ledger + axiom inventory + code-citation CI gate) | `skills/colosseum-compose/` |
 | `colosseum-change` | SKILL (upstream-first change loop) | `skills/colosseum-change/` |
+| `colosseum-panel` | SKILL (OMP-native deliberation panel: `project-plan` + `milestone-review` modes) | `skills/colosseum-panel/` |
+| `omp_panel.py` | Panel engine (three barriered waves, blinded cross-review, fail-closed milestone adjudication, brief + git target-drift gating) | `skills/colosseum-panel/omp_panel.py` |
+| `colosseum-panelist` / `colosseum-panel-synthesizer` | Subagents (panel draft/review voice + synthesizer; generated OMP wrappers) | `agents/panelist-body.md`, `agents/panel-synthesizer-body.md` |
 | `install-agents.py` | Build tool (regenerate per-harness wrappers from canonical bodies) | `scripts/install-agents.py` |
 | `colosseum_run.py` | Manifest dispatch coordinator (reference shape; per-project scripts use the same schema) | `scripts/colosseum_run.py` |
 | `coverage_dashboard.py` | Deterministic G1 coverage view | `scripts/coverage_dashboard.py` |

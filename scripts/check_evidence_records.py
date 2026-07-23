@@ -91,7 +91,10 @@ BINDING_FIELDS = (
 NULLABLE = {"seeds", "waiver"}
 
 
-def validate_record(rec: dict, expect_snapshot: str | None) -> list[str]:
+def validate_record(rec: dict, expect_snapshot: str | None,
+                    expect_intent: str | None = None,
+                    expect_manifest: str | None = None,
+                    snapshot_exact: bool = False) -> list[str]:
     """Returns the list of defects; empty means the record is valid."""
     defects = []
     for field in TOP_FIELDS:
@@ -115,12 +118,22 @@ def validate_record(rec: dict, expect_snapshot: str | None) -> list[str]:
         elif bindings[field] in ("", [], {}) or \
                 (bindings[field] is None and field not in NULLABLE):
             defects.append(f"empty binding field {field!r}")
-    if expect_snapshot and isinstance(bindings.get("source_snapshot"), str) \
-            and not bindings["source_snapshot"].startswith(expect_snapshot):
+    if expect_snapshot:
+        snap = bindings.get("source_snapshot")
+        matched = isinstance(snap, str) and (
+            snap == expect_snapshot if snapshot_exact else snap.startswith(expect_snapshot))
+        if not matched:
+            how = "exactly " if snapshot_exact else ""
+            defects.append(
+                f"stale record: bound to snapshot {snap!r}, expected {how}{expect_snapshot!r}")
+    if expect_intent and bindings.get("intent_hash") != expect_intent:
         defects.append(
-            f"stale record: bound to snapshot {bindings['source_snapshot']!r}, "
-            f"expected {expect_snapshot!r}"
-        )
+            f"stale record: bound to intent {bindings.get('intent_hash')!r}, "
+            f"expected {expect_intent!r}")
+    if expect_manifest and bindings.get("obligation_manifest_hash") != expect_manifest:
+        defects.append(
+            f"stale record: bound to obligation manifest "
+            f"{bindings.get('obligation_manifest_hash')!r}, expected {expect_manifest!r}")
     return defects
 
 
@@ -157,6 +170,13 @@ def main() -> int:
                     help="derive required claim IDs from an obligation manifest")
     ap.add_argument("--expect-snapshot", default=None,
                     help="reject records bound to a different source snapshot")
+    ap.add_argument("--expect-intent", default=None,
+                    help="reject records whose bindings.intent_hash differs (task/AC drift)")
+    ap.add_argument("--expect-manifest", default=None,
+                    help="reject records whose bindings.obligation_manifest_hash differs")
+    ap.add_argument("--snapshot-exact", action="store_true",
+                    help="require source_snapshot == --expect-snapshot exactly "
+                         "(milestone gate over a clean tree; rejects HEAD+dirty)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -186,10 +206,13 @@ def main() -> int:
         return 2
 
     by_claim: dict[str, dict] = {}
+    dup_claims: set[str] = set()
     per_claim: list[dict] = []
     for rec in records:
         cid = rec.get("claim_id")
         if isinstance(cid, str):
+            if cid in by_claim:
+                dup_claims.add(cid)  # duplicate must not let a later PASS mask a FAIL
             by_claim[cid] = rec
 
     failed: list[str] = []
@@ -200,12 +223,17 @@ def main() -> int:
         incomplete.append("(required-claims list is empty — invalid run)")
 
     for cid in required:
+        if cid in dup_claims:
+            incomplete.append(f"{cid}: duplicate records for claim_id (ambiguous)")
+            per_claim.append({"claim_id": cid, "status": "duplicate-record"})
+            continue
         rec = by_claim.get(cid)
         if rec is None:
             incomplete.append(f"{cid}: no record")
             per_claim.append({"claim_id": cid, "status": "missing-record"})
             continue
-        defects = validate_record(rec, args.expect_snapshot)
+        defects = validate_record(rec, args.expect_snapshot, args.expect_intent,
+                                  args.expect_manifest, args.snapshot_exact)
         if defects:
             incomplete.append(f"{cid}: invalid record ({'; '.join(defects)})")
             per_claim.append({"claim_id": cid, "status": "invalid",

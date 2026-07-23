@@ -1,0 +1,68 @@
+{
+  "_comment": "Colosseum deliberation-panel rosters. Installed to <project>/.colosseum/panel-profiles.json by colosseum_init --harness omp. Each seat is a RANKED candidate list resolved to the first AVAILABLE model by the colosseum-panel-resolver extension, which checks availability + enforces distinct model families via OMP ctx.models.family. Panel execution REQUIRES that extension and fails closed if it is absent; the stdlib panel_roster loader is diagnostics/tests only (declared_family labels, no availability or model-family check) and never resolves a live panel. Capacity note (2026-07): the reliable frontier seats are openai-codex/gpt-5.6-sol (OpenAI) and glm-5.2 (Zhipu); claude-fable-5 (Anthropic) and kimi-k3 (Moonshot) are intermittently at capacity. The active roster is therefore the two available families with min_families=2; when Fable and Kimi-k3 return, add the pending seats in _pending_seats and raise min_families. No substitute models (opus/kimi-2.6) are used; a seat resolves to its named frontier model or the run reports its absence. declared_family is a stable persisted label; the opaque OMP family token is never persisted. OMP routes are uncalibrated (calibration: pending).",
+  "version": 1,
+  "profiles": {
+    "large-project": {
+      "mode": "project-plan",
+      "min_families": 2,
+      "seats": [
+        {
+          "seat_id": "openai",
+          "declared_family": "OpenAI",
+          "thinking_level": "max",
+          "calibration": "pending",
+          "candidates": ["openai-codex/gpt-5.6-sol"]
+        },
+        {
+          "seat_id": "zhipu",
+          "declared_family": "Zhipu",
+          "thinking_level": "max",
+          "calibration": "pending",
+          "candidates": ["fireworks/glm-5.2", "glm-5.2"]
+        }
+      ],
+      "_pending_seats": [
+        {"seat_id": "anthropic", "declared_family": "Anthropic", "thinking_level": "max", "calibration": "pending", "candidates": ["anthropic/claude-fable-5"], "_note": "add when Fable returns; raise min_families"},
+        {"seat_id": "moonshot", "declared_family": "Moonshot", "thinking_level": "max", "calibration": "pending", "candidates": ["kimi-k3"], "_note": "add when Kimi-k3 returns; raise min_families"}
+      ],
+      "synthesizer": {
+        "seat_id": "synthesizer",
+        "declared_family": "OpenAI",
+        "thinking_level": "max",
+        "calibration": "pending",
+        "candidates": ["openai-codex/gpt-5.6-sol"]
+      }
+    },
+    "milestone-review": {
+      "mode": "milestone-review",
+      "min_families": 2,
+      "seats": [
+        {
+          "seat_id": "openai",
+          "declared_family": "OpenAI",
+          "thinking_level": "max",
+          "calibration": "pending",
+          "candidates": ["openai-codex/gpt-5.6-sol"]
+        },
+        {
+          "seat_id": "zhipu",
+          "declared_family": "Zhipu",
+          "thinking_level": "max",
+          "calibration": "pending",
+          "candidates": ["fireworks/glm-5.2", "glm-5.2"]
+        }
+      ],
+      "_pending_seats": [
+        {"seat_id": "anthropic", "declared_family": "Anthropic", "thinking_level": "max", "calibration": "pending", "candidates": ["anthropic/claude-fable-5"], "_note": "add when Fable returns; raise min_families"},
+        {"seat_id": "moonshot", "declared_family": "Moonshot", "thinking_level": "max", "calibration": "pending", "candidates": ["kimi-k3"], "_note": "add when Kimi-k3 returns; raise min_families"}
+      ],
+      "synthesizer": {
+        "seat_id": "adjudicator",
+        "declared_family": "OpenAI",
+        "thinking_level": "max",
+        "calibration": "pending",
+        "candidates": ["openai-codex/gpt-5.6-sol"]
+      }
+    }
+  }
+}
