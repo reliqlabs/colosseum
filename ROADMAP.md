@@ -23,18 +23,15 @@ committed on `main`, one commit per item:
 
 Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
 dispatch-config, fixture-tracking, and the full regression suite
-(`tests/run_all.py`, 30 suites). RED locally as of this writing: 28/30 pass;
-`r0_registry_docs.py` and `r14_cli_contracts.py` both fail on one cause, the
-installed `opencode` being 1.18.4 against the `bom.json` pin of 1.18.3. The
-pin is unchanged in HEAD and the worktree, so this is local toolchain drift in
-the opencode harness, not a Colosseum regression. Both suites run to
-completion (collect-and-continue `check()`), and in each the version-string
-equality is the *only* failing assertion: under the live 1.18.4 binary every
-`opencode run` flag contract the BOM encodes (`--agent`, `--model`,
-`--format`, `--variant`) passes, as does everything after the failure. Two
-remedies clear it: reinstall the pinned 1.18.3, or bump `bom.json`
-deliberately. Flag-presence contracts passing is not behavioral equivalence,
-so a bump should still be a considered decision rather than a reflex. The
+(`tests/run_all.py`, 30 suites). Green locally as of this writing (7/7 checks,
+30/30 suites). The `opencode` pin was bumped 1.18.3 -> 1.18.4 on 2026-07-24
+after the installed binary drifted ahead of it. The bump was validated, not
+rubber-stamped: every `opencode run` flag contract the BOM encodes
+(`--agent`, `--model`, `--format`, `--variant`) passes under 1.18.4, and the
+canonical dispatch path was smoke-tested end-to-end in a scaffolded project
+(`--format json --variant max --agent spec-adversary --model
+openai/gpt-5.6-sol`), verified by parsing the event stream to an assistant
+`PONG` and a `step_finish` with `reason: stop` rather than by exit code. The
 GitHub Actions mirror (`colosseum-ci` on `main`) is green since 2026-07-14;
 on its toolchain-less runner the toolchain-dependent suites degrade to a
 tolerated INCOMPLETE rather than failing (see the CI section below).
@@ -195,6 +192,34 @@ should participate.
 - Push `main`: DONE 2026-07-14 (github.com:reliqlabs/colosseum). The
   `scratchpad/` private review narrative is gitignored so a stray
   `git add -A` can never sweep it into a push.
+- Dispatch fail-open (2026-07-24): the rc=0 observation is RETRACTED, but a
+  separate structured-error acceptance/reporting gap remains open. A report that
+  `opencode run` exits 0 while printing an `Error: {...}` payload came from a
+  bad measurement, `opencode ... 2>&1 | tail; echo $?`, which reads the
+  pipeline's status (`tail`) rather than opencode's. Measured directly,
+  opencode exits 1 and writes the payload to stderr with stdout empty, so for
+  *that* case both runners reject it: `benchmark_run.py` `Dispatcher.run` and
+  `opencode_dispatch.py` `dispatch_one` each fail closed on
+  `returncode != 0`. The `plaintext-fallback` branch in `parse_event_stream`
+  is deliberate tolerance for CLI/format drift, and no rc=0-with-error-on-
+  stdout case has been observed.
+  Scope that to the observed case only: `dispatch_one` is not universally
+  fail-closed. Its guard is `returncode != 0 or (errors and not content)`, so
+  a run that exits 0 carrying structured `error` events *plus* assistant text
+  is accepted, and the success record (out_path / finish_reason / tokens /
+  parser_schema) omits `parsed["errors"]` entirely. Such a partially-errored
+  generation would be recorded as a clean success, auditable only in the
+  verbatim `.events.jsonl`. `_is_truncated_stub` catches the short/markerless
+  subset; a long partial response with an error event would pass. Unobserved
+  in practice, so recorded rather than speculatively patched: the fix is to
+  surface `parsed["errors"]` on the success record and decide explicitly
+  whether a nonempty set may accompany a PASS (agent).
+- Nothing is `brew pin`ned, and `opencode` comes from a third-party tap
+  (`anomalyco/homebrew-tap`), so the next `brew upgrade` can silently move it
+  ahead of the BOM again and recreate the 2026-07-24 mismatch. Recommended:
+  `brew pin opencode`, so adopting a new version stays a deliberate act
+  matching the BOM's own "pin here first" rule (user; global toolchain
+  change, so not applied automatically).
 
 ### jobq spec strengthening — DONE 2026-07-14 except F2 (commit 61e6588)
 

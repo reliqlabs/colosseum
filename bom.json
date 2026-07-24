@@ -1,7 +1,7 @@
 {
   "_comment": "Locked compatibility BOM (E6). These are the versions the repo is dogfooded against. tests/r14_cli_contracts.py fails when a live tool drifts from these pins or when a CLI flag the pipeline depends on disappears: update a pin deliberately, re-run the suite, and record the bump in the commit message. Do not point installs at latest/stable; pin here first.",
   "tools": {
-    "opencode": "1.18.3",
+    "opencode": "1.18.4",
     "quint": "0.32.0",
     "apalache": "0.56.1",
     "lean": "4.29.0",
