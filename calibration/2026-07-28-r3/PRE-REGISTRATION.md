@@ -107,7 +107,7 @@ now by commitment, so neither can be written or amended after outputs are read:
 
 ```
 sha256(SEALED-ANNEX.md) = fb5aa2a45d70a1a23020fd103e9bc29ebf0b07e641b4a1e67b6fef6999e4c8d0
-sha256(corpus.json)     = d402c732890f5c34b9a8226a9aa1ffa5bdaf2509dcd6a5d6b108044b6e60783c
+sha256(corpus.json)     = 0032b43572f266053d4b8964a9fe48a99600ca4af3c1484531d92ce1656dbea3
 ```
 
 The annex holds the difficulty-calibration specifics and one location-scoring
@@ -115,6 +115,28 @@ rule whose statement would name a defect's file. Both are load-bearing: the
 difficulty claim justifies holding r2's floor, and the scoring rule must be
 fixed before dispatch to keep scoring mechanical rather than adjudicated. After
 publication anyone can verify these hashes against the committed text.
+
+### Amendment, pre-dispatch (recorded, not silent)
+
+The first commit of this file (`fe874c8`) published
+`sha256(corpus.json) = d402c732890f5c34b9a8226a9aa1ffa5bdaf2509dcd6a5d6b108044b6e60783c`.
+That hash covered the corpus while its `target_snapshot` field still read
+`PENDING-FREEZE`, because the field can only be filled once the commit that
+freezes the target exists. Setting it to the real freeze commit
+(`fe874c8148e7+worktree-clean`) necessarily changed the file's hash, so the
+original commitment would no longer verify against the corpus that eventually
+gets published. The hash above supersedes it.
+
+Both values are recorded so the substitution is auditable rather than looking
+like tampering: replacing `fe874c8148e7+worktree-clean` with `PENDING-FREEZE` in
+the published `corpus.json` reproduces the original hash exactly.
+
+This amendment is pre-dispatch. At the time of writing no voice had been asked
+to review the corpus and no findings existed. The only model calls made against
+the routes under test were two one-line transport probes (`ROUTE-OK`), which is
+why the published usage baseline starts at 5 and 1 requests rather than zero.
+Nothing in the decision rule, the floor, the match rule, or the corpus content
+changed.
 
 ## Route attestation (pre-registered)
 
