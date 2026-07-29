@@ -328,6 +328,28 @@ def _route_established(record: Mapping[str, Any]) -> bool:
     return basis == "omp-reported" or basis.startswith("inferred:")
 
 
+def _unwrap_lone_string(data: Any) -> str:
+    """A structured result's payload, unwrapped when it is one string.
+
+    A subagent that yields structured output arrives here as a Mapping. Naively
+    serializing it writes the model's prose to disk as an ESCAPED JSON string
+    value, so the raw evidence file is a transport envelope rather than the
+    voice's own text -- observed in calibration/2026-07-28-r3, where three of
+    four voices' compliant fenced findings blocks were escaped inside
+    ``{"findings_json": "..."}`` and the first scoring pass read them as
+    unparseable. Only a single-string payload is unwrapped: with two or more
+    fields there is no basis for choosing, and guessing would silently drop
+    evidence.
+    """
+    if isinstance(data, str):
+        return data
+    if isinstance(data, Mapping) and len(data) == 1:
+        (only,) = data.values()
+        if isinstance(only, str):
+            return only
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
 def _result_text(result: Any) -> tuple[str, str | None, str | None]:
     if isinstance(result, str):
         return result, None, None
@@ -344,7 +366,7 @@ def _result_text(result: Any) -> tuple[str, str | None, str | None]:
         else:
             data = result.get("data", output)
             if data is not None:
-                text = json.dumps(data, indent=2, ensure_ascii=False)
+                text = _unwrap_lone_string(data)
             elif result.get("error"):
                 raise RuntimeError(str(result["error"]))
             else:

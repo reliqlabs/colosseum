@@ -1,0 +1,98 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "leasedb",
+  "target_snapshot": "fe874c8148e7+worktree-clean",
+  "line_tolerance": 5,
+  "_comment": "Ground truth for calibration run 2026-07-28-r3. Blinded: this file never enters the dispatch directory. Match rule per docs/benchmark-protocol.md: file basename + exact category + line within tolerance. Domain deliberately unrelated to the burned 2026-07-13-r1 and 2026-07-26-r2 corpora (a lease manager, not a segmented log). Every planted defect was proven reachable by a scratch test before freezing; those tests are NOT shipped in the target. Four taxonomy categories carry nothing planted: missing-bounds-check, default-mismatch, injection, dead-code.",
+  "_overlap_note": "D6 (src/api.rs:49) and D1 (src/api.rs:52) fall inside each other's line tolerance. They remain separable because the match rule requires an exact category match and their categories differ; no single detection can satisfy both.",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "src/api.rs",
+      "line": 52,
+      "category": "race-condition",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "acquire() checks the incumbent lease's liveness under a read lock, releases it, then inserts under a separate write lock. Two concurrent acquirers of one resource both observe no live lease and both receive a grant, and the second insert silently overwrites the first, so two holders each believe they hold the resource under different fencing tokens. Violates B1. Proven reachable with a 2-thread barrier test.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/api.rs:52:race-condition"
+    },
+    {
+      "id": "D2",
+      "file": "src/lease.rs",
+      "line": 36,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "Lease::new computes `now_ms + ttl_ms` with an unchecked add. B6 requires refusing an unrepresentable deadline with TtlOverflow; instead the sum wraps in release builds, producing a deadline in the past so the lease is born expired. The function's Result return type promises the check it never performs, and TtlOverflow is never constructed anywhere in the crate.",
+      "cheapest_capable_layer": "bounded-model-check",
+      "detection_key": "src/lease.rs:36:unchecked-arithmetic"
+    },
+    {
+      "id": "D3",
+      "file": "src/lease.rs",
+      "line": 48,
+      "category": "off-by-one",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "is_valid() uses `now_ms <= self.expires_at_ms`, so a lease is still considered live at the exact instant of its own deadline. B3 requires the lease to be expired when now_ms equals the deadline. Grants a one-millisecond exclusivity overlap between a departing and an arriving holder.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/lease.rs:48:off-by-one"
+    },
+    {
+      "id": "D4",
+      "file": "src/api.rs",
+      "line": 85,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "renew() returns BadToken when the presented token EQUALS the lease's current token, the exact inverse of B5. The rightful holder can never renew, and any caller presenting any other token renews someone else's lease successfully.",
+      "cheapest_capable_layer": "types",
+      "detection_key": "src/api.rs:85:logic-inversion"
+    },
+    {
+      "id": "D5",
+      "file": "src/reaper.rs",
+      "line": 27,
+      "category": "error-swallowed",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "reap_expired() discards the Notifier result with `let _ =` and counts the lease as collected regardless. B7 requires propagating a delivery failure; instead a holder that was never told its lease was revoked is reported to the caller as cleanly collected, so it keeps writing under a token the storage layer will later fence.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/reaper.rs:27:error-swallowed"
+    },
+    {
+      "id": "D6",
+      "file": "src/api.rs",
+      "line": 49,
+      "category": "missing-validation",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "acquire() never checks for a zero duration and instead coerces it with `ttl_ms.max(1)`, silently widening a caller error into a one-millisecond lease. B2 requires rejecting it with ZeroTtl, and ZeroTtl is never constructed anywhere in the crate.",
+      "cheapest_capable_layer": "types",
+      "detection_key": "src/api.rs:49:missing-validation"
+    },
+    {
+      "id": "D7",
+      "file": "src/tokens.rs",
+      "line": 27,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "TokenAllocator keys its counters per resource and forget() removes the counter entirely, so the next grant for that resource restarts at 1 and reissues a token that was already handed out. Violates B4's lifetime monotonicity, which defeats storage-layer fencing: a resurrected token no longer sorts above the tokens a fenced writer already used. UNIQUE FIX SITE: the forget() call in api.rs is REQUIRED by B8, which mandates freeing per-resource state when a lease ends, so deleting the call trades a B4 violation for a B8 violation. The only fix satisfying both clauses is here in tokens.rs -- allocate from a counter monotonic over the manager's lifetime while still dropping the per-resource map entry. Cross-file symptom: the defect only manifests through the release() and reap() call sites in src/api.rs, and a citation at those symptom sites is a miss under the match rule (see the sealed annex, D7 scoring note).",
+      "cheapest_capable_layer": "proof",
+      "detection_key": "src/tokens.rs:27:invariant-violation"
+    },
+    {
+      "id": "D8",
+      "file": "src/api.rs",
+      "line": 101,
+      "category": "resource-leak",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "release() drops the lease and the token counter but never clears the resource's waiter list, so waiter registrations accumulate without bound for resources that no longer exist. Violates B8. The reap() path immediately below does clear waiters, making the omission visible by comparison between the two paths.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/api.rs:101:resource-leak"
+    }
+  ]
+}

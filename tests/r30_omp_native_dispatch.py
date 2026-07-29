@@ -73,6 +73,24 @@ def main() -> int:
           == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"])
     check("canonical OMP route is explicitly uncalibrated",
           route["calibration"] == "pending")
+
+    # Raw evidence must be the VOICE's text, not a transport envelope. A subagent
+    # yielding structured output used to land on disk as escaped JSON, which made
+    # three of four r3 voices read as unparseable despite compliant output.
+    check("a lone-string structured payload is unwrapped",
+          mod._result_text({"data": {"findings": "```json\n[]\n```"}})[0]
+          == "```json\n[]\n```")
+    check("a plain string result is untouched",
+          mod._result_text("verbatim")[0] == "verbatim")
+    check("text field still wins over data",
+          mod._result_text({"text": "chosen", "data": {"x": "ignored"}})[0] == "chosen")
+    # Two fields give no basis for choosing; guessing would drop evidence.
+    multi = mod._result_text({"data": {"a": "one", "b": "two"}})[0]
+    check("a multi-field payload is preserved whole, not guessed at",
+          json.loads(multi) == {"a": "one", "b": "two"}, multi)
+    check("a non-string lone value is preserved as JSON",
+          json.loads(mod._result_text({"data": {"findings": [1, 2]}})[0])
+          == {"findings": [1, 2]})
     # The generated config must carry exactly the registry's levels. The policy
     # itself is checked against each voice's recorded ladder in r0; duplicating
     # a hardcoded level table here would just be a second thing to update, and

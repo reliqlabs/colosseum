@@ -1,0 +1,388 @@
+{
+  "claude-agent": [
+    {
+      "file": "src/api.rs",
+      "line": 68,
+      "category": "race-condition",
+      "severity": "critical",
+      "title": "acquire checks liveness under a briefly held read lock (lines 52-58) then inserts under a separate write lock, so two concurrent acquirers of one resource both receive grants and the second insert silently overwrites a live lease instead of failing with Held (B1)."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 85,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "title": "renew rejects the matching token with BadToken and accepts every non-matching token, inverting B5 so the legitimate holder can never renew while any stale or forged token can move the deadline."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 27,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "forget erases the per-resource counter on release and reap, so the next grant for that resource restarts at token 1 and reissues previously issued tokens, defeating fencing (B4)."
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 48,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "is_valid uses now_ms <= expires_at_ms, so a lease still confers exclusivity and escapes reaping at the exact deadline instant, where B3 requires it to be expired."
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 36,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "now_ms + ttl_ms is unchecked, so a large ttl wraps in release builds into a deadline in the past (or panics in debug) instead of being refused with TtlOverflow (B6)."
+    },
+    {
+      "file": "src/reaper.rs",
+      "line": 27,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "the Notifier result is discarded with let _, so a lease whose revocation notice failed is still removed and counted as cleanly collected, and reap can never report NotifyFailed (B7)."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 49,
+      "category": "missing-validation",
+      "severity": "medium",
+      "title": "acquire silently widens a zero ttl to 1 ms via ttl_ms.max(1) instead of rejecting it with ZeroTtl (B2), leaving the ZeroTtl variant unreachable."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 101,
+      "category": "resource-leak",
+      "severity": "medium",
+      "title": "release removes the lease and token counter but never removes the resource's registered waiters (reap does), so waiter entries for released resources persist indefinitely (B8)."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 120,
+      "category": "resource-leak",
+      "severity": "medium",
+      "title": "register_waiter accepts registrations for resources that have no lease and nothing ever frees them, so per-resource waiter state accumulates without bound (B8)."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 88,
+      "category": "unchecked-arithmetic",
+      "severity": "medium",
+      "title": "renew computes the new deadline with saturating_add, clamping an overflowing deadline to u64::MAX (an effectively unbounded lease) instead of refusing with TtlOverflow (B6)."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 46,
+      "category": "race-condition",
+      "severity": "medium",
+      "title": "the capacity check reads len under a transient read lock, so concurrent acquires on distinct resources can all pass at max_leases - 1 and push the map past max_leases."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 108,
+      "category": "race-condition",
+      "severity": "medium",
+      "title": "reap invokes the caller-supplied Notifier while holding the leases write lock, so a slow notifier blocks every manager operation and a notifier that reenters the manager self-deadlocks on non-reentrant parking_lot locks."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 20,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "token counters are kept per resource, so the same token value is issued for different resources and tokens do not strictly increase over the manager's lifetime as B4 and the allocator's own doc require."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 88,
+      "category": "missing-validation",
+      "severity": "low",
+      "title": "renew silently widens a zero ttl to 1 ms via ttl_ms.max(1), extending a lease by a duration the caller never requested, despite the intent's rule that zero-length is never silently widened."
+    }
+  ],
+  "glm-5.2": [
+    {
+      "file": "src/api.rs",
+      "line": 86,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "title": "renew rejects the correct token and accepts any wrong one, inverting B5 authority"
+    },
+    {
+      "file": "src/reaper.rs",
+      "line": 28,
+      "category": "error-swallowed",
+      "severity": "critical",
+      "title": "reap discards the Notifier result so a failed revocation notice is counted as collected, violating B7"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 69,
+      "category": "race-condition",
+      "severity": "critical",
+      "title": "acquire drops the read lock before taking the write lock, letting two concurrent acquirers both pass Held and insert, breaking B1 mutual exclusion"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 48,
+      "category": "race-condition",
+      "severity": "high",
+      "title": "acquire checks capacity under a read lock then inserts under a later write lock, admitting leases beyond max_leases under concurrency"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 53,
+      "category": "default-mismatch",
+      "severity": "high",
+      "title": "acquire silently widens a zero ttl to 1 instead of returning ZeroTtl, violating B2"
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 50,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "is_valid uses <= so the lease is still live at its deadline, contradicting B3 which expires it at that instant"
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 41,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Lease::new adds now_ms + ttl_ms without overflow handling, panicking in debug or wrapping in release instead of returning TtlOverflow per B6"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 90,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "renew uses saturating_add so an overflowing ttl folds to u64::MAX instead of returning TtlOverflow, violating B6"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 90,
+      "category": "missing-validation",
+      "severity": "medium",
+      "title": "renew accepts a zero ttl and silently widens it to 1 instead of rejecting with ZeroTtl"
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 22,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "forget deletes the per-resource counter so a later grant restarts at 1 and reissues a prior token, violating B4 monotonicity"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 124,
+      "category": "resource-leak",
+      "severity": "medium",
+      "title": "register_waiter creates waiter entries for resources with no lease, accumulating unbounded per-resource state forbidden by B8"
+    },
+    {
+      "file": "src/api.rs",
+      "line": 101,
+      "category": "resource-leak",
+      "severity": "medium",
+      "title": "release frees the lease and tokens but never clears waiters for the resource, retaining state B8 requires freed when a lease ends"
+    }
+  ],
+  "gpt-5.6-sol": [
+    {
+      "file": "src/api.rs",
+      "line": 68,
+      "category": "race-condition",
+      "severity": "critical",
+      "title": "Concurrent acquires can both pass the detached read check and both return grants for the same resource."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 46,
+      "category": "race-condition",
+      "severity": "high",
+      "title": "The non-atomic capacity check lets concurrent acquires exceed max_leases."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 46,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "The early capacity return masks the contractually required Held and ZeroTtl errors."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 49,
+      "category": "missing-validation",
+      "severity": "high",
+      "title": "acquire silently widens a zero TTL to one millisecond instead of returning ZeroTtl."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 68,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "acquire overwrites an expired record without releasing it, collecting it, or notifying its holder."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 85,
+      "category": "logic-inversion",
+      "severity": "high",
+      "title": "renew rejects the current token and accepts every non-current token."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 88,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "renew clamps an overflowing deadline instead of returning TtlOverflow."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 88,
+      "category": "invariant-violation",
+      "severity": "medium",
+      "title": "renew silently changes a representable zero duration into one millisecond, so its deadline computation is not exact."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 100,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "release removes the lease but leaves every waiter for the resource retained."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 122,
+      "category": "resource-leak",
+      "severity": "high",
+      "title": "register_waiter creates unbounded per-resource state even when the resource has no lease."
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 36,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "Lease::new uses unchecked deadline addition, which can panic or wrap instead of returning TtlOverflow."
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 48,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "A lease is treated as live at its exact deadline instead of expiring there."
+    },
+    {
+      "file": "src/reaper.rs",
+      "line": 27,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "reap_expired discards notification failures and still counts the lease as collected."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 20,
+      "category": "invariant-violation",
+      "severity": "high",
+      "title": "Per-resource counters issue duplicate fencing tokens for grants on different resources."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 27,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "Forgetting a resource counter causes its next grant to reuse a previously issued fencing token."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 21,
+      "category": "unchecked-arithmetic",
+      "severity": "low",
+      "title": "The fencing-token increment can panic or wrap after u64::MAX, violating lifetime monotonicity."
+    }
+  ],
+  "kimi-k3": [
+    {
+      "file": "src/lease.rs",
+      "line": 48,
+      "category": "off-by-one",
+      "severity": "high",
+      "title": "is_valid uses now_ms <= expires_at_ms, so a lease is still considered live at the exact instant of its deadline, violating B3's strict-before boundary."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 49,
+      "category": "missing-validation",
+      "severity": "high",
+      "title": "acquire silently widens a zero ttl_ms to 1 via ttl_ms.max(1) instead of rejecting it with ZeroTtl, violating B2."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 85,
+      "category": "logic-inversion",
+      "severity": "critical",
+      "title": "renew rejects when the presented token EQUALS the current token and renews on any other token, so the rightful holder always gets BadToken while any wrong token extends the lease, inverting B5."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 88,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "renew computes the new deadline with saturating_add, silently clamping an unrepresentable deadline to u64::MAX instead of refusing with TtlOverflow, violating B6."
+    },
+    {
+      "file": "src/lease.rs",
+      "line": 36,
+      "category": "unchecked-arithmetic",
+      "severity": "critical",
+      "title": "Lease::new computes expires_at_ms with a bare addition, so now_ms + ttl_ms overflows (panicking in debug or wrapping to a past deadline in release) instead of returning TtlOverflow, violating B6."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 14,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "TokenAllocator keeps per-resource counters instead of a manager-wide counter, so two different resources receive the same fencing token and a storage layer fencing on highest-token-seen falsely rejects valid writers, violating B4."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 27,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "title": "forget() removes the resource's counter so the next grant for that resource restarts at 1, reissuing already-issued tokens after release or reap, violating B4's never-reused rule."
+    },
+    {
+      "file": "src/tokens.rs",
+      "line": 21,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "title": "TokenAllocator::next uses a bare increment that panics or wraps to zero on u64 overflow instead of guaranteeing a unique token, violating B4."
+    },
+    {
+      "file": "src/reaper.rs",
+      "line": 27,
+      "category": "error-swallowed",
+      "severity": "high",
+      "title": "reap_expired discards notifier.revoked() errors with let _ = _, removes the lease, and counts it as collected, so an undelivered revocation is never reported to reap's caller, violating B7."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 46,
+      "category": "race-condition",
+      "severity": "high",
+      "title": "acquire checks capacity under a read lock that is immediately dropped, so two concurrent acquirers can both pass the len() >= max_leases check and both insert, exceeding the configured capacity."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 68,
+      "category": "race-condition",
+      "severity": "critical",
+      "title": "acquire's liveness read and the final insert are not atomic, so two concurrent acquirers of the same resource can both observe no live lease and both insert, producing two grants and breaking B1 mutual exclusion."
+    },
+    {
+      "file": "src/api.rs",
+      "line": 118,
+      "category": "resource-leak",
+      "severity": "medium",
+      "title": "register_waiter creates waiter entries for arbitrary resources and nothing ever removes entries for resources that have no lease, so waiter state grows unboundedly past the B8 bound."
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "baseline": {
+    "openai-codex|gpt-5.6-sol": 1400,
+    "anthropic|claude-opus-5": 1333,
+    "openai-codex|gpt-5.6-terra": 685,
+    "anthropic|claude-fable-5": 396,
+    "anthropic|claude-sonnet-5": 306,
+    "synthetic|hf:zai-org/GLM-5.2": 5,
+    "synthetic|hf:moonshotai/Kimi-K3": 1
+  },
+  "after": {
+    "openai-codex|gpt-5.6-sol": 1264,
+    "anthropic|claude-opus-5": 1253,
+    "openai-codex|gpt-5.6-terra": 685,
+    "anthropic|claude-fable-5": 430,
+    "anthropic|claude-sonnet-5": 306,
+    "fireworks|glm-5.2": 22,
+    "synthetic|hf:zai-org/GLM-5.2": 15,
+    "synthetic|hf:moonshotai/Kimi-K3": 5
+  },
+  "deltas": {
+    "anthropic|claude-fable-5": 34,
+    "synthetic|hf:zai-org/GLM-5.2": 10,
+    "synthetic|hf:moonshotai/Kimi-K3": 4,
+    "fireworks|glm-5.2": 22,
+    "anthropic|claude-opus-5": -80,
+    "openai-codex|gpt-5.6-sol": -136
+  },
+  "fireworks_delta": {
+    "fireworks|glm-5.2": 22
+  },
+  "gate": "fail"
+}

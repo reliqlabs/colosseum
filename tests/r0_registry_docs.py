@@ -88,6 +88,21 @@ def main() -> int:
     for v in omp_mapped:
         check(f"OMP route {v['id']} has separate calibration",
               isinstance(v.get("omp_calibration"), str) and bool(v["omp_calibration"]))
+
+    # The pending sentinel must stay EXACT. render_omp_native_config marks the
+    # whole route "cited" only when no voice equals "pending", so decorating this
+    # field with an explanation ("pending. Scored 7/7 but unattested...") silently
+    # promotes the route to calibrated. That regression was introduced and caught
+    # by CI once; this is the guard.
+    for v in omp_mapped:
+        cal = v["omp_calibration"]
+        looks_pending = cal.strip().lower().startswith("pending")
+        check(f"OMP route {v['id']} pending sentinel is exact",
+              cal == "pending" or not looks_pending,
+              f"reads as pending but is not the literal: {cal[:60]!r}")
+        if cal != "pending" and v.get("omp_calibration_note"):
+            check(f"OMP route {v['id']} cited route carries no pending note",
+                  False, "omp_calibration_note is only for pending routes")
     canonical = gen.profile_by_name(reg, "canonical-4")
     canonical_voices = [gen.voice_by_id(reg, pv["id"]) for pv in canonical["voices"]]
     check("every canonical voice has an OMP-native route",
