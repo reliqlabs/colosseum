@@ -36,8 +36,8 @@ The adversarial voice roster is registry-driven. `registry/voices.json` is the s
 | `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | n/a | Google | opencode | candidate | pending | n/a |
 | `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | n/a | OpenAI-OSS | opencode | candidate | cited | n/a |
 | `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | n/a | NVIDIA | opencode | candidate | cited | n/a |
-| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | `fireworks/glm-5.2` | Zhipu | opencode | canonical-panel | cited | pending |
-| `kimi-k3` | `fireworks-ai/accounts/fireworks/models/kimi-k3` | `fireworks/kimi-k3` | Moonshot | opencode | canonical-panel | cited | pending |
+| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | `synthetic/hf:zai-org/GLM-5.2` | Zhipu | opencode | canonical-panel | cited | pending |
+| `kimi-k3` | `fireworks-ai/accounts/fireworks/models/kimi-k3` | `synthetic/hf:moonshotai/Kimi-K3` | Moonshot | opencode | canonical-panel | cited | pending |
 | `leanstral-2603` | `lmstudio/leanstral-2603` | n/a | Mistral | opencode | local-specialist | n/a | n/a |
 | `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | n/a | Zhipu | opencode | excluded | cited | n/a |
 | `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | n/a | theorem-prover-specialist | opencode | excluded | cited | n/a |

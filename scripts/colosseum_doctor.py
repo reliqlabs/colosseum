@@ -183,6 +183,57 @@ def check_registry(rep: Report, gen, reg: dict) -> None:
             "all mapped" if not missing else f"missing={missing}")
 
 
+def check_omp_ladders(rep: Report, reg: dict) -> None:
+    """Compare each recorded `omp_thinking_ladder` against the live catalog.
+
+    r0 asserts the LEVEL is one-below-max on the RECORDED ladder, which cannot
+    detect a recorded ladder that has gone stale: truncating a ladder's real top
+    rung makes the truncated top look correct and the offline check passes. Only
+    the live catalog closes that hole, so this check is the sole detector of a
+    provider silently redefining the operating point a calibration cites.
+    """
+    recorded = [v for v in reg["voices"] if v.get("omp_thinking_ladder")]
+    if not recorded:
+        return
+    if shutil.which("omp") is None:
+        rep.add("registry", "omp ladders vs live catalog", "warn",
+                "omp not on PATH — recorded ladders unverified")
+        return
+    try:
+        proc = subprocess.run(["omp", "models", "--json"],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        rep.add("registry", "omp ladders vs live catalog", "warn",
+                f"catalog unavailable: {exc}")
+        return
+    if proc.returncode != 0:
+        rep.add("registry", "omp ladders vs live catalog", "warn",
+                f"omp models exited {proc.returncode}")
+        return
+    try:
+        models = json.loads(proc.stdout)["models"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        rep.add("registry", "omp ladders vs live catalog", "warn",
+                f"unparseable catalog: {exc}")
+        return
+    live: dict[str, list] = {}
+    for m in models:
+        for key in (m.get("id"), m.get("selector")):
+            if key:
+                live[key] = m.get("thinking") or []
+    for v in recorded:
+        model = v["omp_model"]
+        if model not in live:
+            rep.add("registry", f"voice {v['id']} ladder", "fail",
+                    f"{model!r} not in the live catalog")
+            continue
+        same = live[model] == v["omp_thinking_ladder"]
+        rep.add("registry", f"voice {v['id']} ladder", "ok" if same else "fail",
+                "matches live catalog" if same else
+                f"recorded={'/'.join(v['omp_thinking_ladder'])} "
+                f"live={'/'.join(live[model])}")
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # 3. Provider plumbing (free) + optional --live probe
 # ─────────────────────────────────────────────────────────────────────────
@@ -745,6 +796,7 @@ def main() -> int:
     rep = Report()
     check_toolchain(rep, bom, include_opencode=not omp_project)
     check_registry(rep, gen, reg)
+    check_omp_ladders(rep, reg)
     check_plumbing(rep, gen, reg, include_opencode=not omp_project)
     if not args.skip_home_drift:
         check_home_drift(rep, repo)

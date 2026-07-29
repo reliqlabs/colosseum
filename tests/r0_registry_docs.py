@@ -93,6 +93,40 @@ def main() -> int:
     check("every canonical voice has an OMP-native route",
           all(v.get("omp_model") for v in canonical_voices))
 
+    # The effort policy is data-checkable, not prose. Each voice records the
+    # ladder its route actually exposes, and the level must be what
+    # `one-below-max` yields on THAT list: step down from `max`, or take the top
+    # rung when the ladder has no `max`. The ladder belongs to the PROVIDER, so
+    # moving a model between providers can legitimately change the level -- which
+    # is exactly why this is asserted against recorded rungs instead of a
+    # hardcoded table of expected levels.
+    for v in omp_mapped:
+        if v.get("omp_thinking_level") is None:
+            check(f"OMP route {v['id']} with a null level records no ladder",
+                  not v.get("omp_thinking_ladder"))
+            continue
+        ladder = v.get("omp_thinking_ladder")
+        check(f"OMP route {v['id']} records its ladder",
+              isinstance(ladder, list) and bool(ladder), ladder)
+        if not (isinstance(ladder, list) and ladder):
+            continue
+        expected = ladder[-2] if ladder[-1] == "max" else ladder[-1]
+        check(f"OMP route {v['id']} level is one-below-max on its own ladder",
+              v["omp_thinking_level"] == expected,
+              f"ladder={'/'.join(ladder)} level={v['omp_thinking_level']} "
+              f"policy_expects={expected}")
+        check(f"OMP route {v['id']} level is a real rung",
+              v["omp_thinking_level"] in ladder, ladder)
+
+    # Self-test: renaming a top rung must be caught, not absorbed. This is the
+    # exact shape that slipped through when GLM moved provider.
+    fake = {"omp_thinking_level": "high", "omp_thinking_ladder": ["low", "high", "xhigh"]}
+    fake_expected = (fake["omp_thinking_ladder"][-2]
+                     if fake["omp_thinking_ladder"][-1] == "max"
+                     else fake["omp_thinking_ladder"][-1])
+    check("self-test: a level below a non-max top rung is detectable",
+          fake["omp_thinking_level"] != fake_expected)
+
     native_route = gen.render_omp_native_config(reg)
     check("OMP-native route hash recomputes",
           native_route["route_hash"] == gen.omp_route_hash(native_route))

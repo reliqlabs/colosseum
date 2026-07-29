@@ -13,12 +13,12 @@
     {
       "id": "glm-5.2",
       "model": "fireworks-ai/accounts/fireworks/models/glm-5p2",
-      "note": "Zhipu via Fireworks. status=canonical-panel. Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
+      "note": "Zhipu via Fireworks. status=canonical-panel. Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md. Effort note: the cited OpenCode calibration evidence was collected at maximum reasoning (`--variant max`). OMP route moved from `fireworks/glm-5.2` to `synthetic/hf:zai-org/GLM-5.2` on 2026-07-28: same weights, subscription-priced rather than per-token metered, an operator cost decision. The two providers expose DIFFERENT ladders for these weights -- Fireworks minimal/low/medium/high/max, synthetic minimal/low/medium/high/xhigh -- so the unchanged one-below-max policy yields `high` on Fireworks but the top rung `xhigh` on synthetic. OMP's retry.fallbackChains maps this route to `fireworks/glm-5.2:high`, so a synthetic outage degrades BOTH provider and effort; a run whose summary reports served_by_fallback measured that pair, not this route."
     },
     {
       "id": "kimi-k3",
       "model": "fireworks-ai/accounts/fireworks/models/kimi-k3",
-      "note": "Moonshot via Fireworks. status=canonical-panel. Moonshot Kimi K3 via Fireworks. Both routes probed live 2026-07-26: the OpenCode slug `accounts/fireworks/models/kimi-k3` returned content with finish_reason stop (the `k3p0` spelling 404s), and `fireworks/kimi-k3` resolves in OMP's ModelRegistry. 1M context, 131K max output, thinking low/high/max, reasoning on by default and returned in a separate `reasoning_content` field so visible content stays clean. Took canonical-4's Moonshot seat from kimi-k2.6 on 2026-07-26. The OpenCode route is calibrated; the OMP-native route is NOT (omp_calibration: pending) and must still be reported as uncalibrated. Same Moonshot family as kimi-k2.6: the panel resolver enforces family distinctness, so the two cannot occupy separate seats on one panel. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
+      "note": "Moonshot via Fireworks. status=canonical-panel. Moonshot Kimi K3. Both OpenCode routes probed live 2026-07-26: the slug `accounts/fireworks/models/kimi-k3` returned content with finish_reason stop (the `k3p0` spelling 404s). 1M context, 131K max output, thinking low/high/max, reasoning on by default and returned in a separate `reasoning_content` field so visible content stays clean. Took canonical-4's Moonshot seat from kimi-k2.6 on 2026-07-26. The OpenCode route is calibrated; the OMP-native route is NOT (omp_calibration: pending) and must still be reported as uncalibrated. Same Moonshot family as kimi-k2.6: the panel resolver enforces family distinctness, so the two cannot occupy separate seats on one panel. Effort note: the cited OpenCode calibration evidence was collected at maximum reasoning (`--variant max`). OMP route moved from `fireworks/kimi-k3` to `synthetic/hf:moonshotai/Kimi-K3` on 2026-07-28: same weights, subscription-priced rather than per-token metered, an operator cost decision. Both providers expose the same low/high/max ladder here, so the unchanged one-below-max policy yields `high` either way and only the provider changes. OMP's retry.fallbackChains maps this route to `fireworks/kimi-k3:high`, so a degrade preserves the effort level but moves to metered billing."
     }
   ],
   "_comment_claude_voice": "claude-agent runs through the calibrated Claude Code Agent route or the separately tracked OMP-native route. It never runs through opencode_dispatch.py.",
@@ -93,22 +93,22 @@
       },
       {
         "id": "glm-5.2",
-        "model": "fireworks/glm-5.2",
+        "model": "synthetic/hf:zai-org/GLM-5.2",
         "family": "Zhipu",
-        "thinking_level": "high",
-        "dispatch_selector": "fireworks/glm-5.2:high",
+        "thinking_level": "xhigh",
+        "dispatch_selector": "synthetic/hf:zai-org/GLM-5.2:xhigh",
         "calibration": "pending"
       },
       {
         "id": "kimi-k3",
-        "model": "fireworks/kimi-k3",
+        "model": "synthetic/hf:moonshotai/Kimi-K3",
         "family": "Moonshot",
         "thinking_level": "high",
-        "dispatch_selector": "fireworks/kimi-k3:high",
+        "dispatch_selector": "synthetic/hf:moonshotai/Kimi-K3:high",
         "calibration": "pending"
       }
     ],
-    "route_hash": "sha256:8cfbe2a1594c9921"
+    "route_hash": "sha256:d501830ac0020cda"
   },
   "_comment_omp_native": "Generated from registry/voices.json. Run from OMP with the colosseum-adversarial skill's omp_fanout.py helper. A pending calibration must be reported as uncalibrated; never borrow OpenCode fitness evidence."
 }

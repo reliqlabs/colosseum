@@ -61,10 +61,16 @@ def main() -> int:
           == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"])
     check("canonical OMP route is explicitly uncalibrated",
           route["calibration"] == "pending")
-    check("every canonical voice dispatches one step below max",
+    # The generated config must carry exactly the registry's levels. The policy
+    # itself is checked against each voice's recorded ladder in r0; duplicating
+    # a hardcoded level table here would just be a second thing to update, and
+    # it is what broke when GLM's provider changed its top rung's name.
+    registry = json.loads((REPO / "registry" / "voices.json").read_text())
+    canonical = {v["id"]: v for v in registry["voices"]}
+    check("config levels match the registry, voice for voice",
           {v["id"]: v["thinking_level"] for v in route["voices"]}
-          == {"claude-agent": "xhigh", "gpt-5.6-sol": "xhigh",
-              "glm-5.2": "high", "kimi-k3": "high"},
+          == {v["id"]: canonical[v["id"]]["omp_thinking_level"]
+              for v in route["voices"]},
           {v["id"]: v.get("thinking_level") for v in route["voices"]})
     check("dispatch selector carries the per-voice level",
           all(v["dispatch_selector"] == f"{v['model']}:{v['thinking_level']}"
