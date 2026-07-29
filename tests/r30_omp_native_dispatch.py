@@ -155,6 +155,27 @@ def main() -> int:
     check("a missing served model is unknown, never a clean False",
           mod.classify_served_route("p/m:high", {"text": "r"})["served_is_fallback"]
           is None)
+    overlay = mod.fallback_suppression_overlay(route["voices"])
+    expected_suppressed = sorted(
+        mod._base_selector(voice["dispatch_selector"]) for voice in route["voices"]
+    )
+    check("suppression overlay disables exactly every selected base selector",
+          overlay == {"retry": {"fallbackChains": {
+              selector: [] for selector in expected_suppressed
+          }}}, overlay)
+    duplicate = dict(route["voices"][0])
+    duplicate["id"] = "duplicate"
+    check("suppression refuses two voices sharing one base selector",
+          raises(lambda: mod.fallback_suppression_overlay([route["voices"][0], duplicate]),
+                 "share a base selector"))
+    suppressed_same = mod.classify_served_route(
+        "fireworks/kimi-k3:high",
+        {"text": "r", "details": {"model": "fireworks/kimi-k3:high"}},
+        suppressed_selectors=frozenset({"fireworks/kimi-k3"}))
+    check("a prechecked suppressed route establishes an equal selector",
+          suppressed_same["served_is_fallback"] is False
+          and suppressed_same["fallback_basis"].startswith("configured-suppression:")
+          and mod._route_established(suppressed_same))
     selected = mod.load_omp_native_config(
         CONFIG, selected_ids=["glm-5.2", "claude-agent"])
     check("explicit OMP voice order is preserved",
@@ -186,6 +207,7 @@ def main() -> int:
             "handle": f"agent://{voice_id}",
             "id": voice_id,
             "agent": options["agent"],
+            "details": {"model": model},
         }
 
     with tempfile.TemporaryDirectory(prefix="r30-run-") as td:
@@ -199,6 +221,47 @@ def main() -> int:
         os.environ["PI_SESSION_FILE"] = str(sess)
         target = root / "intent.md"
         target.write_text("# Intent\n")
+        evidence_dir = root / "calibration"
+        evidence_dir.mkdir()
+        certificate_overlay = evidence_dir / "fallback-suppression.json"
+        certificate_overlay.write_text(json.dumps(
+            mod.fallback_suppression_overlay(selected["voices"]), indent=2) + "\n")
+        certificate_precheck = evidence_dir / "fallback-precheck.json"
+        certificate_precheck.write_text(json.dumps({
+            "command": ["omp", "config", "get", "retry.fallbackChains"],
+            "cwd": str(root),
+            "environment": {"PI_CONFIG_FILES": str(certificate_overlay)},
+            "overlay_sha256": mod._sha256_file(certificate_overlay),
+            "effective_fallback_chains": (
+                mod.fallback_suppression_overlay(selected["voices"])
+                ["retry"]["fallbackChains"]
+            ),
+        }, indent=2) + "\n")
+        certificate = mod.load_fallback_suppression(
+            selected["voices"], certificate_overlay, certificate_precheck)
+        check("suppression certificate binds the selected overlay and precheck",
+              certificate["status"] == "prechecked-suppression"
+              and certificate["suppressed_selectors"] == sorted(
+                  mod.fallback_suppression_overlay(selected["voices"])
+                  ["retry"]["fallbackChains"])
+              and certificate["overlay_sha256"] == mod._sha256_file(certificate_overlay))
+        invalid_precheck = evidence_dir / "invalid-precheck.json"
+        invalid_effective = dict(json.loads(
+            certificate_precheck.read_text())["effective_fallback_chains"])
+        invalid_effective[mod._base_selector(selected["voices"][0]["dispatch_selector"])] = [
+            "fallback/model"
+        ]
+        invalid_precheck.write_text(json.dumps({
+            "command": ["omp", "config", "get", "retry.fallbackChains"],
+            "cwd": str(root),
+            "environment": {"PI_CONFIG_FILES": str(certificate_overlay)},
+            "overlay_sha256": mod._sha256_file(certificate_overlay),
+            "effective_fallback_chains": invalid_effective,
+        }) + "\n")
+        check("suppression precheck fails closed on an eligible fallback",
+              raises(lambda: mod.load_fallback_suppression(
+                  selected["voices"], certificate_overlay, invalid_precheck),
+                  "leaves a tested route eligible"))
         run_dir = root / ".colosseum" / "attacks" / "partial"
         summary = mod.run_omp_fanout(
             agent_fn=fake_agent,
@@ -214,6 +277,7 @@ def main() -> int:
                 "calibration": route["calibration"],
                 "phase": "attack",
             },
+            fallback_suppression=certificate,
         )
         check("one failed voice does not sink surviving reports",
               summary["verdict"] == "PARTIAL" and summary["voices_ok"] == 1,
@@ -230,12 +294,12 @@ def main() -> int:
               (run_dir / "raw" / "omp-glm-5.2.error.txt").read_text())
         check("native bridge never invents finish reasons",
               all(voice["finish_reason"] is None for voice in summary["voices"]))
-        # The fake echoes the requested selector, so the served route is
-        # ambiguous-equal. That must surface in route_unverified rather than
-        # letting the summary read cleaner than the per-voice basis.
-        check("summary provenance matches the per-voice basis",
+        # The fake echoes the requested selector. Without a bridge provenance
+        # field this is normally ambiguous, but the validated empty-chain
+        # certificate makes the surviving route established.
+        check("suppression certificate closes only the certified route ambiguity",
               summary["served_by_fallback"] == []
-              and summary["route_unverified"] == ["claude-agent"],
+              and summary["route_unverified"] == [],
               {"fallback": summary["served_by_fallback"],
                "unverified": summary["route_unverified"]})
         check("an errored voice is not counted as an unverified route",
@@ -251,9 +315,11 @@ def main() -> int:
               and summary["preflight"]["target_spec"] == "intent.md"
               and summary["preflight"]["target_spec_sha256"].startswith("sha256:"))
         meta = json.loads((run_dir / "meta.json").read_text())
-        check("run metadata binds route and calibration",
+        check("run metadata binds route, calibration, and suppression certificate",
               meta["metadata"]["route_hash"] == route["route_hash"]
-              and meta["metadata"]["calibration"] == "pending")
+              and meta["metadata"]["calibration"] == "pending"
+              and meta["fallback_suppression"] == certificate
+              and summary["fallback_suppression"] == certificate)
         check("run directory cannot be overwritten",
               raises(lambda: mod.run_omp_fanout(
                   agent_fn=fake_agent,

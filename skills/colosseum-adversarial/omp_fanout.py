@@ -20,9 +20,10 @@ _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 _PEM_PRIVATE_KEY_RE = re.compile(
     rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----")
 _ROUTE_HASH_RE = re.compile(r"^sha256:[0-9a-f]{16}$")
+_SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _RESERVED_SUMMARY = {
     "version", "harness", "started_at", "finished_at", "agent", "verdict",
-    "voices_ok", "voices_total", "voices", "metadata",
+    "voices_ok", "voices_total", "voices", "metadata", "fallback_suppression",
 }
 
 
@@ -247,6 +248,132 @@ def _base_selector(selector: str) -> str:
     return head if sep and tail in _THINKING_LEVELS else selector
 
 
+def fallback_suppression_overlay(
+    voices: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, dict[str, list[object]]]]:
+    """Exact process-local OMP overlay that disables tested routes' fallbacks.
+
+    OMP gives an exact ``provider/model`` fallback-chain key precedence over
+    wildcard and role keys, and replaces that key's array in a config overlay.
+    An empty array therefore prevents retry fallback for that model without
+    changing any other process's settings or any unrelated chain. Two voices
+    cannot share a base selector: a certificate could not then distinguish their
+    route evidence, so reject rather than silently widening its scope.
+    """
+    checked = [_validate_voice(voice) for voice in voices]
+    if not checked:
+        raise ValueError("fallback suppression requires at least one voice")
+    selectors = [_base_selector(voice["dispatch_selector"]) for voice in checked]
+    if len(set(selectors)) != len(selectors):
+        raise ValueError("fallback suppression voices share a base selector")
+    return {
+        "retry": {
+            "fallbackChains": {selector: [] for selector in sorted(selectors)},
+        },
+    }
+
+
+def _load_json_object(path: Path, label: str) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"cannot read {label}: {path}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"{label} must contain a JSON object: {path}")
+    return data
+
+
+def load_fallback_suppression(
+    voices: Sequence[Mapping[str, Any]],
+    overlay_path: str | Path | None = None,
+    precheck_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Verify the launcher certificate for this process-local fallback overlay.
+
+    The OMP eval sandbox cannot inspect its parent settings. This validates the
+    generated overlay and the pre-launch ``omp --config … config get`` artifact,
+    then records the resulting precondition honestly as
+    ``prechecked-suppression``. It does not claim a runtime settings RPC exists.
+    """
+    overlay_arg = overlay_path or os.environ.get("COLOSSEUM_OMP_FALLBACK_OVERLAY")
+    precheck_arg = precheck_path or os.environ.get("COLOSSEUM_OMP_FALLBACK_PRECHECK")
+    if not isinstance(overlay_arg, (str, Path)) or not str(overlay_arg):
+        raise ValueError("fallback suppression overlay path is required")
+    if not isinstance(precheck_arg, (str, Path)) or not str(precheck_arg):
+        raise ValueError("fallback suppression precheck path is required")
+    overlay = Path(overlay_arg).resolve()
+    precheck = Path(precheck_arg).resolve()
+    expected = fallback_suppression_overlay(voices)
+    if _load_json_object(overlay, "fallback suppression overlay") != expected:
+        raise ValueError("fallback suppression overlay does not exactly match selected voices")
+    overlay_hash = _sha256_file(overlay)
+    evidence = _load_json_object(precheck, "fallback suppression precheck")
+    if evidence.get("overlay_sha256") != overlay_hash:
+        raise ValueError("fallback suppression precheck is not bound to the overlay")
+    effective = evidence.get("effective_fallback_chains")
+    expected_chains = expected["retry"]["fallbackChains"]
+    if not isinstance(effective, Mapping) or any(
+        effective.get(selector) != [] for selector in expected_chains
+    ):
+        raise ValueError("fallback suppression precheck leaves a tested route eligible")
+    command = evidence.get("command")
+    environment = evidence.get("environment")
+    if not isinstance(command, list) or not all(isinstance(arg, str) for arg in command):
+        raise ValueError("fallback suppression precheck command is malformed")
+    if not isinstance(evidence.get("cwd"), str) or not evidence["cwd"]:
+        raise ValueError("fallback suppression precheck cwd is malformed")
+    overlay_sources = environment.get("PI_CONFIG_FILES") if isinstance(environment, Mapping) else None
+    if not isinstance(overlay_sources, str):
+        raise ValueError("fallback suppression precheck lacks PI_CONFIG_FILES")
+    configured_paths = {
+        Path(source).resolve() for source in overlay_sources.split(os.pathsep) if source
+    }
+    if overlay not in configured_paths or command[-3:] != [
+        "config", "get", "retry.fallbackChains",
+    ]:
+        raise ValueError("fallback suppression precheck did not query the expected overlay")
+    return {
+        "status": "prechecked-suppression",
+        "overlay_file": str(overlay),
+        "overlay_sha256": overlay_hash,
+        "precheck_file": str(precheck),
+        "precheck_sha256": _sha256_file(precheck),
+        "suppressed_selectors": sorted(expected_chains),
+        "note": (
+            "OMP `config get`, run with the same PI_CONFIG_FILES overlay also "
+            "passed to the launch, shows zero retry fallback candidates for every "
+            "selected route. This is a pre-launch configuration certificate, not "
+            "provider-served-route attestation."
+        ),
+    }
+
+
+def _validate_fallback_suppression(
+    suppression: Mapping[str, Any] | None,
+    voices: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    if suppression is None:
+        return None
+    if not isinstance(suppression, Mapping):
+        raise ValueError("fallback_suppression must be a mapping or null")
+    if suppression.get("status") != "prechecked-suppression":
+        raise ValueError("fallback_suppression must be a prechecked certificate")
+    expected = set(fallback_suppression_overlay(voices)["retry"]["fallbackChains"])
+    selectors = suppression.get("suppressed_selectors")
+    if (not isinstance(selectors, list) or not all(isinstance(value, str) for value in selectors)
+            or set(selectors) != expected or len(selectors) != len(expected)):
+        raise ValueError("fallback_suppression selectors do not exactly match selected voices")
+    for key in ("overlay_file", "precheck_file"):
+        if not isinstance(suppression.get(key), str) or not suppression[key]:
+            raise ValueError(f"fallback_suppression.{key} must be a non-empty string")
+    for key in ("overlay_sha256", "precheck_sha256"):
+        if not isinstance(suppression.get(key), str) or not _SHA256_RE.fullmatch(suppression[key]):
+            raise ValueError(f"fallback_suppression.{key} must be a sha256 digest")
+    if not isinstance(suppression.get("note"), str) or not suppression["note"]:
+        raise ValueError("fallback_suppression.note must be a non-empty string")
+    return dict(suppression)
+
+
 def _nested_get(result: Mapping[str, Any], key: str) -> Any:
     """Read `key` from the result, or from its `details` object.
 
@@ -286,15 +413,19 @@ def _reported_fallback(result: Any) -> bool | None:
     return flag if isinstance(flag, bool) else None
 
 
-def classify_served_route(requested: str, result: Any) -> dict[str, Any]:
+def classify_served_route(
+    requested: str,
+    result: Any,
+    *,
+    suppressed_selectors: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
     """Decide whether a retry fallback served this dispatch, and on what basis.
 
     OMP rewrites `resolvedModel` to the fallback when one is applied, so a
     served model differing from the requested one is positive evidence. The
-    converse is NOT clean: the bridge reports
-    `resolvedModel ?? modelOverride`, so equality can mean either "no
-    fallback" or "resolvedModel was absent and the override echoed back". The
-    basis is recorded so evidence never presents an inference as a fact.
+    converse is not clean unless a validated, process-local configuration
+    certificate disabled that exact route's fallback chain. The basis is
+    recorded so evidence never presents an inference as a fact.
     """
     served = _served_model(result)
     reported = _reported_fallback(result)
@@ -304,9 +435,19 @@ def classify_served_route(requested: str, result: Any) -> dict[str, Any]:
     if served is None:
         return {"served_model": None, "served_is_fallback": None,
                 "fallback_basis": "unavailable: bridge reported no model"}
-    if _base_selector(served) != _base_selector(requested):
+    requested_base = _base_selector(requested)
+    if _base_selector(served) != requested_base:
         return {"served_model": served, "served_is_fallback": True,
                 "fallback_basis": "inferred: served model differs from requested"}
+    if requested_base in suppressed_selectors:
+        return {
+            "served_model": served,
+            "served_is_fallback": False,
+            "fallback_basis": (
+                "configured-suppression: prechecked empty retry fallback chain "
+                "for this exact route"
+            ),
+        }
     return {"served_model": served, "served_is_fallback": False,
             "fallback_basis": ("inferred-ambiguous: served == requested, which "
                                "means either no fallback or an absent "
@@ -316,16 +457,16 @@ def classify_served_route(requested: str, result: Any) -> dict[str, Any]:
 def _route_established(record: Mapping[str, Any]) -> bool:
     """Whether the record POSITIVELY establishes which route answered.
 
-    True only for OMP's own report, or for a served model that demonstrably
-    differs from the requested one. An equal selector is NOT established: the
-    bridge reports `resolvedModel ?? modelOverride`, so equality cannot
-    distinguish "no fallback" from "resolvedModel absent". Keeping this strict
-    is what stops a summary from reading cleaner than its evidence.
+    An OMP provenance report is authoritative. Otherwise, a differing served
+    model establishes a fallback, and a matching model is established only when
+    this run carries a validated configuration certificate that suppressed its
+    exact retry chain. Other equal-selector matches remain ambiguous.
     """
     basis = record.get("fallback_basis")
     if not isinstance(basis, str):
         return False
-    return basis == "omp-reported" or basis.startswith("inferred:")
+    return (basis == "omp-reported" or basis.startswith("inferred:")
+            or basis.startswith("configured-suppression:"))
 
 
 def _unwrap_lone_string(data: Any) -> str:
@@ -429,13 +570,17 @@ def run_omp_fanout(
     agent_name: str = "colosseum-spec-adversary",
     schema: Mapping[str, Any] | None = None,
     metadata: Mapping[str, Any] | None = None,
+    fallback_suppression: Mapping[str, Any] | None = None,
     allow_unverified_isolation: bool = False,
 ) -> dict[str, Any]:
     """Run one OMP subagent per voice and persist each outcome independently.
 
     Exactly one of ``prompt`` and ``prompt_by_voice`` is required. Exceptions
     from one model call become per-voice error records; they never reject the
-    parallel wave or discard reports from other voices.
+    parallel wave or discard reports from other voices. ``fallback_suppression``
+    may carry a certificate from ``load_fallback_suppression``. It establishes
+    an equal-selector result only by proving a process-local, empty fallback
+    chain was prechecked before the parent OMP process launched.
     The project tree is scanned before dispatch. ``target_spec`` and ``run_dir``
     must resolve inside ``project_root``; runs live under
     ``.colosseum/attacks`` and never overwrite an existing directory.
@@ -455,6 +600,10 @@ def run_omp_fanout(
     checked_voices = [_validate_voice(voice) for voice in voices]
     if not checked_voices:
         raise ValueError("voices must not be empty")
+    suppression = _validate_fallback_suppression(fallback_suppression, checked_voices)
+    suppressed_selectors = frozenset(
+        suppression["suppressed_selectors"] if suppression is not None else ()
+    )
     ids = [voice["id"] for voice in checked_voices]
     if len(set(ids)) != len(ids):
         raise ValueError("voices contains duplicate ids")
@@ -541,6 +690,7 @@ def run_omp_fanout(
         "preflight": preflight,
         "metadata": dict(metadata or {}),
         "isolation": isolation,
+        "fallback_suppression": suppression,
         "voices": checked_voices,
     }
     (destination / "meta.json").write_text(
@@ -590,7 +740,11 @@ def run_omp_fanout(
                 # retry layer may serve a dispatch from a configured fallback
                 # (retry.fallbackChains), and evidence that names only the
                 # requested model would misattribute the provider.
-                **classify_served_route(voice["dispatch_selector"], result),
+                **classify_served_route(
+                    voice["dispatch_selector"],
+                    result,
+                    suppressed_selectors=suppressed_selectors,
+                ),
             }
             return record
         except Exception as exc:  # one voice must never sink the fan-out wave
@@ -652,6 +806,7 @@ def run_omp_fanout(
             "preflight": preflight,
             "voices": list(records),
             "isolation": isolation,
+            "fallback_suppression": suppression,
             "served_by_fallback": served_by_fallback,
             "route_unverified": route_unverified,
         }

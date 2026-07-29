@@ -71,6 +71,17 @@ def main() -> int:
 
     # 1. Registry parse + calibration invariant.
     reg = json.loads(REGISTRY.read_text())
+    bom_tools = json.loads((REPO / "bom.json").read_text())["tools"]
+    template_tools = json.loads(
+        (REPO / "templates" / "dogfood-evidence.example.json").read_text()
+    )["tool_versions"]
+    template_pins = {
+        key: value for key, value in template_tools.items()
+        if key not in {"_cite", "note"}
+    }
+    check("dogfood evidence template mirrors every current BOM tool pin",
+          template_pins == bom_tools,
+          f"template={template_pins!r} bom={bom_tools!r}")
     check("registry parses with voices[] and profiles[]",
           isinstance(reg.get("voices"), list) and isinstance(reg.get("profiles"), list))
     n_canon = 0
@@ -88,6 +99,9 @@ def main() -> int:
     for v in omp_mapped:
         check(f"OMP route {v['id']} has separate calibration",
               isinstance(v.get("omp_calibration"), str) and bool(v["omp_calibration"]))
+        check(f"OMP route {v['id']} has a closed provenance grade",
+              v.get("omp_route_grade") in gen.OMP_ROUTE_GRADES,
+              v.get("omp_route_grade"))
 
     # The pending sentinel must stay EXACT. render_omp_native_config marks the
     # whole route "cited" only when no voice equals "pending", so decorating this
@@ -100,6 +114,9 @@ def main() -> int:
         check(f"OMP route {v['id']} pending sentinel is exact",
               cal == "pending" or not looks_pending,
               f"reads as pending but is not the literal: {cal[:60]!r}")
+        if cal != "pending" and v["omp_route_grade"] != "attested":
+            check(f"OMP route {v['id']} cited route is attested",
+                  False, f"grade={v['omp_route_grade']!r}")
         if cal != "pending" and v.get("omp_calibration_note"):
             check(f"OMP route {v['id']} cited route carries no pending note",
                   False, "omp_calibration_note is only for pending routes")
@@ -142,11 +159,21 @@ def main() -> int:
     check("self-test: a level below a non-max top rung is detectable",
           fake["omp_thinking_level"] != fake_expected)
 
+    check("self-test: an unknown OMP provenance grade is detectable",
+          "unverified" not in gen.OMP_ROUTE_GRADES)
+
     native_route = gen.render_omp_native_config(reg)
     check("OMP-native route hash recomputes",
           native_route["route_hash"] == gen.omp_route_hash(native_route))
     check("OMP-native route remains explicitly uncalibrated",
           native_route["calibration"] == "pending")
+    check("OMP-native route preserves per-voice provenance grades",
+          {voice["id"]: voice["route_grade"] for voice in native_route["voices"]} == {
+              "claude-agent": "unattested",
+              "gpt-5.6-sol": "unattested",
+              "glm-5.2": "degraded",
+              "kimi-k3": "attested",
+          })
 
     # A deliberately-broken clone must be caught (the invariant validates something).
     bad = json.loads(REGISTRY.read_text())

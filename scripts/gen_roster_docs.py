@@ -51,6 +51,9 @@ END_CANONICAL = "<!-- END GENERATED: voice-roster -->"
 BEGIN_RE = re.compile(r"^\s*<!--\s*BEGIN GENERATED: voice-roster\b.*?-->\s*$")
 END_RE = re.compile(r"^\s*<!--\s*END GENERATED: voice-roster\s*-->\s*$")
 
+OMP_ROUTE_GRADES = frozenset(
+    {"attested", "unattested", "degraded", "errored", "contaminated", "not-run"})
+
 
 # ─────────────────────────────────────────────────────────────────────────
 # Registry access + profile hashing (imported by doctor and tests/r0)
@@ -206,22 +209,24 @@ def render_code_adversarial_frontier(reg: dict) -> str:
 def render_scripts_readme_roster(reg: dict) -> str:
     """scripts/README.md — full reference table."""
     rows = [
-        "| Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration | OMP route grade |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for v in reg["voices"]:
         cal = "pending" if v["calibration"] == "pending" else (
             "n/a" if v["calibration"].startswith("n/a") else "cited")
         omp_model = f"`{v['omp_model']}`" if v.get("omp_model") else "n/a"
         omp_cal = v.get("omp_calibration", "n/a")
+        omp_grade = v.get("omp_route_grade", "n/a")
         rows.append(
             f"| `{v['id']}` | `{v['model']}` | {omp_model} | {v['family']} | "
-            f"{v['harness']} | {v['status']} | {cal} | {omp_cal} |")
+            f"{v['harness']} | {v['status']} | {cal} | {omp_cal} | {omp_grade} |")
     rows.append("")
     rows.append(
         "Reference calibration applies only to the recorded OpenCode or Claude Code "
         "route. OMP calibration is tracked separately; `pending` native routes are "
-        "experimental and cannot inherit the reference claim.")
+        "experimental and cannot inherit the reference claim. OMP route grade records "
+        "transport provenance, independently of the fitness gate.")
     return "\n".join(rows)
 
 
@@ -295,7 +300,8 @@ def render_omp_native_config(reg: dict) -> dict:
         voice = voice_by_id(reg, pv["id"])
         model = voice.get("omp_model")
         calibration = voice.get("omp_calibration")
-        if not model or not calibration:
+        route_grade = voice.get("omp_route_grade")
+        if not model or not calibration or route_grade not in OMP_ROUTE_GRADES:
             sys.exit(f"FATAL: canonical voice {voice['id']!r} has no complete OMP route")
         if "omp_thinking_level" not in voice:
             sys.exit(f"FATAL: canonical voice {voice['id']!r} has no omp_thinking_level")
@@ -307,6 +313,7 @@ def render_omp_native_config(reg: dict) -> dict:
             "thinking_level": level,
             "dispatch_selector": f"{model}:{level}" if level else model,
             "calibration": calibration,
+            "route_grade": route_grade,
         })
     route = {
         "profile": f"{prof['name']}@{prof['content_hash']}",
@@ -376,7 +383,8 @@ def render_dispatch_config(reg: dict, current_text: str) -> str:
     cfg["_comment_omp_native"] = (
         "Generated from registry/voices.json. Run from OMP with the "
         "colosseum-adversarial skill's omp_fanout.py helper. A pending calibration "
-        "must be reported as uncalibrated; never borrow OpenCode fitness evidence.")
+        "must be reported as uncalibrated; route_grade records transport provenance "
+        "and never borrows OpenCode fitness evidence.")
     return json.dumps(cfg, indent=2, ensure_ascii=False) + "\n"
 
 

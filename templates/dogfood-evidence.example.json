@@ -51,7 +51,7 @@
   ],
   "tool_versions": {
     "_cite": "colosseum/bom.json (locked compatibility BOM, E6)",
-    "opencode": "1.17.18",
+    "opencode": "1.18.5",
     "quint": "0.32.0",
     "apalache": "0.56.1",
     "lean": "4.29.0",

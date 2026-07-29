@@ -101,7 +101,7 @@ Dispatch happens in parallel — every requested voice attacks concurrently.
 
 **Three agentic transports. There is no single-shot path.**
 
-| **OMP-native `agent()` fan-out** | Required in an OMP harness. | One read-only project agent per voice, model selected per call, bounded parallelism, `agent://` artifacts. Route calibration is independent and currently pending. |
+| **OMP-native `agent()` fan-out** | Required in an OMP harness. | One read-only project agent per voice, model selected per call, bounded parallelism, `agent://` artifacts. Native calibration is independent per route; inspect the generated route state. |
 | <!-- OMP-EXCLUDE-ROW -->**OpenCode + `spec-adversary`** | Non-OMP clients or a model unavailable through OMP. | Multi-turn ReAct with file access, retries, finish reasons, token data, and the established benchmark path. |
 | <!-- OMP-EXCLUDE-ROW -->**Claude Code Agent subagent** | Claude Code harness. | Direct file access and existing `claude-agent` calibration. |
 
@@ -129,6 +129,27 @@ the routine operating point. Note that the recorded calibration evidence was
 collected at max, so a routine run is cheaper than, and not identical to, the
 run that produced the fitness citation.
 
+**Fitness-calibration route attestation (mandatory).** A successful
+equal-selector result does not establish which provider answered: OMP may retry
+through `retry.fallbackChains`, and the eval bridge may only echo the requested
+selector. A calibration run MUST instead suppress the retry chains for exactly
+the voices under test, using the process-local `--config` overlay produced by
+`scripts/omp_calibration_session.py`. It prechecks the effective chain before
+launching OMP, archives the overlay, precheck, and launch record in the
+calibration evidence directory, and never writes global or project settings.
+
+Launch the calibration OMP process through that script before any voice is
+dispatched. Pass its selected voice IDs and the calibration evidence directory;
+the script rejects a caller-supplied `--config` so the recorded overlay is the
+only one OMP loads. The suppression proves only that OMP's configured retry
+chain had zero candidates for each tested route. It does not claim anything
+about provider-internal failover.
+
+From the resulting OMP Python `eval` cell, load the validated certificate and
+pass it into the fan-out. The helper records it in both `meta.json` and
+`summary.json`, then treats an otherwise ambiguous equal-selector result as
+established only for a certified suppressed route:
+
 First confirm every requested pattern is reachable in OMP's `/model` picker.
 Then run the helper from an OMP Python `eval` cell:
 
@@ -138,6 +159,9 @@ exec(read("skill://colosseum-adversarial/omp_fanout.py"), omp_fanout_ns)
 omp_route = omp_fanout_ns["load_omp_native_config"](
     ".colosseum/dispatch.json",
     selected_ids=["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"],
+)
+omp_suppression = omp_fanout_ns["load_fallback_suppression"](
+    omp_route["voices"],
 )
 omp_result = omp_fanout_ns["run_omp_fanout"](
     agent_fn=agent,
@@ -155,6 +179,7 @@ omp_result = omp_fanout_ns["run_omp_fanout"](
         "phase": "attack",
     },
     allow_unverified_isolation=True,
+    fallback_suppression=omp_suppression,
 )
 display(omp_result)
 ```
@@ -197,10 +222,10 @@ of one shared `prompt` and use a new run directory with `metadata.phase` set to
 `critique`, `defense`, or `re-critique`. This gives each wave the same
 failure-isolated artifact contract.
 
-All currently registered OMP routes have `omp_calibration: pending`. They are
-usable for experimental runs and must be reported as uncalibrated. This does
-not permit an OMP harness to reroute through OpenCode; benchmark coverage must
-establish native calibration.
+Each route's generated `omp_calibration` state controls how its reports are
+described. `pending` routes are usable for experiments and must be reported as
+uncalibrated; cited routes carry evidence for that exact OMP selector. Neither
+state permits an OMP harness to reroute through OpenCode.
 
 <!-- OMP-EXCLUDE-START -->
 ### OpenCode + spec-adversary agent (ReAct)

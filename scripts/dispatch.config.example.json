@@ -81,7 +81,8 @@
         "family": "Anthropic",
         "thinking_level": "xhigh",
         "dispatch_selector": "anthropic/claude-fable-5:xhigh",
-        "calibration": "pending"
+        "calibration": "pending",
+        "route_grade": "unattested"
       },
       {
         "id": "gpt-5.6-sol",
@@ -89,7 +90,8 @@
         "family": "OpenAI",
         "thinking_level": "xhigh",
         "dispatch_selector": "openai-codex/gpt-5.6-sol:xhigh",
-        "calibration": "pending"
+        "calibration": "pending",
+        "route_grade": "unattested"
       },
       {
         "id": "glm-5.2",
@@ -97,7 +99,8 @@
         "family": "Zhipu",
         "thinking_level": "xhigh",
         "dispatch_selector": "synthetic/hf:zai-org/GLM-5.2:xhigh",
-        "calibration": "pending"
+        "calibration": "pending",
+        "route_grade": "degraded"
       },
       {
         "id": "kimi-k3",
@@ -105,10 +108,11 @@
         "family": "Moonshot",
         "thinking_level": "high",
         "dispatch_selector": "synthetic/hf:moonshotai/Kimi-K3:high",
-        "calibration": "Seeded-defect recall 6/7 on the held-out leasedb corpus over the OMP-NATIVE transport at synthetic/hf:moonshotai/Kimi-K3:high, blinded single pass under the deny-first colosseum-spec-adversary profile (calibration/2026-07-28-r3; D1 excluded for all voices as mis-specified). Cleared the pre-registered floor. The ONLY voice in that run whose served route was positively attested: its sole configured fallback target (fireworks/kimi-k3) had no usage-ledger counter, so a degrade would have created a visible entry and none appeared. Missed D8, anchoring the waiter leak at register_waiter rather than at the release site a fix would change. Transcript audited clean. Scope: one voice, one pass, one corpus, this rung only."
+        "calibration": "Seeded-defect recall 6/7 on the held-out leasedb corpus over the OMP-NATIVE transport at synthetic/hf:moonshotai/Kimi-K3:high, blinded single pass under the deny-first colosseum-spec-adversary profile (calibration/2026-07-28-r3; D1 excluded for all voices as mis-specified). Cleared the pre-registered floor. The ONLY voice in that run whose served route was positively attested: its sole configured fallback target (fireworks/kimi-k3) had no usage-ledger counter, so a degrade would have created a visible entry and none appeared. Missed D8, anchoring the waiter leak at register_waiter rather than at the release site a fix would change. Transcript audited clean. Scope: one voice, one pass, one corpus, this rung only.",
+        "route_grade": "attested"
       }
     ],
     "route_hash": "sha256:d501830ac0020cda"
   },
-  "_comment_omp_native": "Generated from registry/voices.json. Run from OMP with the colosseum-adversarial skill's omp_fanout.py helper. A pending calibration must be reported as uncalibrated; never borrow OpenCode fitness evidence."
+  "_comment_omp_native": "Generated from registry/voices.json. Run from OMP with the colosseum-adversarial skill's omp_fanout.py helper. A pending calibration must be reported as uncalibrated; route_grade records transport provenance and never borrows OpenCode fitness evidence."
 }

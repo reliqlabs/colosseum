@@ -316,7 +316,7 @@ def main() -> int:
             "#!/bin/sh\n"
             "printf '%s\\n' \"$*\" >> \"$OPENCODE_SENTINEL\"\n"
             "if [ \"$1\" = \"--version\" ]; then\n"
-            "  printf '%s\\n' '1.18.4'\n"
+            "  printf '%s\\n' '1.18.5'\n"
             "  exit 0\n"
             "fi\n"
             "exit 99\n"

@@ -1,6 +1,6 @@
 # Roadmap: status and remaining work
 
-Last updated: 2026-07-24. This is the handoff document. It records where the
+Last updated: 2026-07-28. This is the handoff document. It records where the
 2026-07-11 remediation plan of record stands, what remains before the repo may
 call itself dependable by its own exit criteria, and who each remaining item
 waits on. A new maintainer or session should be able to resume from this file
@@ -18,16 +18,16 @@ committed on `main`, one commit per item:
 | P1 (mechanisms) | C1-C10: two-gate ledger (G1/G2), conformance bridge (G3), critique loop (G4), voice registry, MCP hardening, skill sweep, intent template, baseline floors, dogfood evidence, repository CI | done |
 | P2 instruments | M1 coverage dashboard, M2 self-measurement, M3 recall scorer + pre-registered benchmark protocol, M5 boundary skill / system-intent / ledger versioning | done |
 | M3 live calibration | `calibration/2026-07-13-r1`: blinded seeded-defect run, six scoreable voices | done |
-| OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, fail-closed session-root gate, live-tree preflight, failure-isolated evidence, initializer/doctor support (R29/R30) | committed on `feature/omp-integration`; project-rooted one-voice transport E2E passed (`calibration/2026-07-22-omp-native-e2e/`); project-installed helper resolution, canonical 4-voice run, and route calibration pending |
+| OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, fail-closed session-root gate, live-tree preflight, process-local fallback suppression, failure-isolated evidence, initializer/doctor support (R29/R30/R33) | implemented on `feature/omp-integration`; the canonical 4-voice run is recorded at `calibration/2026-07-28-r3/`. Native calibration remains pending at the route level: one voice is attested and cited; two are unattested and one degraded. |
 | OMP-native deliberation panel | Three-wave `colosseum-panel` skill (drafts → blinded cross-review → synthesis): family/coverage quorum, randomized-label blinding + deferred identity, brief + git target-drift gating (binary-safe, full-digest, `.colosseum`-excluded), harness-aware doctor, `project-plan` + `milestone-review` modes (R31, ~50 assertions incl. a real Gate B end-to-end; R32 resolver dispatch-identity contract executed under Bun) | committed on `feature/omp-integration`; **`project-plan` live-verified** project-rooted (`calibration/2026-07-23-omp-panel-e2e/`, 3-family COMPLETE) but uncalibrated; **`milestone-review` EXPERIMENTAL** — evidence-bound fail-closed guard + Gate B `--expect-intent`/`--snapshot-exact`/dup-rejection are correct and deterministically tested, but not yet run against a real project's itf_replay G1 records + live panel; roster-resolver extension live-verified in a real OMP session (`calibration/2026-07-24-resolver-live/`: `ctx.models.family` distinctness positive + negative, canonical `provider/id` dispatch identity, both active seats serving real inference at `:max`); active roster is Sol+GLM (min_families=2) with Fable/Kimi-k3 pending; full three-wave run on that roster and calibration pending |
 
 Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
 dispatch-config, fixture-tracking, and the full regression suite
 (`tests/run_all.py`, 30 suites). Green locally as of this writing (7/7 checks,
-30/30 suites). The `opencode` pin was bumped 1.18.3 -> 1.18.4 on 2026-07-24
+30/30 suites). The `opencode` pin was bumped 1.18.4 -> 1.18.5 on 2026-07-28
 after the installed binary drifted ahead of it. The bump was validated, not
 rubber-stamped: every `opencode run` flag contract the BOM encodes
-(`--agent`, `--model`, `--format`, `--variant`) passes under 1.18.4, and the
+(`--agent`, `--model`, `--format`, `--variant`) passes under 1.18.5, and the
 canonical dispatch path was smoke-tested end-to-end in a scaffolded project
 (`--format json --variant max --agent spec-adversary --model
 openai/gpt-5.6-sol`), verified by parsing the event stream to an assistant
@@ -37,30 +37,35 @@ on its toolchain-less runner the toolchain-dependent suites degrade to a
 tolerated INCOMPLETE rather than failing (see the CI section below).
 
 The default adversarial panel is pinned as
-`canonical-4@sha256:08831d0ce9f2086b` (operator decision 2026-07-13):
-`claude-agent` (Fable 5, or the strongest available Opus when Fable is
-absent), `gpt-5.6-sol`, `glm-5.2` (Fireworks), `kimi-k2.6`. All four seats
-carry cited 8/8 seeded-recall calibration. `registry/voices.json` is the
-source of truth; roster docs are generated from it by
-`scripts/gen_roster_docs.py`.
+`canonical-4@sha256:0f73580ef4e3fdf2`: `claude-agent` (Fable 5, or the
+strongest available Opus when Fable is absent), `gpt-5.6-sol`, `glm-5.2`, and
+`kimi-k3`. Each seat has its own cited reference-transport calibration.
+`registry/voices.json` is the source of truth; roster docs are generated from it
+by `scripts/gen_roster_docs.py`.
 
-OMP now has a native multi-voice transport through its `eval` `agent()` bridge.
-The exact ModelRegistry routes and their content hash are generated into
+OMP has a native multi-voice transport through its `eval` `agent()` bridge. The
+exact ModelRegistry routes and their content hash are generated into
 `.colosseum/dispatch.json`; `omp_fanout.py` preflights the live tree, binds the
 target hash, runs bounded per-model adversary agents, and preserves partial
 evidence. Native dispatch is fail-closed on the session root: it refuses unless
 the caller opts in AND the OMP session cwd (from the documented `PI_SESSION_FILE`
 header) equals `project_root`, and it stamps `isolation:"unverified"` because the
-subagent filesystem is not confined. A project-rooted single-voice transport E2E
-passed via headless `omp -p` (COMPLETE 1/1, ~$1.43;
-`calibration/2026-07-22-omp-native-e2e/`): the gate matched, preflight scanned
-clean, and the project's `.omp/agents` wrapper dispatched. Still pending: the
-project-installed `.omp/skills` helper resolution path (the smoke loaded the repo
-copy via a global symlink), the canonical 4-voice route (external providers), and
-route calibration. This changes orchestration and evidence capture, not any
-existing G1 verification claim. Every OMP route is explicitly `pending`
-calibration, so OpenCode/Claude Code calibration must not be transferred to
-native runs.
+subagent filesystem is not confined.
+
+The four-voice native run at `calibration/2026-07-28-r3/` produced usable
+outputs, but it did not validate the whole native route. Its registry grades are
+machine-readable: `kimi-k3` is `attested` and carries its native citation;
+`claude-agent` and `gpt-5.6-sol` are `unattested`; `glm-5.2` is `degraded`.
+The generated profile therefore remains `calibration: "pending"`. Native
+calibration never inherits the reference OpenCode or Claude Code claim.
+
+Future calibration runs must use `scripts/omp_calibration_session.py`. It
+appends a process-local `retry.fallbackChains` suppression overlay to any caller
+`PI_CONFIG_FILES`, prechecks the effective OMP configuration, archives the
+overlay, precheck, and launch record, then passes the same overlay to OMP. A
+successful precheck prevents retry fallback for the selected routes before any
+model call, making the route condition decidable without mutating user or
+project settings.
 
 ## Exit criteria scoreboard
 

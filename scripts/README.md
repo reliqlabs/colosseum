@@ -27,22 +27,22 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). The canonical panel (`canonical-4`) is `claude-agent` (Fable 5, or the strongest available Opus), `gpt-5.6-sol`, `glm-5.2`, and `kimi-k3`, all with cited seeded-recall fitness runs; the first three from `calibration/2026-07-13-r1` and `kimi-k3` from `calibration/2026-07-26-r2`, which also re-baselined the voice it replaced. `kimi-k2.6` (the prior Moonshot seat, superseded 2026-07-26), `gpt-oss-120b`, and `nemotron-3-120b-a12b` are calibrated candidates; `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-| Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration |
-|---|---|---|---|---|---|---|---|
-| `claude-agent` | `in-harness` | `anthropic/claude-fable-5` | Anthropic | claude-code | canonical-panel | cited | pending |
-| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | candidate | cited | pending |
-| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | `openai-codex/gpt-5.6-sol` | OpenAI | opencode | canonical-panel | cited | pending |
-| `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | n/a | DeepSeek | opencode | candidate | pending | n/a |
-| `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | n/a | Google | opencode | candidate | pending | n/a |
-| `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | n/a | OpenAI-OSS | opencode | candidate | cited | n/a |
-| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | n/a | NVIDIA | opencode | candidate | cited | n/a |
-| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | `synthetic/hf:zai-org/GLM-5.2` | Zhipu | opencode | canonical-panel | cited | pending |
-| `kimi-k3` | `fireworks-ai/accounts/fireworks/models/kimi-k3` | `synthetic/hf:moonshotai/Kimi-K3` | Moonshot | opencode | canonical-panel | cited | Seeded-defect recall 6/7 on the held-out leasedb corpus over the OMP-NATIVE transport at synthetic/hf:moonshotai/Kimi-K3:high, blinded single pass under the deny-first colosseum-spec-adversary profile (calibration/2026-07-28-r3; D1 excluded for all voices as mis-specified). Cleared the pre-registered floor. The ONLY voice in that run whose served route was positively attested: its sole configured fallback target (fireworks/kimi-k3) had no usage-ledger counter, so a degrade would have created a visible entry and none appeared. Missed D8, anchoring the waiter leak at register_waiter rather than at the release site a fix would change. Transcript audited clean. Scope: one voice, one pass, one corpus, this rung only. |
-| `leanstral-2603` | `lmstudio/leanstral-2603` | n/a | Mistral | opencode | local-specialist | n/a | n/a |
-| `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | n/a | Zhipu | opencode | excluded | cited | n/a |
-| `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | n/a | theorem-prover-specialist | opencode | excluded | cited | n/a |
+| Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration | OMP route grade |
+|---|---|---|---|---|---|---|---|---|
+| `claude-agent` | `in-harness` | `anthropic/claude-fable-5` | Anthropic | claude-code | canonical-panel | cited | pending | unattested |
+| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | candidate | cited | pending | not-run |
+| `gpt-5.6-sol` | `openai/gpt-5.6-sol` | `openai-codex/gpt-5.6-sol` | OpenAI | opencode | canonical-panel | cited | pending | unattested |
+| `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | n/a | DeepSeek | opencode | candidate | pending | n/a | n/a |
+| `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | n/a | Google | opencode | candidate | pending | n/a | n/a |
+| `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | n/a | OpenAI-OSS | opencode | candidate | cited | n/a | n/a |
+| `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | n/a | NVIDIA | opencode | candidate | cited | n/a | n/a |
+| `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | `synthetic/hf:zai-org/GLM-5.2` | Zhipu | opencode | canonical-panel | cited | pending | degraded |
+| `kimi-k3` | `fireworks-ai/accounts/fireworks/models/kimi-k3` | `synthetic/hf:moonshotai/Kimi-K3` | Moonshot | opencode | canonical-panel | cited | Seeded-defect recall 6/7 on the held-out leasedb corpus over the OMP-NATIVE transport at synthetic/hf:moonshotai/Kimi-K3:high, blinded single pass under the deny-first colosseum-spec-adversary profile (calibration/2026-07-28-r3; D1 excluded for all voices as mis-specified). Cleared the pre-registered floor. The ONLY voice in that run whose served route was positively attested: its sole configured fallback target (fireworks/kimi-k3) had no usage-ledger counter, so a degrade would have created a visible entry and none appeared. Missed D8, anchoring the waiter leak at register_waiter rather than at the release site a fix would change. Transcript audited clean. Scope: one voice, one pass, one corpus, this rung only. | attested |
+| `leanstral-2603` | `lmstudio/leanstral-2603` | n/a | Mistral | opencode | local-specialist | n/a | n/a | n/a |
+| `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | n/a | Zhipu | opencode | excluded | cited | n/a | n/a |
+| `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | n/a | theorem-prover-specialist | opencode | excluded | cited | n/a | n/a |
 
-Reference calibration applies only to the recorded OpenCode or Claude Code route. OMP calibration is tracked separately; `pending` native routes are experimental and cannot inherit the reference claim.
+Reference calibration applies only to the recorded OpenCode or Claude Code route. OMP calibration is tracked separately; `pending` native routes are experimental and cannot inherit the reference claim. OMP route grade records transport provenance, independently of the fitness gate.
 <!-- END GENERATED: voice-roster -->
 
 ## OMP-native adversarial fan-out

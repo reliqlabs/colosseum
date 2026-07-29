@@ -168,12 +168,21 @@ def check_registry(rep: Report, gen, reg: dict) -> None:
                     if not ok else "cited")
         omp_model = v.get("omp_model")
         omp_calibration = v.get("omp_calibration")
-        if omp_model or omp_calibration:
-            ok = (isinstance(omp_model, str) and bool(omp_model)
-                  and isinstance(omp_calibration, str) and bool(omp_calibration))
+        omp_route_grade = v.get("omp_route_grade")
+        if omp_model or omp_calibration or omp_route_grade:
+            complete = (isinstance(omp_model, str) and bool(omp_model)
+                        and isinstance(omp_calibration, str) and bool(omp_calibration)
+                        and omp_route_grade in gen.OMP_ROUTE_GRADES)
             rep.add("registry", f"voice {v['id']} OMP route",
-                    "ok" if ok else "fail",
-                    f"model={omp_model!r} calibration={omp_calibration!r}")
+                    "ok" if complete else "fail",
+                    f"model={omp_model!r} calibration={omp_calibration!r} "
+                    f"route_grade={omp_route_grade!r}")
+            if complete and omp_calibration != "pending":
+                cited = omp_route_grade == "attested"
+                rep.add("registry", f"voice {v['id']} cited OMP route attested",
+                        "ok" if cited else "fail",
+                        "attested" if cited else
+                        f"cited calibration requires attested, got {omp_route_grade!r}")
 
     canonical = gen.profile_by_name(reg, "canonical-4")
     missing = [pv["id"] for pv in canonical["voices"]
