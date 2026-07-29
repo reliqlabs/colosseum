@@ -37,6 +37,18 @@ DISPATCH = REPO / "scripts" / "opencode_dispatch.py"
 FAILURES: list[str] = []
 
 
+def pem_armor(kind: str) -> str:
+    """Assemble a full PEM armor block at RUNTIME.
+
+    Written literally, these lines would make the preflight scanner flag its own
+    test suite, so this repo could not be used as a fan-out `project_root`
+    without failing closed on a false positive. Concatenation keeps the fixture
+    byte-identical while leaving no armor in the source.
+    """
+    return ("-----BEGIN " + kind + "-----\nAAAA\n"
+            "-----END " + kind + "-----\n")
+
+
 def check(label: str, ok: bool, detail: str = "") -> None:
     if ok:
         print(f"  [ok]   {label}")
@@ -143,8 +155,7 @@ def main() -> int:
 
         # 5. tracked private-key material under a non-secret name
         proj = make_fixture(tmp / "c5")
-        (proj / "notes.txt").write_text(
-            "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n")
+        (proj / "notes.txt").write_text(pem_armor("OPENSSH PRIVATE KEY"))
         commit_all(proj, "seed key")
         r = preflight(write_config(proj))
         check("private-key content: preflight blocks", r.returncode != 0, f"exit={r.returncode}")
