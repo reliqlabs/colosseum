@@ -135,10 +135,10 @@ def main() -> int:
         check("dispatch.json target_spec filled", cfg["target_spec"] == str(spec_path.resolve()))
         check("dispatch.json voices come from the registry (canonical-4 opencode set)",
               [v["id"] for v in cfg["voices"]]
-              == ["gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
+              == ["gpt-5.6-sol", "glm-5.2", "kimi-k3"])
         check("dispatch.json carries canonical OMP-native membership",
               [v["id"] for v in cfg["omp_native"]["voices"]]
-              == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
+              == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"])
         check("dispatch.json OMP route hash is content-addressed",
               cfg["omp_native"]["route_hash"]
               == gen.omp_route_hash(cfg["omp_native"]))

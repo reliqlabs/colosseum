@@ -3,22 +3,22 @@
   "project_root": "/absolute/path/to/your/project",
   "target_spec": "/absolute/path/to/your/project/intent.md",
   "run_tag_prefix": "intent-v1",
-  "_comment_canonical_panel": "Canonical membership canonical-4@sha256:08831d0ce9f2086b. Existing fitness evidence is transport-specific; see registry/voices.json.",
+  "_comment_canonical_panel": "Canonical membership canonical-4@sha256:0f73580ef4e3fdf2. Existing fitness evidence is transport-specific; see registry/voices.json.",
   "voices": [
     {
       "id": "gpt-5.6-sol",
       "model": "openai/gpt-5.6-sol",
-      "note": "OpenAI via direct openai provider. status=canonical-panel. OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc."
+      "note": "OpenAI via direct openai provider. status=canonical-panel. OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
     },
     {
       "id": "glm-5.2",
       "model": "fireworks-ai/accounts/fireworks/models/glm-5p2",
-      "note": "Zhipu via Fireworks. status=canonical-panel. Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md."
+      "note": "Zhipu via Fireworks. status=canonical-panel. Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
     },
     {
-      "id": "kimi-k2.6",
-      "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
-      "note": "Moonshot via Burnt gateway. status=canonical-panel. Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
+      "id": "kimi-k3",
+      "model": "fireworks-ai/accounts/fireworks/models/kimi-k3",
+      "note": "Moonshot via Fireworks. status=canonical-panel. Moonshot Kimi K3 via Fireworks. Both routes probed live 2026-07-26: the OpenCode slug `accounts/fireworks/models/kimi-k3` returned content with finish_reason stop (the `k3p0` spelling 404s), and `fireworks/kimi-k3` resolves in OMP's ModelRegistry. 1M context, 131K max output, thinking low/high/max, reasoning on by default and returned in a separate `reasoning_content` field so visible content stays clean. Took canonical-4's Moonshot seat from kimi-k2.6 on 2026-07-26. The OpenCode route is calibrated; the OMP-native route is NOT (omp_calibration: pending) and must still be reported as uncalibrated. Same Moonshot family as kimi-k2.6: the panel resolver enforces family distinctness, so the two cannot occupy separate seats on one panel. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
     }
   ],
   "_comment_claude_voice": "claude-agent runs through the calibrated Claude Code Agent route or the separately tracked OMP-native route. It never runs through opencode_dispatch.py.",
@@ -59,8 +59,8 @@
   ],
   "_comment_context_appendix": "Optional shared-context block prepended to every call. Use for type signatures, invariant labels, or cross-section glossary entries that are load-bearing but not under attack. Mark clearly as read-only / not-to-be-attacked.",
   "context_appendix": "=== CONTEXT APPENDIX (read-only — DO NOT ATTACK; these sections are attacked in their own invocations) ===\n\nSystem under review: <your system name and one-line description>.\nIntent doc: version <X.Y.Z>.\n\n=== END CONTEXT APPENDIX ===",
-  "_comment_variant": "default_variant is passed as `--variant` to every voice that lacks its own `variant` field. Canonical setting is max (maximum thinking budget on every voice that supports it). A per-voice `variant` field overrides; set it to an empty string to omit the flag for that voice.",
-  "default_variant": "max",
+  "_comment_variant": "default_variant is passed as `--variant` to every voice that lacks its own `variant` field. OpenCode exposes only `high` and `max`, so `high` is its one-below-max setting and is the standing default: max reasoning is a deliberate escalation, not the routine operating point. A per-voice `variant` field overrides; set it to an empty string to omit the flag for that voice. NOTE: the recorded calibration runs were dispatched at `max`, so a `high` run is the current operating point, not the calibrated one.",
+  "default_variant": "high",
   "_comment_timeouts": "per_call_timeout: seconds budget per (voice, slice) call. Local reasoning models on consumer hardware can take 10-25 min per slice. max_retries: per-call retry budget on truncated stubs or HTTP errors.",
   "per_call_timeout": 1800,
   "max_retries": 2,
@@ -70,37 +70,45 @@
   ],
   "opencode_version_pin": null,
   "omp_native": {
-    "profile": "canonical-4@sha256:08831d0ce9f2086b",
+    "profile": "canonical-4@sha256:0f73580ef4e3fdf2",
     "agent": "colosseum-spec-adversary",
-    "thinking_level": "max",
+    "thinking_policy": "one-below-max",
     "calibration": "pending",
     "voices": [
       {
         "id": "claude-agent",
         "model": "anthropic/claude-fable-5",
         "family": "Anthropic",
+        "thinking_level": "xhigh",
+        "dispatch_selector": "anthropic/claude-fable-5:xhigh",
         "calibration": "pending"
       },
       {
         "id": "gpt-5.6-sol",
         "model": "openai-codex/gpt-5.6-sol",
         "family": "OpenAI",
+        "thinking_level": "xhigh",
+        "dispatch_selector": "openai-codex/gpt-5.6-sol:xhigh",
         "calibration": "pending"
       },
       {
         "id": "glm-5.2",
         "model": "fireworks/glm-5.2",
         "family": "Zhipu",
+        "thinking_level": "high",
+        "dispatch_selector": "fireworks/glm-5.2:high",
         "calibration": "pending"
       },
       {
-        "id": "kimi-k2.6",
-        "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
+        "id": "kimi-k3",
+        "model": "fireworks/kimi-k3",
         "family": "Moonshot",
+        "thinking_level": "high",
+        "dispatch_selector": "fireworks/kimi-k3:high",
         "calibration": "pending"
       }
     ],
-    "route_hash": "sha256:cd3aa813c9ec5361"
+    "route_hash": "sha256:8cfbe2a1594c9921"
   },
   "_comment_omp_native": "Generated from registry/voices.json. Run from OMP with the colosseum-adversarial skill's omp_fanout.py helper. A pending calibration must be reported as uncalibrated; never borrow OpenCode fitness evidence."
 }

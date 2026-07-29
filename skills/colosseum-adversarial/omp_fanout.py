@@ -89,9 +89,10 @@ def preflight_scan(root: str | Path) -> list[str]:
 def _route_hash(route: Mapping[str, Any]) -> str:
     normalized = {
         "agent": route["agent"],
-        "thinking_level": route["thinking_level"],
+        "thinking_policy": route["thinking_policy"],
         "voices": sorted(
-            ({"id": voice["id"], "model": voice["model"]}
+            ({"id": voice["id"], "model": voice["model"],
+              "thinking_level": voice.get("thinking_level")}
              for voice in route["voices"]),
             key=lambda voice: voice["id"],
         ),
@@ -100,7 +101,7 @@ def _route_hash(route: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
-def _validate_voice(voice: Mapping[str, Any]) -> dict[str, str]:
+def _validate_voice(voice: Mapping[str, Any]) -> dict[str, Any]:
     required = ("id", "model", "family", "calibration")
     missing = [key for key in required if not isinstance(voice.get(key), str)
                or not voice[key]]
@@ -108,7 +109,21 @@ def _validate_voice(voice: Mapping[str, Any]) -> dict[str, str]:
         raise ValueError(f"OMP voice has missing/invalid fields {missing}: {voice!r}")
     if not _SLUG_RE.fullmatch(voice["id"]):
         raise ValueError(f"unsafe OMP voice id: {voice['id']!r}")
-    return {key: voice[key] for key in required}
+    if "thinking_level" not in voice:
+        raise ValueError(f"OMP voice {voice['id']!r} has no thinking_level")
+    level = voice["thinking_level"]
+    if level is not None and (not isinstance(level, str) or not level):
+        raise ValueError(
+            f"OMP voice {voice['id']!r} thinking_level must be a non-empty "
+            f"string or null, got {level!r}")
+    checked: dict[str, Any] = {key: voice[key] for key in required}
+    checked["thinking_level"] = level
+    # OMP selector grammar is `provider/model:thinkingLevel`, and an explicit
+    # selector level outranks the agent wrapper's frontmatter level, so the
+    # per-voice effort is what actually runs. A null level dispatches the bare
+    # model (the route exposes no ladder).
+    checked["dispatch_selector"] = f"{voice['model']}:{level}" if level else voice["model"]
+    return checked
 
 
 def load_omp_native_config(
@@ -124,7 +139,7 @@ def load_omp_native_config(
     route = config.get("omp_native")
     if not isinstance(route, dict):
         raise ValueError(f"{path}: missing omp_native object")
-    for key in ("profile", "agent", "thinking_level", "calibration", "route_hash"):
+    for key in ("profile", "agent", "thinking_policy", "calibration", "route_hash"):
         if not isinstance(route.get(key), str) or not route[key]:
             raise ValueError(f"{path}: omp_native.{key} must be a non-empty string")
     if not _ROUTE_HASH_RE.fullmatch(route["route_hash"]):
@@ -160,7 +175,7 @@ def load_omp_native_config(
         "target_spec": config["target_spec"],
         "profile": route["profile"],
         "agent": route["agent"],
-        "thinking_level": route["thinking_level"],
+        "thinking_policy": route["thinking_policy"],
         "calibration": route["calibration"],
         "route_hash": route["route_hash"],
         "voices": voices,
@@ -375,7 +390,7 @@ def run_omp_fanout(
         }
         options: dict[str, Any] = {
             "agent": agent_name,
-            "model": voice["model"],
+            "model": voice["dispatch_selector"],
             "label": f"omp-{voice_id}",
             "handle": True,
         }

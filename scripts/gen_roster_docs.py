@@ -86,12 +86,18 @@ def profile_content_hash(profile: dict) -> str:
 
 
 def omp_route_hash(route: dict) -> str:
-    """Content-address the exact OMP agent, thinking level, and model routes."""
+    """Content-address the exact OMP agent, policy, and per-voice dispatch.
+
+    The per-voice thinking level is part of the route identity: the same
+    models at a different effort are a different inference route, and a run
+    citing this hash must not silently mean a different operating point.
+    """
     normalized = {
         "agent": route["agent"],
-        "thinking_level": route["thinking_level"],
+        "thinking_policy": route["thinking_policy"],
         "voices": sorted(
-            ({"id": v["id"], "model": v["model"]} for v in route["voices"]),
+            ({"id": v["id"], "model": v["model"],
+              "thinking_level": v.get("thinking_level")} for v in route["voices"]),
             key=lambda d: d["id"],
         ),
     }
@@ -277,6 +283,11 @@ def render_omp_native_config(reg: dict) -> dict:
 
     OMP route calibration is deliberately independent from the voice's
     OpenCode/Claude Code calibration.
+
+    Thinking level is PER VOICE, not per route: each model exposes its own
+    ladder, so "one step below max" is `xhigh` on some and `high` on others.
+    A single route-level scalar cannot express that, so the route carries the
+    policy name and each voice carries the concrete level it dispatches at.
     """
     prof = profile_by_name(reg, "canonical-4")
     voices = []
@@ -286,16 +297,21 @@ def render_omp_native_config(reg: dict) -> dict:
         calibration = voice.get("omp_calibration")
         if not model or not calibration:
             sys.exit(f"FATAL: canonical voice {voice['id']!r} has no complete OMP route")
+        if "omp_thinking_level" not in voice:
+            sys.exit(f"FATAL: canonical voice {voice['id']!r} has no omp_thinking_level")
+        level = voice["omp_thinking_level"]
         voices.append({
             "id": voice["id"],
             "model": model,
             "family": voice["family"],
+            "thinking_level": level,
+            "dispatch_selector": f"{model}:{level}" if level else model,
             "calibration": calibration,
         })
     route = {
         "profile": f"{prof['name']}@{prof['content_hash']}",
         "agent": "colosseum-spec-adversary",
-        "thinking_level": "max",
+        "thinking_policy": "one-below-max",
         "calibration": ("pending" if any(v["calibration"] == "pending" for v in voices)
                         else "cited"),
         "voices": voices,

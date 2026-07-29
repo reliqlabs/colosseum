@@ -24,19 +24,20 @@ Config schema is documented in `dispatch.config.example.json` alongside this scr
 
 ### Voice roster (authoritative source: `registry/voices.json`)
 
-The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). The canonical panel (`canonical-4`, operator decision 2026-07-13) is `claude-agent` (Fable 5, or the strongest available Opus), `gpt-5.6-sol`, `glm-5.2`, and `kimi-k2.6`, all with cited seeded-recall fitness runs (`calibration/2026-07-13-r1`); `gpt-oss-120b` and `nemotron-3-120b-a12b` are calibrated candidates; `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
+The adversarial voice roster is registry-driven. `registry/voices.json` is the source of truth; the table below and the roster blocks in the SKILLs, INSTALL, and `dispatch.config.example.json` are generated from it by `scripts/gen_roster_docs.py` (run `--check` in CI to fail on drift). The canonical panel (`canonical-4`) is `claude-agent` (Fable 5, or the strongest available Opus), `gpt-5.6-sol`, `glm-5.2`, and `kimi-k3`, all with cited seeded-recall fitness runs; the first three from `calibration/2026-07-13-r1` and `kimi-k3` from `calibration/2026-07-26-r2`, which also re-baselined the voice it replaced. `kimi-k2.6` (the prior Moonshot seat, superseded 2026-07-26), `gpt-oss-120b`, and `nemotron-3-120b-a12b` are calibrated candidates; `deepseek-v4-flash` and `gemini-3.1-pro-preview` await a fitness run.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
 | Voice id | Reference model | OMP model | Family | Reference harness | Status | Reference calibration | OMP calibration |
 |---|---|---|---|---|---|---|---|
 | `claude-agent` | `in-harness` | `anthropic/claude-fable-5` | Anthropic | claude-code | canonical-panel | cited | pending |
-| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | canonical-panel | cited | pending |
+| `kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` | Moonshot | opencode | candidate | cited | pending |
 | `gpt-5.6-sol` | `openai/gpt-5.6-sol` | `openai-codex/gpt-5.6-sol` | OpenAI | opencode | canonical-panel | cited | pending |
 | `deepseek-v4-flash` | `ds4/deepseek-v4-flash` | n/a | DeepSeek | opencode | candidate | pending | n/a |
 | `gemini-3.1-pro-preview` | `google/gemini-3.1-pro-preview` | n/a | Google | opencode | candidate | pending | n/a |
 | `gpt-oss-120b` | `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` | n/a | OpenAI-OSS | opencode | candidate | cited | n/a |
 | `nemotron-3-120b-a12b` | `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` | n/a | NVIDIA | opencode | candidate | cited | n/a |
 | `glm-5.2` | `fireworks-ai/accounts/fireworks/models/glm-5p2` | `fireworks/glm-5.2` | Zhipu | opencode | canonical-panel | cited | pending |
+| `kimi-k3` | `fireworks-ai/accounts/fireworks/models/kimi-k3` | `fireworks/kimi-k3` | Moonshot | opencode | canonical-panel | cited | pending |
 | `leanstral-2603` | `lmstudio/leanstral-2603` | n/a | Mistral | opencode | local-specialist | n/a | n/a |
 | `glm-4.7-flash` | `burnt/cloudflare-100/@cf/zai-org/glm-4.7-flash` | n/a | Zhipu | opencode | excluded | cited | n/a |
 | `goedel-prover-v2-32b` | `lmstudio/goedel-prover-v2-32b` | n/a | theorem-prover-specialist | opencode | excluded | cited | n/a |
@@ -251,8 +252,8 @@ colosseum/scripts/install-agents.py lint    # verify wrappers match canonical bo
 # glm-4.7-flash and the goedel class are excluded — see the roster table above).
 colosseum_run.py init \
     /path/to/.colosseum/intent.md \
-    --voices=claude-agent,gpt-5.6-sol,glm-5.2,kimi-k2.6 \
-    --owners=claude-agent:claude-code,gpt-5.6-sol:opencode,glm-5.2:opencode,kimi-k2.6:opencode
+    --voices=claude-agent,gpt-5.6-sol,glm-5.2,kimi-k3 \
+    --owners=claude-agent:claude-code,gpt-5.6-sol:opencode,glm-5.2:opencode,kimi-k3:opencode
 
 # Phase 2a — Claude Code harness dispatches its assigned voice(s):
 #   • spawns the Agent subagent with full tool access
@@ -263,7 +264,7 @@ colosseum_run.py complete <run-dir> --voice=claude-agent --elapsed=339 --finish-
 # Phase 2b — OpenCode harness dispatches its assigned voice(s) in parallel.
 # Each non-Claude voice is an OpenCode subagent with file-access tools + step
 # budget. OpenCode marks each complete as it lands.
-colosseum_run.py complete <run-dir> --voice=kimi-k2.6 --elapsed=520 --finish-reason=stop
+colosseum_run.py complete <run-dir> --voice=kimi-k3 --elapsed=520 --finish-reason=stop
 colosseum_run.py error    <run-dir> --voice=goedel-prover-v2-32b --detail="degenerated into tautology loops" --elapsed=852
 
 # Phase 3 — anyone (CI, human, agent) blocks until all voices terminal:

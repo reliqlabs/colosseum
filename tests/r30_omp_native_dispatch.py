@@ -58,9 +58,34 @@ def main() -> int:
     route = mod.load_omp_native_config(CONFIG)
     check("canonical OMP route resolves all four voices",
           [voice["id"] for voice in route["voices"]]
-          == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
+          == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"])
     check("canonical OMP route is explicitly uncalibrated",
           route["calibration"] == "pending")
+    check("every canonical voice dispatches one step below max",
+          {v["id"]: v["thinking_level"] for v in route["voices"]}
+          == {"claude-agent": "xhigh", "gpt-5.6-sol": "xhigh",
+              "glm-5.2": "high", "kimi-k3": "high"},
+          {v["id"]: v.get("thinking_level") for v in route["voices"]})
+    check("dispatch selector carries the per-voice level",
+          all(v["dispatch_selector"] == f"{v['model']}:{v['thinking_level']}"
+              for v in route["voices"]),
+          [v["dispatch_selector"] for v in route["voices"]])
+    check("route records the effort policy", route["thinking_policy"] == "one-below-max")
+    check("a voice with no thinking level fails closed",
+          raises(lambda: mod._validate_voice(
+              {"id": "v", "model": "p/m", "family": "F", "calibration": "pending"}),
+                 "thinking_level"))
+    check("a null thinking level dispatches the bare model",
+          mod._validate_voice({"id": "v", "model": "p/m", "family": "F",
+                               "calibration": "pending",
+                               "thinking_level": None})["dispatch_selector"] == "p/m")
+    check("route hash covers the thinking level",
+          mod._route_hash({"agent": "a", "thinking_policy": "one-below-max",
+                           "voices": [{"id": "v", "model": "p/m",
+                                       "thinking_level": "high"}]})
+          != mod._route_hash({"agent": "a", "thinking_policy": "one-below-max",
+                              "voices": [{"id": "v", "model": "p/m",
+                                          "thinking_level": "max"}]}))
     selected = mod.load_omp_native_config(
         CONFIG, selected_ids=["glm-5.2", "claude-agent"])
     check("explicit OMP voice order is preserved",
@@ -83,7 +108,7 @@ def main() -> int:
     def fake_agent(prompt: str, **options):
         model = options["model"]
         calls.append((model, prompt))
-        if model == selected["voices"][0]["model"]:
+        if model == selected["voices"][0]["dispatch_selector"]:
             raise RuntimeError("provider unavailable")
         voice_id = options["label"].removeprefix("omp-")
         return {
@@ -130,7 +155,7 @@ def main() -> int:
               statuses == {"glm-5.2": "error", "claude-agent": "ok"}, statuses)
         check("successful report persists verbatim",
               (run_dir / "raw" / "omp-claude-agent.md").read_text()
-              == f"report from {selected['voices'][1]['model']}")
+              == f"report from {selected['voices'][1]['dispatch_selector']}")
         check("provider error persists independently",
               "provider unavailable" in
               (run_dir / "raw" / "omp-glm-5.2.error.txt").read_text())

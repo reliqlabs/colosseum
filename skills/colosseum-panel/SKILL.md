@@ -70,10 +70,16 @@ not a validated oracle.
   to organize evidence-based scrutiny; do not treat a `PASS` as a certified gate
   until it is calibrated against a real evidence pipeline.
 
-Current roster (capacity-constrained, 2026-07): the active panel is two families
-— `openai-codex/gpt-5.6-sol` (OpenAI) and `glm-5.2` (Zhipu), `min_families=2`.
-`claude-fable-5` and `kimi-k3` are pending in the profile and lift the panel to
-3-4 families when they return.
+Current roster (2026-07-26): the active panel is three families —
+`openai-codex/gpt-5.6-sol` (OpenAI), `glm-5.2` (Zhipu), and `kimi-k3`
+(Moonshot), `min_families=3`. The Moonshot seat was activated when Kimi K3
+landed on Fireworks; its route is dispatchable but uncalibrated, so its seat
+carries `calibration: pending` like every other. `claude-fable-5` (Anthropic)
+remains pending in the profile and lifts the panel to 4 families when it
+returns. `glm-5.2` and `kimi-k3` share the Fireworks provider but resolve to
+distinct family tokens, so both seats satisfy the resolver's distinctness
+check; `kimi-k2.6` is the same `kimi` lineage as `kimi-k3` and cannot hold a
+separate seat.
 
 ## The brief and criterion source
 

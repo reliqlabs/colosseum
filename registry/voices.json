@@ -9,7 +9,7 @@
       "family": "provider/model family for diversity accounting at synthesis time (Anthropic / OpenAI / Google / Moonshot / DeepSeek / NVIDIA / Zhipu / Mistral / Alibaba / ...).",
       "harness": "opencode | claude-code. 'claude-code' is the in-harness Agent-subagent path (claude-agent only); everything else is 'opencode'.",
       "provider": "OpenCode provider key the model routes through (burnt | openai | google | ds4 | lmstudio | null for in-harness). doctor greps ~/.config/opencode/opencode.jsonc for this.",
-      "default_variant": "variant passed as --variant when this voice lacks an explicit per-call variant. 'max' is canonical. null means omit the flag.",
+      "default_variant": "variant passed as --variant when this voice lacks an explicit per-call variant. OpenCode exposes only `high` and `max`, so `high` is its one-below-max setting and is the standing default; `max` is reserved for a deliberate escalation. null means omit the flag.",
       "status": "canonical-panel | candidate | local-specialist | excluded. See _comment_status_values.",
       "calibration": "evidence reference: the run that demonstrated fitness (or the failure that excluded it), cited to where the repo documents it. The literal string 'pending' means no fitness run is documented yet — allowed ONLY for non-canonical status.",
       "requires_env": "list of env var names that MUST be set for dispatch to succeed (provider auth). doctor checks these are present. [] when none.",
@@ -18,7 +18,8 @@
       "retired": "ISO date + reason when status became 'excluded' or the voice left service; null otherwise.",
       "notes": "auth caveats, gateway quirks, latency, successor models, anything a runner needs before pinning.",
       "omp_model": "optional OMP ModelRegistry pattern for the same nominal voice. Absent means no OMP-native route is registered. This is a separate harness route, not evidence that the OpenCode calibration transfers.",
-      "omp_calibration": "required when omp_model is present. Evidence for this exact OMP-native route, or the literal 'pending'. A pending OMP route may be exercised experimentally but MUST NOT be called calibrated."
+      "omp_calibration": "required when omp_model is present. Evidence for this exact OMP-native route, or the literal 'pending'. A pending OMP route may be exercised experimentally but MUST NOT be called calibrated.",
+      "omp_thinking_level": "OMP thinking level for this voice's omp_model, set one step below that model's maximum on its own ladder (`omp models --json` -> thinking[]). Required when omp_model is present; null means the route exposes no thinking ladder and the dispatch selector carries no `:level` suffix. Dispatch composes `<omp_model>:<omp_thinking_level>`, which overrides the agent wrapper's frontmatter level (OMP resolves effort > selector level > agent frontmatter)."
     },
     "status_values": {
       "canonical-panel": "in the default milestone panel; REQUIRES non-pending calibration.",
@@ -39,51 +40,54 @@
       "model": "in-harness",
       "omp_model": "anthropic/claude-fable-5",
       "omp_calibration": "pending",
+      "omp_thinking_level": "xhigh",
       "family": "Anthropic",
       "harness": "claude-code",
       "provider": null,
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "canonical-panel",
       "calibration": "verified-rcv intent-revised multi-voice run (7 voices, 16 themes) — Claude-via-Agent contributed file-access findings text-only voices missed (skills/colosseum-adversarial/SKILL.md Step 7 exemplar). Corroborated by the colosseum self-review round1 (claude-fable-5 reviewers, 60/60 confirmed defects — scratchpad/evidence/MANIFEST.txt). Seeded-defect recall 8/8 plus one confirmed unplanted defect (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "The one voice that does NOT route through OpenCode: dispatched in-harness via the colosseum-spec-adversary Agent subagent (Mode 2). Target model pinned by operator decision 2026-07-13: Fable 5 (claude-fable-5); if Fable is unavailable in the session, use the strongest available Opus. No opencode.jsonc entry."
+      "notes": "The one voice that does NOT route through OpenCode: dispatched in-harness via the colosseum-spec-adversary Agent subagent (Mode 2). Target model pinned by operator decision 2026-07-13: Fable 5 (claude-fable-5); if Fable is unavailable in the session, use the strongest available Opus. No opencode.jsonc entry. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
     },
     {
       "id": "kimi-k2.6",
       "model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
       "omp_model": "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6",
       "omp_calibration": "pending",
+      "omp_thinking_level": null,
       "family": "Moonshot",
       "harness": "opencode",
       "provider": "burnt",
-      "default_variant": "max",
-      "status": "canonical-panel",
-      "calibration": "verified-rcv single-voice ReAct calibration: caught 5 state-invariant attacks (S5/S6/S9/S10 + Block 6 set-relations) where the inlined single-shot variant found 1 hedged mention; 6.8-15.0K chars/slice, 143-371s, ~10% retry at output cap 131072 (skills/colosseum-adversarial/SKILL.md Step 4 empirical-results table). Seeded-defect recall 8/8, blinded single-pass code review, exact-category match (calibration/2026-07-13-r1).",
+      "default_variant": "high",
+      "status": "candidate",
+      "calibration": "verified-rcv single-voice ReAct calibration: caught 5 state-invariant attacks (S5/S6/S9/S10 + Block 6 set-relations) where the inlined single-shot variant found 1 hedged mention; 6.8-15.0K chars/slice, 143-371s, ~10% retry at output cap 131072 (skills/colosseum-adversarial/SKILL.md Step 4 empirical-results table). Seeded-defect recall 8/8, blinded single-pass code review, exact-category match (calibration/2026-07-13-r1). Re-baselined 6/8 on the harder held-out ledger corpus (calibration/2026-07-26-r2), missing D2 by one line beyond tolerance with the correct category and D7 on a category call.",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc."
+      "notes": "Moonshot Kimi K2.6 via the Burnt gateway (Cloudflare AI Workers). Reasoning is currently OFF on this route (gateway-controlled); if a kimi-thinking route appears, update model + note. Needs limit.output >= 65536 (recommend 131072) in opencode.jsonc. Left canonical-4's Moonshot seat 2026-07-26: superseded by kimi-k3, which scored >= it on the same fresh corpus (calibration/2026-07-26-r2). This is a supersession, not a fitness failure — the route is live (probed 2026-07-26) and its 2026-07-13 calibration stands, so it remains a usable candidate voice."
     },
     {
       "id": "gpt-5.6-sol",
       "model": "openai/gpt-5.6-sol",
       "omp_model": "openai-codex/gpt-5.6-sol",
       "omp_calibration": "pending",
+      "omp_thinking_level": "xhigh",
       "family": "OpenAI",
       "harness": "opencode",
       "provider": "openai",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "canonical-panel",
       "calibration": "Seeded-defect recall 8/8 with correct categories, blinded single-pass code review, 2 marginal unmatched extras (calibration/2026-07-13-r1). Sibling variant gpt-5.6-sol-pro scored 8/8 in the same run before the operator standardized on sol.",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc."
+      "notes": "OpenAI GPT-5.6 Sol via the direct openai provider (opencode OAuth credential; $OPENAI_API_KEY not required). Operator decision 2026-07-13: gpt-5.6-sol is the standing OpenAI voice. gpt-5.6-pro is blocked by an account-level issue at dispatch ('not supported when using Codex with a ChatGPT account'); revisit when the account is fixed. Model names resolve from the models.dev catalog merged with custom models{} in opencode.jsonc. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
     },
     {
       "id": "deepseek-v4-flash",
@@ -91,7 +95,7 @@
       "family": "DeepSeek",
       "harness": "opencode",
       "provider": "ds4",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "candidate",
       "calibration": "pending",
       "requires_env": [],
@@ -106,7 +110,7 @@
       "family": "Google",
       "harness": "opencode",
       "provider": "google",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "candidate",
       "calibration": "pending",
       "requires_env": [
@@ -123,7 +127,7 @@
       "family": "OpenAI-OSS",
       "harness": "opencode",
       "provider": "burnt",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "candidate",
       "calibration": "partial: verified-rcv exercised it and characterized a cross-block/cross-section confusion failure mode (flagged 'Block 6 self-contradicts' by conflating Block 5's idempotent self-loop with Block 6's transitional rejection — skills/colosseum-adversarial/SKILL.md Section B). Useful supplementary voice; not yet a clean canonical-panel fitness run. Clean fitness run: seeded-defect recall 8/8 with exact lines and clean output-contract compliance (calibration/2026-07-13-r1).",
       "requires_env": [],
@@ -138,7 +142,7 @@
       "family": "NVIDIA",
       "harness": "opencode",
       "provider": "burnt",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "candidate",
       "calibration": "Seeded-defect recall 7/8: found all planted lines but labeled D6 missing-validation where the corpus says error-swallowed, a right-place wrong-category miss under the pre-registered rule (calibration/2026-07-13-r1).",
       "requires_env": [],
@@ -152,17 +156,36 @@
       "model": "fireworks-ai/accounts/fireworks/models/glm-5p2",
       "omp_model": "fireworks/glm-5.2",
       "omp_calibration": "pending",
+      "omp_thinking_level": "high",
       "family": "Zhipu",
       "harness": "opencode",
       "provider": "fireworks-ai",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "canonical-panel",
       "calibration": "Seeded-defect recall 8/8 with correct categories via the Fireworks route, blinded single-pass code review (calibration/2026-07-13-r1).",
       "requires_env": [],
       "endpoint": null,
       "added": "2026-07-11",
       "retired": null,
-      "notes": "Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md."
+      "notes": "Zhipu GLM 5.2. The burnt-gateway route never existed (gateway exposes only glm-4.7-flash) and errored on both 2026-07-13 dispatch attempts (refs err_f8ee989f, err_1de17803); repinned to Fireworks (accounts/fireworks/models/glm-5p2), which passed calibration the same day. See calibration/2026-07-13-r1/README.md. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
+    },
+    {
+      "id": "kimi-k3",
+      "model": "fireworks-ai/accounts/fireworks/models/kimi-k3",
+      "omp_model": "fireworks/kimi-k3",
+      "omp_calibration": "pending",
+      "omp_thinking_level": "high",
+      "family": "Moonshot",
+      "harness": "opencode",
+      "provider": "fireworks-ai",
+      "default_variant": "high",
+      "status": "canonical-panel",
+      "calibration": "Seeded-defect recall 7/8 on the held-out ledger corpus, blinded single-pass code review under the deny-first spec-adversary profile (calibration/2026-07-26-r2). Cleared the pre-registered entry floor (>= 5/8) and the relative bar against the incumbent kimi-k2.6, re-baselined at 6/8 on the same corpus; the decision rule was fixed in that run's PRE-REGISTRATION.md before any output was read. The margin is one defect on a category call, so the supported claim is parity-or-better with kimi-k2.6, NOT measurable superiority. Missed D2 (found the exact line, wrong category).",
+      "requires_env": [],
+      "endpoint": null,
+      "added": "2026-07-26",
+      "retired": null,
+      "notes": "Moonshot Kimi K3 via Fireworks. Both routes probed live 2026-07-26: the OpenCode slug `accounts/fireworks/models/kimi-k3` returned content with finish_reason stop (the `k3p0` spelling 404s), and `fireworks/kimi-k3` resolves in OMP's ModelRegistry. 1M context, 131K max output, thinking low/high/max, reasoning on by default and returned in a separate `reasoning_content` field so visible content stays clean. Took canonical-4's Moonshot seat from kimi-k2.6 on 2026-07-26. The OpenCode route is calibrated; the OMP-native route is NOT (omp_calibration: pending) and must still be reported as uncalibrated. Same Moonshot family as kimi-k2.6: the panel resolver enforces family distinctness, so the two cannot occupy separate seats on one panel. Effort note: the cited calibration evidence was collected at maximum reasoning (`--variant max`). Routine dispatch now runs one step below max per this voice's ladder, an operator cost decision made 2026-07-26 and NOT a re-calibrated operating point; re-running the fitness protocol at the lower effort is the only thing that would make it one."
     },
     {
       "id": "leanstral-2603",
@@ -170,7 +193,7 @@
       "family": "Mistral",
       "harness": "opencode",
       "provider": "lmstudio",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "local-specialist",
       "calibration": "n/a — Lean-specialist, deliberately outside the general adversarial panel. Substitute for one general voice only when the spec under review IS a Lean theorem.",
       "requires_env": [],
@@ -185,7 +208,7 @@
       "family": "Zhipu",
       "harness": "opencode",
       "provider": "burnt",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "excluded",
       "calibration": "verified-rcv calibration (negative): degenerate-loop behavior in both inline dispatch (paragraph repetition during reasoning-budget burnout) and subagent parallel runs (enumerated fake attacks #4-75+ on a single slice). At its ~30B 'flash' size class it is local-model tier, not gateway-frontier tier.",
       "requires_env": [],
@@ -200,7 +223,7 @@
       "family": "theorem-prover-specialist",
       "harness": "opencode",
       "provider": "lmstudio",
-      "default_variant": "max",
+      "default_variant": "high",
       "status": "excluded",
       "calibration": "verified-rcv calibration (negative): included in an 8-voice fan-out and produced ~8K tokens of degenerate tautology loops with abstract variable lists, 852s wall, output unusable. Theorem-prover specialists pattern-match a spec as a proof GOAL and attempt Lean/Coq tactics instead of attacking it.",
       "requires_env": [],
@@ -213,26 +236,26 @@
   "profiles": [
     {
       "name": "canonical-4",
-      "description": "The default milestone panel, set by operator decision 2026-07-13: claude-agent (in-harness, Fable 5 or strongest available Opus), gpt-5.6-sol (direct openai provider), glm-5.2 (Fireworks), and kimi-k2.6 (Burnt gateway), all at --variant max, all with cited 8/8 seeded-recall calibration (calibration/2026-07-13-r1). Supersedes canonical-5 (memberships pinnable at canonical-5@sha256:19595e6530eb6331 and canonical-5@sha256:63b7c9db3c128174). Pin a run as 'panel canonical-4@<content_hash>'.",
+      "description": "The default milestone panel. Set by operator decision 2026-07-13 as claude-agent (in-harness, Fable 5 or strongest available Opus), gpt-5.6-sol (direct openai provider), glm-5.2 (Fireworks), and kimi-k2.6 (Burnt gateway), all at --variant max. The Moonshot seat changed on 2026-07-26: kimi-k3 (Fireworks) replaced kimi-k2.6 after clearing the pre-registered entry floor and relative bar on a fresh held-out corpus (calibration/2026-07-26-r2). Every member holds cited seeded-recall calibration; the first three at 8/8 on calibration/2026-07-13-r1, kimi-k3 at 7/8 on the harder 2026-07-26-r2 corpus where the incumbent re-baselined at 6/8. Supersedes canonical-5 (memberships pinnable at canonical-5@sha256:19595e6530eb6331 and canonical-5@sha256:63b7c9db3c128174) and the pre-swap canonical-4@sha256:08831d0ce9f2086b. Pin a run as 'panel canonical-4@<content_hash>'. Effort: every seat dispatches one step below its model's maximum thinking level (xhigh for claude-fable-5 and gpt-5.6-sol, high for glm-5.2 and kimi-k3), set 2026-07-26. All cited calibration evidence predates that change and was collected at max, so the panel's recorded fitness describes the max operating point, not the current one.",
       "voices": [
         {
           "id": "claude-agent",
-          "variant": "max"
+          "variant": "high"
         },
         {
           "id": "gpt-5.6-sol",
-          "variant": "max"
+          "variant": "high"
         },
         {
           "id": "glm-5.2",
-          "variant": "max"
+          "variant": "high"
         },
         {
-          "id": "kimi-k2.6",
-          "variant": "max"
+          "id": "kimi-k3",
+          "variant": "high"
         }
       ],
-      "content_hash": "sha256:08831d0ce9f2086b"
+      "content_hash": "sha256:0f73580ef4e3fdf2"
     }
   ]
 }
