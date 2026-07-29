@@ -138,6 +138,37 @@ why the published usage baseline starts at 5 and 1 requests rather than zero.
 Nothing in the decision rule, the floor, the match rule, or the corpus content
 changed.
 
+### Amendment 2, pre-scoring (recorded, not silent)
+
+The dispatch has run. At the time of writing, what has been observed is: per
+voice status, elapsed time, output byte count, the claude-agent error string, and
+the usage-ledger deltas. **No findings block has been parsed and nothing has been
+scored.** No transcript has been opened. This amendment fixes two rules the
+original document left silent on, before any of that happens.
+
+**Retry policy for ERRORED voices.** An ERRORED voice gets exactly ONE retry, as
+a fresh stateless dispatch with the identical prompt. Applied uniformly to any
+voice in that state, decided before any transcript was read, because a retry
+decided after seeing what a dying voice had already found would be
+outcome-influenced adjudication.
+
+Both attempts are published. If a voice yields a parseable findings block on more
+than one attempt, the FIRST parseable attempt is the one scored: this is a retry
+for a broken transport, never a best-of-N sample. If the retry also fails, the
+voice is ERRORED and its `omp_calibration` stays `pending`.
+
+**ROUTE-DEGRADED voices are not retried in this run.** A retry would carry the
+identical degrade risk, because making the route deterministic means editing
+`retry.fallbackChains`, which is shared machine-wide configuration that other
+live sessions on this machine depend on for their own failover. Changing it
+underneath them to tidy up one calibration is not a trade this run is willing to
+make. The voice is recorded as ROUTE-DEGRADED and excluded, and the inability to
+pin a route per-dispatch without global side effects is recorded as an instrument
+limitation of the OMP-native transport.
+
+Consequence, stated before scoring: at most three of four voices can earn a
+non-pending `omp_calibration` from this run, and it may be fewer.
+
 ## Route attestation (pre-registered)
 
 The OMP eval bridge does not surface the resolved model, so a voice's own record
