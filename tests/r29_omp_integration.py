@@ -523,6 +523,56 @@ def main() -> int:
               len(cached_checks) == 1 and cached_checks[0]["status"] == "ok",
               str(cached_checks))
 
+        # A project may deliberately keep NO local skills/agents and rely on
+        # the user-level install. That is correct configuration, not drift --
+        # but the copy that will actually be used must still be verified, or a
+        # stale user artifact passes unchecked under --skip-home-drift.
+        lean = Path(td) / "lean-project"
+        (lean / ".colosseum").mkdir(parents=True)
+        (lean / ".colosseum" / "harness").write_text("omp\n")
+        (lean / ".omp").mkdir()
+        shutil.copy2(SCRIPTS / "dispatch.config.example.json",
+                     lean / ".colosseum" / "dispatch.json")
+
+        def lean_report():
+            proc = run([
+                "uv", "run", "--script", str(SCRIPTS / "colosseum_doctor.py"),
+                "--project", str(lean), "--skip-home-drift", "--json",
+            ], env=env)
+            return json.loads(proc.stdout)["checks"]
+
+        lean_checks = lean_report()
+        satisfied = [c for c in lean_checks if c["name"].startswith("user-wide ")]
+        # Scope to the categories the user-wide fallback covers. MCP servers,
+        # the resolver extension and panel profiles have NO user-level
+        # equivalent, so this fixture omits them and they must still report.
+        lean_bad = [c for c in lean_checks
+                    if c["category"] in ("drift/omp-skills", "drift/omp-agents")
+                    and c["status"] != "ok"]
+        check("a project with no local skills is satisfied user-wide",
+              len(satisfied) == len(canonical_agents) + len(canonical_skills)
+              and not lean_bad,
+              f"satisfied={len(satisfied)} bad={[c['name'] for c in lean_bad]}")
+        check("artifacts with no user-level equivalent still report",
+              {c["name"] for c in lean_checks
+               if c["category"].startswith("drift/omp-") and c["status"] != "ok"}
+              == {".omp/mcp.json",
+                  ".omp/extensions/colosseum-panel-resolver.ts",
+                  ".colosseum/panel-profiles.json"})
+
+        tampered = agent_dir / "skills" / "colosseum-verify" / "SKILL.md"
+        original = tampered.read_text()
+        tampered.write_text(original + "tampered\n")
+        drifted_user_checks = [
+            c for c in lean_report()
+            if c["name"] == "user-wide skills/colosseum-verify"
+        ]
+        tampered.write_text(original)
+        check("a stale user-level copy is drift even under --skip-home-drift",
+              len(drifted_user_checks) == 1
+              and drifted_user_checks[0]["status"] == "fail",
+              str(drifted_user_checks))
+
     check_dispatch_key_ownership()
 
     print()

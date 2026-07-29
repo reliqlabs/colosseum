@@ -630,13 +630,31 @@ def check_project_drift(rep: Report, repo: Path, project: Path,
     rep.add("drift/omp-dispatch", ".colosseum/dispatch.json omp_native",
             "ok" if ok else "fail", detail)
 
+    # Project-local skills and agents are OPTIONAL once a user-level OMP
+    # install provides them: OMP discovers `~/.omp/agent/{skills,agents}` in
+    # every session, so a project that deliberately keeps no local copy is
+    # correctly configured, not drifted. Only report a failure when the
+    # artifact is absent from BOTH locations. Reporting the deliberate choice
+    # as drift is the same harness-blindness that hardcoded ~/.claude.
+    user_dir = omp_user_agent_dir()
+    user_agents = user_dir / "agents"
+    user_skills = user_dir / "skills"
+
     canonical_agents = {
         path.name: path for path in sorted((repo / "agents" / "omp").glob("*.md"))
     }
     installed_agents = omp_root / "agents"
     for name, canonical in canonical_agents.items():
-        _classify(rep, "drift/omp-agents", f".omp/agents/{name}",
-                  canonical, installed_agents / name)
+        local = installed_agents / name
+        if not local.exists() and (user_agents / name).exists():
+            # Verify the copy that will actually be used. Presence alone is not
+            # enough: with --skip-home-drift the drift/omp-user-* checks are
+            # suppressed, so an unconditional "ok" here would leave a stale
+            # user-level artifact unverified anywhere in the run.
+            _classify(rep, "drift/omp-agents", f"user-wide agents/{name}",
+                      canonical, user_agents / name)
+            continue
+        _classify(rep, "drift/omp-agents", f".omp/agents/{name}", canonical, local)
     if installed_agents.exists():
         for installed in sorted(installed_agents.glob("colosseum-*.md")):
             if installed.name not in canonical_agents:
@@ -649,8 +667,14 @@ def check_project_drift(rep: Report, repo: Path, project: Path,
     }
     installed_skills = omp_root / "skills"
     for name, canonical in canonical_skills.items():
+        local = installed_skills / name
+        if not local.is_dir() and (user_skills / name).is_dir():
+            _classify_tree(rep, "drift/omp-skills", f"user-wide skills/{name}",
+                           canonical, user_skills / name,
+                           canonical_hash_fn=_omp_skill_tree_sha)
+            continue
         _classify_tree(rep, "drift/omp-skills", f".omp/skills/{name}",
-                       canonical, installed_skills / name,
+                       canonical, local,
                        canonical_hash_fn=_omp_skill_tree_sha)
     if installed_skills.exists():
         for installed in sorted(installed_skills.glob("colosseum-*")):
