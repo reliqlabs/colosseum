@@ -86,6 +86,39 @@ def main() -> int:
           != mod._route_hash({"agent": "a", "thinking_policy": "one-below-max",
                               "voices": [{"id": "v", "model": "p/m",
                                           "thinking_level": "max"}]}))
+    check("base selector strips only a real thinking level",
+          mod._base_selector("synthetic/hf:zai-org/GLM-5.2:xhigh")
+          == "synthetic/hf:zai-org/GLM-5.2"
+          and mod._base_selector("synthetic/hf:moonshotai/Kimi-K3")
+          == "synthetic/hf:moonshotai/Kimi-K3"
+          and mod._base_selector("burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6")
+          == "burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6")
+    # OMP rewrites resolvedModel to the fallback target, so a differing served
+    # model is positive evidence a retry chain answered. Equality is NOT clean:
+    # the bridge reports `resolvedModel ?? modelOverride`.
+    fired = mod.classify_served_route(
+        "synthetic/hf:zai-org/GLM-5.2:xhigh",
+        {"text": "r", "details": {"model": "fireworks/glm-5.2:high"}})
+    check("a differing served model is recorded as a fallback",
+          fired["served_is_fallback"] is True
+          and fired["served_model"] == "fireworks/glm-5.2:high"
+          and fired["fallback_basis"].startswith("inferred:"))
+    same = mod.classify_served_route(
+        "fireworks/kimi-k3:high",
+        {"text": "r", "details": {"model": "fireworks/kimi-k3:high"}})
+    check("an equal served model is recorded as ambiguous, not clean",
+          same["served_is_fallback"] is False
+          and "ambiguous" in same["fallback_basis"])
+    authoritative = mod.classify_served_route(
+        "fireworks/kimi-k3:high",
+        {"text": "r", "details": {"model": "fireworks/kimi-k3:high",
+                                  "resolvedModelIsFallback": True}})
+    check("OMP's own flag outranks selector comparison when present",
+          authoritative["served_is_fallback"] is True
+          and authoritative["fallback_basis"] == "omp-reported")
+    check("a missing served model is unknown, never a clean False",
+          mod.classify_served_route("p/m:high", {"text": "r"})["served_is_fallback"]
+          is None)
     selected = mod.load_omp_native_config(
         CONFIG, selected_ids=["glm-5.2", "claude-agent"])
     check("explicit OMP voice order is preserved",
@@ -161,6 +194,19 @@ def main() -> int:
               (run_dir / "raw" / "omp-glm-5.2.error.txt").read_text())
         check("native bridge never invents finish reasons",
               all(voice["finish_reason"] is None for voice in summary["voices"]))
+        # The fake echoes the requested selector, so the served route is
+        # ambiguous-equal. That must surface in route_unverified rather than
+        # letting the summary read cleaner than the per-voice basis.
+        check("summary provenance matches the per-voice basis",
+              summary["served_by_fallback"] == []
+              and summary["route_unverified"] == ["claude-agent"],
+              {"fallback": summary["served_by_fallback"],
+               "unverified": summary["route_unverified"]})
+        check("an errored voice is not counted as an unverified route",
+              "glm-5.2" not in summary["route_unverified"])
+        check("requested selector is recorded per voice",
+              all(voice["requested_selector"] == voice["dispatch_selector"]
+                  for voice in summary["voices"]))
         check("summary is written last as parseable JSON",
               json.loads((run_dir / "summary.json").read_text())["verdict"]
               == "PARTIAL")

@@ -182,6 +182,103 @@ def load_omp_native_config(
     }
 
 
+_THINKING_LEVELS = frozenset({
+    "off", "minimal", "low", "medium", "high", "xhigh", "max", "auto",
+})
+
+
+def _base_selector(selector: str) -> str:
+    """`provider/id` with a trailing `:thinkingLevel` stripped, if present.
+
+    Only a final segment that is a known level is removed: a model id may
+    legitimately contain a colon (synthetic's `hf:zai-org/GLM-5.2`), so a naive
+    split would mangle the id and make every comparison look like a fallback.
+    """
+    head, sep, tail = selector.rpartition(":")
+    return head if sep and tail in _THINKING_LEVELS else selector
+
+
+def _nested_get(result: Mapping[str, Any], key: str) -> Any:
+    """Read `key` from the result, or from its `details` object.
+
+    The eval `agent()` bridge nests dispatch metadata under `details`; some
+    runtimes flatten it onto the result. Check both rather than assume one.
+    """
+    if key in result:
+        return result[key]
+    details = result.get("details")
+    if isinstance(details, Mapping):
+        return details.get(key)
+    return None
+
+
+def _served_model(result: Any) -> str | None:
+    """The model OMP actually dispatched, as the bridge reports it."""
+    if not isinstance(result, Mapping):
+        return None
+    model = _nested_get(result, "model")
+    if isinstance(model, str) and model:
+        return model
+    if isinstance(model, list) and model and isinstance(model[0], str):
+        return model[0]
+    return None
+
+
+def _reported_fallback(result: Any) -> bool | None:
+    """OMP's own `resolvedModelIsFallback`, when the bridge forwards it.
+
+    The eval bridge currently drops this field (it forwards only `model`), so
+    this is usually None and the caller must fall back to comparing selectors.
+    Preferred whenever present because it is authoritative.
+    """
+    if not isinstance(result, Mapping):
+        return None
+    flag = _nested_get(result, "resolvedModelIsFallback")
+    return flag if isinstance(flag, bool) else None
+
+
+def classify_served_route(requested: str, result: Any) -> dict[str, Any]:
+    """Decide whether a retry fallback served this dispatch, and on what basis.
+
+    OMP rewrites `resolvedModel` to the fallback when one is applied, so a
+    served model differing from the requested one is positive evidence. The
+    converse is NOT clean: the bridge reports
+    `resolvedModel ?? modelOverride`, so equality can mean either "no
+    fallback" or "resolvedModel was absent and the override echoed back". The
+    basis is recorded so evidence never presents an inference as a fact.
+    """
+    served = _served_model(result)
+    reported = _reported_fallback(result)
+    if reported is not None:
+        return {"served_model": served, "served_is_fallback": reported,
+                "fallback_basis": "omp-reported"}
+    if served is None:
+        return {"served_model": None, "served_is_fallback": None,
+                "fallback_basis": "unavailable: bridge reported no model"}
+    if _base_selector(served) != _base_selector(requested):
+        return {"served_model": served, "served_is_fallback": True,
+                "fallback_basis": "inferred: served model differs from requested"}
+    return {"served_model": served, "served_is_fallback": False,
+            "fallback_basis": ("inferred-ambiguous: served == requested, which "
+                               "means either no fallback or an absent "
+                               "resolvedModel echoing the override")}
+
+
+def _route_established(record: Mapping[str, Any]) -> bool:
+    """Whether the record POSITIVELY establishes which route answered.
+
+    True only for OMP's own report, or for a served model that demonstrably
+    differs from the requested one. An equal selector is NOT established: the
+    bridge reports `resolvedModel ?? modelOverride`, so equality cannot
+    distinguish "no fallback" from "resolvedModel absent". Keeping this strict
+    is what stops a summary from reading cleaner than its evidence.
+    """
+    basis = record.get("fallback_basis")
+    if not isinstance(basis, str):
+        return False
+    return basis == "omp-reported" or basis.startswith("inferred:")
+
+
 def _result_text(result: Any) -> tuple[str, str | None, str | None]:
     if isinstance(result, str):
         return result, None, None
@@ -387,6 +484,7 @@ def run_omp_fanout(
             "prompt_file": str(prompt_rel),
             "prompt_sha256": _sha256_text(voice_prompt),
             "finish_reason": None,
+            "requested_selector": voice["dispatch_selector"],
         }
         options: dict[str, Any] = {
             "agent": agent_name,
@@ -413,6 +511,11 @@ def run_omp_fanout(
                 "output_bytes": len(text.encode()),
                 "handle": handle,
                 "agent_id": agent_id,
+                # Which route ANSWERED, not merely which was requested: OMP's
+                # retry layer may serve a dispatch from a configured fallback
+                # (retry.fallbackChains), and evidence that names only the
+                # requested model would misattribute the provider.
+                **classify_served_route(voice["dispatch_selector"], result),
             }
             return record
         except Exception as exc:  # one voice must never sink the fan-out wave
@@ -447,6 +550,18 @@ def run_omp_fanout(
             verdict = "COMPLETE"
         else:
             verdict = "PARTIAL" if voices_ok else "INCOMPLETE"
+        # Route provenance at a glance: an evidence reader must not have to
+        # diff per-voice selectors to learn which route answered. The two lists
+        # partition the OK voices by whether the served route is POSITIVELY
+        # established -- an ambiguous equal-selector match is unverified, not
+        # clean, so the summary never reads better than the per-voice basis.
+        served_by_fallback = sorted(
+            record["id"] for record in records
+            if isinstance(record, Mapping) and record.get("served_is_fallback") is True)
+        route_unverified = sorted(
+            record["id"] for record in records
+            if isinstance(record, Mapping) and record.get("status") == "ok"
+            and not _route_established(record))
         summary = {
             "version": 1,
             "harness": "omp-native",
@@ -462,6 +577,8 @@ def run_omp_fanout(
             "preflight": preflight,
             "voices": list(records),
             "isolation": isolation,
+            "served_by_fallback": served_by_fallback,
+            "route_unverified": route_unverified,
         }
         if orchestration_error is not None:
             summary["orchestration_error"] = orchestration_error
