@@ -33,6 +33,14 @@ Cargo.lock.bak
 # tests/fixtures/r22/adapter/target stay ignored — they sit next to a Cargo.toml.)
 !tests/fixtures/m3b/target/
 !tests/fixtures/m3b/target/**
+# calibration/<run>/target is the seeded review TARGET a calibration scored,
+# not a Cargo build dir. The global target/ rule above silently excluded it, so
+# every run's corpus.json cited line numbers in code the repo did not contain
+# and no defect could be re-verified. Track it; ignore only real build output
+# underneath (a `cargo check` in the target leaves target/target/).
+!calibration/*/target/
+!calibration/*/target/**
+calibration/*/target/target/
 
 # --- Editor / OS scratch ---
 *.swp
