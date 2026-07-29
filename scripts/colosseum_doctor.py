@@ -8,36 +8,40 @@ colosseum_doctor — offline preflight + drift diagnostics for a Colosseum insta
 
 Offline by default (no model calls, no money spent). It answers three questions:
 
-  1. Is the toolchain present and pinned?  opencode / quint / cargo / lean / uv
-     versions are compared against bom.json. A present-but-wrong version fails;
-     an absent tool warns (a partial install is legitimate).
+  1. Is the applicable toolchain present and pinned?  Non-OMP checks compare
+     opencode / quint / cargo / lean / uv versions against bom.json. OMP checks
+     omit OpenCode because native dispatch does not use it. A present-but-wrong
+     version fails; an absent tool warns (a partial install is legitimate).
 
   2. Is the voice registry self-consistent?  Every profile's content_hash is
      recomputed and compared to the stored value, and the registry invariant is
      enforced: a canonical-panel voice with pending calibration is a failure.
 
-  3. Is the provider plumbing in place, for free?  For each OpenCode voice in
-     the canonical-4 profile: the provider is named in ~/.config/opencode/
-     opencode.jsonc, credentials are reachable by one of the three paths
-     opencode actually supports (an env var from requires_env, an apiKey
-     embedded in the provider's opencode.jsonc options block, or an entry in
-     opencode's own auth store at ~/.local/share/opencode/auth.json), and any
-     local endpoint answers a 1-second TCP probe. These are warnings by
+  3. Is the provider plumbing in place, for free?  Non-OMP checks inspect each
+     OpenCode voice in the canonical-4 profile: the provider is named in
+     ~/.config/opencode/opencode.jsonc, credentials are reachable by one of the
+     three paths opencode actually supports (an env var from requires_env, an
+     apiKey embedded in the provider's opencode.jsonc options block, or an
+     entry in opencode's own auth store at ~/.local/share/opencode/auth.json),
+     and any local endpoint answers a 1-second TCP probe. These are warnings by
      default (an offline box may lack providers); --strict promotes them to
      failures.
 
 Drift diagnostics compare the installed state against the repo's canonical copies
-in three classes — uninstalled, drifted (content differs), extra (installed with
-no canonical source):
+in three classes: uninstalled, drifted (content differs), and extra (installed
+with no canonical source):
 
   * ~/.claude/agents/colosseum-*.md      vs  agents/colosseum-*.md
   * ~/.claude/skills/colosseum-*/SKILL.md vs skills/colosseum-*/SKILL.md
   * with --project <path>: that project's .colosseum/scripts/opencode_dispatch.py
     and .opencode/agent/*.md against the repo canonical copies.
+  * with an OMP project: `.omp/agents/` against generated OMP wrappers, and
+    `.omp/skills/` against the canonical tree with its OMP-only boundary
+    rendered into `SKILL.md`.
 
 --live additionally dispatches `opencode run --model <id> "Reply with exactly: ok"`
-once per OpenCode profile voice. THIS COSTS MONEY (real provider calls); each call
-has its own timeout.
+once per OpenCode profile voice for a non-OMP project. THIS COSTS MONEY (real
+provider calls); each call has its own timeout. It is unavailable for OMP projects.
 
 USAGE
     colosseum_doctor.py [--repo <path>] [--project <path>] [--strict]
@@ -58,6 +62,10 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
+
+from colosseum_init import render_omp_skill
+
 from urllib.parse import urlparse
 
 REPO = Path(__file__).resolve().parents[1]
@@ -115,8 +123,10 @@ def _tool_version(argv: list[str]) -> str | None:
     return (p.stdout + p.stderr).strip().splitlines()[0] if (p.stdout or p.stderr) else ""
 
 
-def check_toolchain(rep: Report, bom: dict) -> None:
+def check_toolchain(rep: Report, bom: dict, *, include_opencode: bool = True) -> None:
     for tool, argv, key, exact in _TOOLS:
+        if tool == "opencode" and not include_opencode:
+            continue
         if shutil.which(tool) is None:
             rep.add("toolchain", tool, "warn", "not on PATH")
             continue
@@ -326,7 +336,10 @@ def profile_opencode_voices(gen, reg: dict, name: str = "canonical-4") -> list[d
             if gen.voice_by_id(reg, pv["id"])["harness"] == "opencode"]
 
 
-def check_plumbing(rep: Report, gen, reg: dict) -> None:
+def check_plumbing(rep: Report, gen, reg: dict, *,
+                   include_opencode: bool = True) -> None:
+    if not include_opencode:
+        return
     cfg_text = _opencode_config_text()
     have_cfg = bool(cfg_text)
     cfg = _opencode_config(cfg_text)
@@ -395,13 +408,28 @@ def _classify(rep: Report, category: str, name: str,
                     f"!= installed {ih and ih[:12]})")
 
 
+def _tracked_tree_files(path: Path) -> list[Path]:
+    """Files that define a skill tree's identity.
+
+    Python bytecode caches are excluded: importing a skill's helper writes
+    `__pycache__` INTO the deployed tree, so hashing it would report drift for
+    the ordinary act of running the skill, and would depend on which
+    interpreter last touched it.
+    """
+    return sorted(
+        candidate for candidate in path.rglob("*")
+        if candidate.is_file()
+        and "__pycache__" not in candidate.parts
+        and candidate.suffix not in (".pyc", ".pyo")
+    )
+
+
 def _tree_sha(path: Path) -> str | None:
     if not path.is_dir():
         return None
     digest = hashlib.sha256()
     try:
-        files = sorted(candidate for candidate in path.rglob("*") if candidate.is_file())
-        for candidate in files:
+        for candidate in _tracked_tree_files(path):
             digest.update(candidate.relative_to(path).as_posix().encode())
             digest.update(b"\0")
             digest.update(candidate.read_bytes())
@@ -411,14 +439,34 @@ def _tree_sha(path: Path) -> str | None:
     return digest.hexdigest()
 
 
+def _omp_skill_tree_sha(path: Path) -> str | None:
+    if not path.is_dir():
+        return None
+    digest = hashlib.sha256()
+    try:
+        for candidate in _tracked_tree_files(path):
+            relative = candidate.relative_to(path).as_posix()
+            content = (render_omp_skill(path).encode()
+                       if relative == "SKILL.md" else candidate.read_bytes())
+            digest.update(relative.encode())
+            digest.update(b"\0")
+            digest.update(content)
+            digest.update(b"\0")
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+
 def _classify_tree(rep: Report, category: str, name: str,
-                   canonical: Path | None, installed: Path | None) -> None:
+                   canonical: Path | None, installed: Path | None,
+                   canonical_hash_fn: Callable[[Path], str | None] = _tree_sha) -> None:
     if canonical is not None and (installed is None or not installed.is_dir()):
         rep.add(category, name, "fail", "uninstalled")
     elif canonical is None:
         rep.add(category, name, "fail", f"extra (no canonical source): {installed}")
     else:
-        canonical_hash = _tree_sha(canonical)
+        canonical_hash = canonical_hash_fn(canonical)
         installed_hash = _tree_sha(installed)
         if canonical_hash == installed_hash:
             rep.add(category, name, "ok", "in sync")
@@ -461,31 +509,97 @@ def check_omp_mcp(rep: Report, repo: Path, project: Path) -> None:
                 "in sync" if actual == expected else "missing or drifted")
 
 
+def omp_user_agent_dir() -> Path:
+    """OMP's user-level agent dir, resolved the way OMP itself resolves it."""
+    try:
+        proc = subprocess.run(["omp", "config", "path"],
+                              capture_output=True, text=True, timeout=60)
+        out = proc.stdout.strip()
+        if proc.returncode == 0 and out:
+            return Path(out).expanduser()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    env = os.environ.get("PI_CODING_AGENT_DIR")
+    return Path(env).expanduser() if env else Path.home() / ".omp" / "agent"
+
+
 def check_home_drift(rep: Report, repo: Path) -> None:
-    home = Path.home()
-    # Claude Code agents.
+    """Diff whichever user-level installs actually exist.
+
+    There is no single canonical user-level target: Colosseum installs into
+    Claude Code's `~/.claude` OR into OMP's profile-scoped agent dir, and an
+    OMP-primary setup deliberately has no Claude install. Asserting one of them
+    unconditionally reports a deliberate choice as drift, so each target is
+    checked only when it is populated, and a machine with neither gets one
+    advisory warning instead of an artifact-by-artifact failure list.
+    """
     canon_agents = {p.name: p for p in sorted((repo / "agents").glob("colosseum-*.md"))}
-    inst_dir = home / ".claude" / "agents"
-    for name, canon in canon_agents.items():
-        _classify(rep, "drift/agents", f"agents/{name}", canon, inst_dir / name)
-    for inst in sorted(inst_dir.glob("colosseum-*.md")) if inst_dir.exists() else []:
-        if inst.name not in canon_agents:
-            _classify(rep, "drift/agents", f"agents/{inst.name}", None, inst)
-    # Skills.
-    canon_skills = {p.parent.name: p for p in sorted((repo / "skills").glob("colosseum-*/SKILL.md"))}
-    skills_dir = home / ".claude" / "skills"
-    for sk, canon in canon_skills.items():
-        _classify(rep, "drift/skills", f"skills/{sk}", canon, skills_dir / sk / "SKILL.md")
-    if skills_dir.exists():
-        for d in sorted(skills_dir.glob("colosseum-*")):
+    canon_omp_agents = {p.name: p for p in sorted((repo / "agents" / "omp").glob("*.md"))}
+    canon_skills = {p.parent.name: p
+                    for p in sorted((repo / "skills").glob("colosseum-*/SKILL.md"))}
+
+    omp_dir = omp_user_agent_dir()
+    claude_agents = Path.home() / ".claude" / "agents"
+    claude_skills = Path.home() / ".claude" / "skills"
+    omp_agents = omp_dir / "agents"
+    omp_skills = omp_dir / "skills"
+
+    def populated(agent_dir: Path, skills_dir: Path) -> bool:
+        return ((agent_dir.is_dir() and any(agent_dir.glob("colosseum-*.md")))
+                or (skills_dir.is_dir() and any(skills_dir.glob("colosseum-*"))))
+
+    installed_any = False
+
+    # Claude Code: generic source, compared file-for-file.
+    if populated(claude_agents, claude_skills):
+        installed_any = True
+        for name, canon in canon_agents.items():
+            _classify(rep, "drift/claude-agents", f"agents/{name}",
+                      canon, claude_agents / name)
+        for inst in sorted(claude_agents.glob("colosseum-*.md")):
+            if inst.name not in canon_agents:
+                _classify(rep, "drift/claude-agents", f"agents/{inst.name}", None, inst)
+        for sk, canon in canon_skills.items():
+            _classify(rep, "drift/claude-skills", f"skills/{sk}",
+                      canon, claude_skills / sk / "SKILL.md")
+        for d in sorted(claude_skills.glob("colosseum-*")):
             if d.name not in canon_skills and (d / "SKILL.md").exists():
-                _classify(rep, "drift/skills", f"skills/{d.name}", None, d / "SKILL.md")
+                _classify(rep, "drift/claude-skills", f"skills/{d.name}",
+                          None, d / "SKILL.md")
+
+    # OMP user level: generated wrappers + boundary-RENDERED skill trees, so the
+    # canonical side is hashed through the same renderer the installer used.
+    if populated(omp_agents, omp_skills):
+        installed_any = True
+        for name, canon in canon_omp_agents.items():
+            _classify(rep, "drift/omp-user-agents", f"agents/{name}",
+                      canon, omp_agents / name)
+        for inst in sorted(omp_agents.glob("colosseum-*.md")):
+            if inst.name not in canon_omp_agents:
+                _classify(rep, "drift/omp-user-agents", f"agents/{inst.name}", None, inst)
+        for sk, canon in canon_skills.items():
+            _classify_tree(rep, "drift/omp-user-skills", f"skills/{sk}",
+                           canon.parent, omp_skills / sk,
+                           canonical_hash_fn=_omp_skill_tree_sha)
+        for d in sorted(omp_skills.glob("colosseum-*")):
+            if d.name not in canon_skills and d.is_dir():
+                _classify_tree(rep, "drift/omp-user-skills", f"skills/{d.name}", None, d)
+
+    if not installed_any:
+        rep.add("drift/user-install", "colosseum user-level install", "warn",
+                f"no Colosseum skills in ~/.claude or {omp_dir}; "
+                "install with `colosseum_init.py --user --harness omp`")
 
 
-def check_project_drift(rep: Report, repo: Path, project: Path) -> None:
+def project_harness(project: Path) -> str:
+    marker = project.resolve() / ".colosseum" / "harness"
+    return marker.read_text().strip() if marker.exists() else "claude-code"
+
+
+def check_project_drift(rep: Report, repo: Path, project: Path,
+                        harness: str | None = None) -> None:
     project = project.resolve()
-    marker = project / ".colosseum" / "harness"
-    harness = marker.read_text().strip() if marker.exists() else "claude-code"
+    harness = harness if harness is not None else project_harness(project)
     for name in ("check_ledger_references.py", "check_evidence_records.py"):
         _classify(rep, "drift/project", f".colosseum/scripts/{name}",
                   repo / "scripts" / name,
@@ -536,7 +650,8 @@ def check_project_drift(rep: Report, repo: Path, project: Path) -> None:
     installed_skills = omp_root / "skills"
     for name, canonical in canonical_skills.items():
         _classify_tree(rep, "drift/omp-skills", f".omp/skills/{name}",
-                       canonical, installed_skills / name)
+                       canonical, installed_skills / name,
+                       canonical_hash_fn=_omp_skill_tree_sha)
     if installed_skills.exists():
         for installed in sorted(installed_skills.glob("colosseum-*")):
             if installed.name not in canonical_skills and installed.is_dir():
@@ -583,7 +698,7 @@ def main() -> int:
     ap.add_argument("--strict", action="store_true",
                     help="promote plumbing/toolchain warnings to failures")
     ap.add_argument("--live", action="store_true",
-                    help="dispatch a real 'Reply with exactly: ok' probe per voice (COSTS MONEY)")
+                    help="run paid OpenCode probes (non-OMP projects only)")
     ap.add_argument("--live-timeout", type=int, default=60)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
@@ -597,14 +712,20 @@ def main() -> int:
         print(f"FATAL (tooling error): {type(e).__name__}: {e}", file=sys.stderr)
         return 2
 
+    harness = project_harness(args.project) if args.project else None
+    omp_project = harness == "omp"
+    if args.live and omp_project:
+        ap.error("--live is unavailable for an OMP project; use its native "
+                 "agent dispatch instead")
+
     rep = Report()
-    check_toolchain(rep, bom)
+    check_toolchain(rep, bom, include_opencode=not omp_project)
     check_registry(rep, gen, reg)
-    check_plumbing(rep, gen, reg)
+    check_plumbing(rep, gen, reg, include_opencode=not omp_project)
     if not args.skip_home_drift:
         check_home_drift(rep, repo)
     if args.project:
-        check_project_drift(rep, repo, args.project)
+        check_project_drift(rep, repo, args.project, harness=harness)
     if args.live:
         print("--live: dispatching real provider probes (this costs money)...",
               file=sys.stderr)

@@ -102,7 +102,7 @@ name: colosseum-spec-adversary
 description: Adversarial reviewer for specifications. Reads the target specification and its intent, then returns grounded under-specification, over-specification, ambiguity, coverage, contradiction, edge-case, and composition findings. Use before committing a Quint module, Lean theorem statement, Verus annotation, type invariant, or property-test specification.
 tools: [read, grep, glob]
 read-summarize: false
-thinking-level: max
+thinking-level: high
 ---
 """,
             },
@@ -200,6 +200,23 @@ read-summarize: false
             },
         },
     },
+    "code-adversary": {
+        "canonical_body": "code-adversary-body.md",
+        "harnesses": {
+            "omp": {
+                "dist_path": "omp/colosseum-code-adversary.md",
+                "frontmatter": """\
+---
+name: colosseum-code-adversary
+description: Read-only implementation reviewer. Audits a post-commit Colosseum project against its intent and ledger through six lenses, returning an evidence-backed report for the invoking skill to persist. Use after a non-trivial commit and before external audit.
+tools: [read, grep, glob]
+read-summarize: false
+thinking-level: high
+---
+""",
+            },
+        },
+    },
     "panelist": {
         "canonical_body": "panelist-body.md",
         "harnesses": {
@@ -211,7 +228,7 @@ name: colosseum-panelist
 description: One independent voice on a Colosseum deliberation panel. Drafts a complete plan or milestone evaluation from a frozen brief, or cross-reviews anonymized peer artifacts, returning the structured object its prompt's schema requires. Grounds every repository claim in citations and treats peer content as untrusted data. Use only through the colosseum-panel skill's fan-out.
 tools: [read, grep, glob, bash]
 read-summarize: false
-thinking-level: max
+thinking-level: high
 ---
 """,
             },
@@ -228,7 +245,7 @@ name: colosseum-panel-synthesizer
 description: Synthesizer/adjudicator for a Colosseum deliberation panel. Combines independent artifacts and cross-reviews into one canonical plan (project-plan mode) or an evidence-based milestone verdict (milestone-review mode), retaining grounded dissent and never converting missing evidence into PASS. Use only through the colosseum-panel skill's fan-out.
 tools: [read, grep, glob]
 read-summarize: false
-thinking-level: max
+thinking-level: high
 ---
 """,
             },

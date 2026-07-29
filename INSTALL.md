@@ -213,6 +213,60 @@ The generated config uses `${COLOSSEUM}` and the three optional tool variables,
 so export them before launching OMP. Run `/mcp reload`, `/mcp list`, and
 `/mcp test <name>` from OMP after installation.
 
+To update an existing OMP scaffold, including the OMP-only skill routing
+boundary and newly added OMP agents:
+
+```bash
+$COLOSSEUM/scripts/colosseum_init.py <project> --harness omp --refresh-omp
+```
+
+`--refresh-omp` replaces only Colosseum-owned OMP skills, agents, panel
+artifacts, and conflicting named Colosseum MCP entries. It preserves
+`.colosseum/dispatch.json`, project scripts, and unrelated MCP servers. It
+refuses an invalid MCP file rather than replacing it; use the broader `--force`
+only after reviewing or backing up the project dispatch configuration. Restart
+OMP from the project root after the update so it discovers the refreshed
+project-local skills and agents.
+
+#### User-wide OMP install (recommended)
+
+A project scaffold only reaches sessions started inside that project. Install
+the skills and agents once at OMP's user level so every OMP session sees them,
+including repositories with no Colosseum scaffold:
+
+```bash
+$COLOSSEUM/scripts/colosseum_init.py --user --harness omp
+```
+
+This writes boundary-rendered skills to `<omp-agent-dir>/skills/` and the
+generated OMP wrappers to `<omp-agent-dir>/agents/`, resolving the directory
+through `omp config path` so `OMP_PROFILE` and `PI_CODING_AGENT_DIR` are
+honoured. Skills are always rendered COPIES, never symlinks: the OMP boundary
+and the stripping of non-OMP transport sections are deployment-time
+transforms, so a symlink back to the source would ship live `opencode`
+instructions into an OMP session.
+
+It installs only the project-independent artifacts. Everything that names a
+specific project — `dispatch.json`, `panel-profiles.json`, the panel-resolver
+extension, the `.colosseum/` evidence tree — still requires a per-project
+scaffold, so a user install never implies a project is set up. A skill invoked
+in an unscaffolded repository fails closed on the missing dispatch config,
+which is intended: a clear stop beats a silent fallback to another transport.
+
+Two operational notes. The path is profile-scoped, so rerun under each
+`OMP_PROFILE` you use. Rerun with `--force` after any canonical skill or agent
+change; `colosseum_doctor.py` reports drift under `drift/omp-user-*`.
+
+Because OMP also discovers Claude Code's user skills (`~/.claude/skills`, via
+`skills.enableClaudeUser`, default on) at a lower priority than its own, a
+Claude-harness install of Colosseum is visible to OMP as un-rendered generic
+text with its OpenCode sections intact. For an OMP-primary machine, remove the
+Claude-harness install and turn that source off:
+
+```bash
+omp config set skills.enableClaudeUser false
+```
+
 ### 5.2 Claude Code
 
 Register all wrappers, or only those for tools you installed:
@@ -407,12 +461,12 @@ Probe each selected OpenCode pin before relying on it, for example
 provider credentials fail that voice's dispatch.
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-**Canonical panel (`canonical-4@sha256:08831d0ce9f2086b`).** The milestone membership has calibrated OpenCode/Claude Code routes and separately tracked OMP-native routes:
+**Canonical panel (`canonical-4@sha256:0f73580ef4e3fdf2`).** The milestone membership has calibrated OpenCode/Claude Code routes and separately tracked OMP-native routes:
 
 - `claude-agent` — calibrated in-harness Claude Code Agent route; OMP `anthropic/claude-fable-5` is separately pending.
 - `openai/gpt-5.6-sol` — OpenAI, direct openai provider. **canonical-panel** (calibrated).
 - `fireworks-ai/accounts/fireworks/models/glm-5p2` — Zhipu, Fireworks. **canonical-panel** (calibrated).
-- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated).
+- `fireworks-ai/accounts/fireworks/models/kimi-k3` — Moonshot, Fireworks. **canonical-panel** (calibrated).
 
 OMP-native model patterns and route calibration are generated into `.colosseum/dispatch.json`. Confirm each pattern in OMP's `/model` picker before a run. OpenCode pins should still be probed with `opencode run --model <id> "Reply with exactly: ok"`.
 <!-- END GENERATED: voice-roster -->

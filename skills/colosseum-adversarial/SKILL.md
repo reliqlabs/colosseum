@@ -1,6 +1,6 @@
 ---
 name: colosseum-adversarial
-description: "Run the Colosseum spec adversary against a specification, single-voice or multi-voice. Reads the spec and intent. OMP can fan agentic voices across its ModelRegistry through eval agent(), while OpenCode remains the calibrated reference and compatibility transport. External models never use an MCP or completion() single-shot path. Use before committing a spec or after revising one."
+description: "Run the Colosseum spec adversary against a specification, single-voice or multi-voice. Reads the spec and intent. Dispatch is agentic in every case: one repository-aware adversary agent per voice, never an MCP or a single-shot completion. The transport is whichever the running harness owns, named in the skill body; do not infer one from this line. Use before committing a spec or after revising one."
 ---
 
 You are orchestrating an adversarial review of a specification. The methodology rests on the claim that *the unit of trust is surviving adversarial scrutiny*, not consensus. Your job is the orchestration: locate the artifacts, dispatch one or more adversaries, capture their output verbatim, persist it, and report overlap + divergence.
@@ -10,9 +10,13 @@ You are not the adversary. You do not produce the attacks. You do not soften the
 ## Single-voice vs multi-voice
 
 This skill supports two review sizes and three agentic transports:
-
-- **Single-voice (default)**: invoke `colosseum-spec-adversary` through OMP `task` or the Claude Code Agent tool. Record the concrete provider/model.
-- **Multi-voice**: in OMP, use the native `eval` `agent()` bridge with a per-call model override and bounded `parallel()` fan-out. OpenCode remains the calibrated reference and compatibility transport.
+- **Single-voice (default)**: in OMP, invoke
+  `colosseum-spec-adversary` through OMP `task`. In other harnesses, use that
+  harness's native agent facility. Record the concrete provider/model.
+- **Multi-voice**: an OMP harness uses the native `eval` `agent()` bridge with
+  a per-call model override and bounded `parallel()` fan-out. It MUST NOT call
+  OpenCode. OpenCode is the calibrated reference and compatibility transport
+  only when launched from a non-OMP harness.
 
 The user selects explicit voice IDs, not buckets. The canonical profile's
 existing calibration applies to its recorded OpenCode or Claude Code route. An
@@ -37,12 +41,11 @@ Ask the user for, or determine from context:
   1. `claude-agent`
   2. `gpt-5.6-sol`
   3. `glm-5.2`
-  4. `kimi-k2.6`
+  4. `kimi-k3`
 
-  The profile records a transport-specific route for each voice. OMP resolves
-  IDs through `.colosseum/dispatch.json`'s `omp_native.voices`; OpenCode resolves
-  the same IDs through `voices`. Never infer that equal nominal models imply
-  equal calibration.
+  The profile records a transport-specific route for each voice. In OMP, resolve
+  IDs only through `.colosseum/dispatch.json`'s `omp_native.voices`. Never infer
+  that equal nominal models imply equal calibration.
 
   Use a smaller explicit subset for routine work. Reserve the full profile for
   spec milestones or experiments that need the full panel. For Lean-specific
@@ -51,9 +54,8 @@ Ask the user for, or determine from context:
   theorem-prover specialist for general adversarial review.
 
   Reject bucket names such as `openai`, `google`, `local`, or `gateway`.
-  Provider inventory drifts. Confirm OMP patterns in `/model`; probe OpenCode
-  pins with `opencode run --model <id> "Reply with exactly: ok"` before a
-  milestone.
+  Provider inventory drifts. In OMP, confirm requested ModelRegistry patterns
+  in `/model`. Non-OMP harnesses validate their own provider routes.
 
 If either the spec or the intent is missing, stop and ask. An adversary with no intent reference produces vague complaints rather than grounded attacks.
 
@@ -63,7 +65,7 @@ Read both artifacts to confirm they exist and are non-empty. If the intent descr
 
 ## Step 3: Construct the attack prompt
 
-Every voice runs the `spec-adversary` agent, which has file access, so the attack methodology lives in the agent's system prompt (its body) and is NOT inlined into each call. The per-call message is small: it names the target and, for per-section dispatch, the slice; the agent reads the spec and intent itself via its Read tool. This is what `opencode_dispatch.py` builds; you only construct a message by hand for a one-off call.
+Every voice runs the `spec-adversary` agent, which has file access, so the attack methodology lives in the agent's system prompt (its body) and is NOT inlined into each call. The per-call message is small: it names the target and, for per-section dispatch, the slice; the agent reads the spec and intent itself via its Read tool. The non-OMP coordinator builds the same message; you only construct one by hand for a one-off call.
 
 The message structure:
 
@@ -99,26 +101,33 @@ Dispatch happens in parallel — every requested voice attacks concurrently.
 
 **Three agentic transports. There is no single-shot path.**
 
-| Transport | When to use | Calibration and runtime property |
-|---|---|---|
-| **OMP-native `agent()` fan-out** | Preferred integration when OMP reaches every requested model. | One read-only project agent per voice, model selected per call, bounded parallelism, `agent://` artifacts. Route calibration is independent and currently pending. |
-| **OpenCode + `spec-adversary`** | Calibrated reference, non-OMP clients, or a model available only through OpenCode. | Multi-turn ReAct with file access, retries, finish reasons, token data, and the established benchmark path. |
-| **Claude Code Agent subagent** | In-harness Claude seat from Claude Code. | Direct file access and existing `claude-agent` calibration. |
+| **OMP-native `agent()` fan-out** | Required in an OMP harness. | One read-only project agent per voice, model selected per call, bounded parallelism, `agent://` artifacts. Route calibration is independent and currently pending. |
+| <!-- OMP-EXCLUDE-ROW -->**OpenCode + `spec-adversary`** | Non-OMP clients or a model unavailable through OMP. | Multi-turn ReAct with file access, retries, finish reasons, token data, and the established benchmark path. |
+| <!-- OMP-EXCLUDE-ROW -->**Claude Code Agent subagent** | Claude Code harness. | Direct file access and existing `claude-agent` calibration. |
 
-OMP-native and OpenCode are explicit alternatives for a voice. Never start one
-and silently fall back to the other. A changed transport changes the recorded
-inference route and its calibration status.
-
-Use `scripts/colosseum_run.py` when voices are split across harnesses. A wholly
-OMP-native run uses `omp_fanout.py`'s summary as its state record. OpenCode's
-`opencode_dispatch.py` retains its own `summary.json`.
+An OMP harness MUST use its native route and never silently or explicitly fall
+back to another transport. A changed transport changes the recorded inference
+route and calibration status.
+<!-- OMP-EXCLUDE-START -->
+Use `scripts/colosseum_run.py` only when an orchestrator outside OMP intentionally spans harnesses.
+<!-- OMP-EXCLUDE-END -->
+A wholly OMP-native run uses `omp_fanout.py`'s summary as its state record.
 
 ### OMP-native agent fan-out
 
-The generated `.omp/agents/colosseum-spec-adversary.md` wrapper is read-only and
-runs at maximum supported thinking. `.colosseum/dispatch.json` contains an
-`omp_native` block generated from `registry/voices.json`; each route names its
-exact OMP ModelRegistry pattern and separate calibration state.
+The generated `.omp/agents/colosseum-spec-adversary.md` wrapper is read-only.
+`.colosseum/dispatch.json` contains an `omp_native` block generated from
+`registry/voices.json`; each route names its exact OMP ModelRegistry pattern,
+its thinking level, and its separate calibration state.
+
+**Effort is per voice, one step below each model's maximum** (`thinking_policy:
+one-below-max`) — `xhigh` where the ladder offers it, `high` where `max` is the
+next rung up. The helper dispatches `<model>:<thinking_level>`, and an explicit
+selector level outranks the wrapper's frontmatter level, so the per-voice
+setting is what actually runs. Max reasoning is a deliberate escalation, not
+the routine operating point. Note that the recorded calibration evidence was
+collected at max, so a routine run is cheaper than, and not identical to, the
+run that produced the fitness citation.
 
 First confirm every requested pattern is reachable in OMP's `/model` picker.
 Then run the helper from an OMP Python `eval` cell:
@@ -128,7 +137,7 @@ omp_fanout_ns = {}
 exec(read("skill://colosseum-adversarial/omp_fanout.py"), omp_fanout_ns)
 omp_route = omp_fanout_ns["load_omp_native_config"](
     ".colosseum/dispatch.json",
-    selected_ids=["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"],
+    selected_ids=["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"],
 )
 omp_result = omp_fanout_ns["run_omp_fanout"](
     agent_fn=agent,
@@ -189,10 +198,11 @@ of one shared `prompt` and use a new run directory with `metadata.phase` set to
 failure-isolated artifact contract.
 
 All currently registered OMP routes have `omp_calibration: pending`. They are
-usable for experimental runs but must be reported as uncalibrated. OpenCode
-remains the canonical milestone transport until the blinded benchmark covers
-OMP-native routes.
+usable for experimental runs and must be reported as uncalibrated. This does
+not permit an OMP harness to reroute through OpenCode; benchmark coverage must
+establish native calibration.
 
+<!-- OMP-EXCLUDE-START -->
 ### OpenCode + spec-adversary agent (ReAct)
 
 Use the OpenCode transport when calibration or provider reachability requires it.
@@ -202,8 +212,8 @@ Use the `spec-adversary` OpenCode agent at `colosseum/agents/opencode/spec-adver
 **Invocation shape**:
 
 ```bash
-opencode run --agent spec-adversary --model burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6 \
-  --variant max --format json \
+opencode run --agent spec-adversary --model fireworks-ai/accounts/fireworks/models/kimi-k3 \
+  --variant high --format json \
   "TARGET_SPEC: /path/to/intent.md\n\nTARGET_SLICE: temporal-invariants — ..."
 ```
 
@@ -218,13 +228,14 @@ Orchestrate (voice × slice) pairs from a Python script that captures stdout per
 **Per-voice voice IDs to pass to `--model`** (configured in `~/.config/opencode/opencode.jsonc`; the gateway roster drifts with operator curation, so verify against `curl <gateway-base>/models` before a milestone run):
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. **canonical-panel** (calibrated)
+- `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` — Moonshot, Burnt gateway. candidate
 - `openai/gpt-5.6-sol` — OpenAI, direct openai provider. **canonical-panel** (calibrated)
 - `ds4/deepseek-v4-flash` — DeepSeek, local ds4 runner. candidate (calibration pending) — endpoint `http://127.0.0.1:8000`.
 - `google/gemini-3.1-pro-preview` — Google, direct google provider. candidate (calibration pending) — requires `GOOGLE_GENERATIVE_AI_API_KEY`.
 - `burnt/cloudflare-100/@cf/openai/gpt-oss-120b` — OpenAI-OSS, Burnt gateway. candidate (partial calibration)
 - `burnt/cloudflare-100/@cf/nvidia/nemotron-3-120b-a12b` — NVIDIA, Burnt gateway. candidate
 - `fireworks-ai/accounts/fireworks/models/glm-5p2` — Zhipu, Fireworks. **canonical-panel** (calibrated)
+- `fireworks-ai/accounts/fireworks/models/kimi-k3` — Moonshot, Fireworks. **canonical-panel** (calibrated)
 - `lmstudio/leanstral-2603` — Mistral, local. local-specialist (Lean-only; substitute for one general voice only when the spec IS a Lean theorem).
 - `lmstudio/<local-model-id>` — any model configured under OpenCode's `lmstudio` provider (matches names in your `lms ls`).
 - **Excluded** (do NOT dispatch): `glm-4.7-flash`, `goedel-prover-v2-32b` — see `registry/voices.json` for the calibration evidence behind each exclusion.
@@ -261,7 +272,9 @@ External voices run only through the OMP `agent()` bridge or OpenCode. OMP
 `query_local` helpers are not adversarial dispatch paths because they do not run
 the repository-aware adversary agent.
 
-If OpenCode is not installed on the host, install it (INSTALL §7) before running a multi-voice pass. There is no degraded single-shot mode to fall back to.
+If OpenCode is not installed, install it (INSTALL §7) only before a non-OMP
+multi-voice pass. An OMP-native pass has no OpenCode prerequisite and has no
+degraded single-shot fallback.
 
 ### Gateway roster drift
 
@@ -281,6 +294,7 @@ Two discipline items:
 2. **Coordinate cross-session dispatch** when two agents work in parallel: one fan-out at a time across sessions, or accept best-effort with retries. The `colosseum_run.py` manifest protocol gives a natural coordination point — both sessions read + update the same `run.json`.
 
 Wait for all parallel dispatches to complete. Capture each response.
+<!-- OMP-EXCLUDE-END -->
 
 ### Delta attack mode (revision rounds)
 
@@ -382,11 +396,14 @@ OMP-native layout is written by `omp_fanout.py`:
 └── summary.json             # COMPLETE / PARTIAL / INCOMPLETE + per-voice metadata
 ```
 
+<!-- OMP-EXCLUDE-START -->
 OpenCode writes its documented `per-section/`, `opencode-<voice-id>.md`,
 `dispatch.log`, `preflight.json`, and `summary.json` layout. Mixed-harness runs
 use `colosseum_run.py` for the shared `run.json` state record and retain each
-transport's native artifacts. Synthesis is always orchestrator output and goes
-in `synthesis.md`, never into a raw report.
+transport's native artifacts.
+<!-- OMP-EXCLUDE-END -->
+Synthesis is always orchestrator output and goes in `synthesis.md`, never into
+a raw report.
 
 Single-model layout (unchanged from prior version):
 
@@ -403,8 +420,8 @@ For manually persisted or OpenCode-aggregated reports, each per-model file start
 - Intent document: <absolute path>
 - Reviewed at: <ISO timestamp>
 - Round: <N>
-- Voice id: <registry id, e.g. `kimi-k2.6` or `gpt-5.6-sol`>
-- Model id: <exact transport model, e.g. `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` or `openai-codex/gpt-5.6-sol`>
+- Voice id: <registry id, e.g. `kimi-k3` or `gpt-5.6-sol`>
+- Model id: <exact transport model, e.g. `fireworks-ai/accounts/fireworks/models/kimi-k3` or `openai-codex/gpt-5.6-sol`>
 - Provider family: <Anthropic / Google / OpenAI / Mistral / Moonshot / NVIDIA / DeepSeek / etc.>
 - Inference seat: <omp-native / claude-code / opencode-gateway / opencode-direct / opencode-lmstudio / opencode-ds4>
 - Calibration: <exact route evidence citation | pending>
@@ -421,7 +438,9 @@ Round number is determined by counting prior attack reports against the same spe
 
 **Voice metadata discipline** (verified-rcv evidence): provider family + inference seat + finish_reason are load-bearing for synthesis. Family diversity is the actual signal multi-model dispatch produces; the synthesis must be able to distinguish "5 of 7 voices flagging the same bug" from "5 of 7 voices from the same provider family". Finish reason distinguishes "voice said its piece" (`stop`) from "voice ran out of budget mid-attack" (`length`) from "voice errored or timed out" (`error`) — the synthesis-time interpretation of the verdict depends on which.
 
+<!-- OMP-EXCLUDE-START -->
 When using the manifest tool (`colosseum_run.py`), these fields live in `run.json` under each voice's `metadata` object; the markdown header is a courtesy copy for human reviewers.
+<!-- OMP-EXCLUDE-END -->
 
 **Never edit any per-model report.** The whole point of multi-model adversarial is that each model's blind spots are different. Editing flattens them.
 
@@ -490,7 +509,10 @@ Verified-rcv calibration catalogues voice-level failure modes that synthesis mus
 - **Truncation** (`finish_reason: length`): voice ran out of output budget mid-attack-list. Content is partial; remaining findings unknown. Synthesis records but does not over-interpret a truncated voice's silence on a theme.
 - **Reasoning-budget burnout**: reasoning model exhausted its hidden reasoning tokens before producing substantive visible output, or burned through visible output by repeating already-stated material (gemma-4-26b-a4b "Final check" loop after ~220 lines, observed in verified-rcv).
 - **Degeneration**: voice produced syntactically valid but semantically empty content — tautology loops, abstract variable enumerations, prompt-template echoes (goedel-prover-v2-32b case + glm-4-7-flash's verdict-template echo, observed in verified-rcv).
-- **Verdict-template echo**: voice's verdict line literally repeats the prompt's enumeration menu ("VERDICT: BREAKS | SURVIVES | INDETERMINATE") instead of choosing one. Verdict-extraction regex must filter; synthesis examines content for the implicit verdict.
+- **Verdict-template echo**: a voice's verdict line literally repeats the prompt
+  menu (`VERDICT: BREAKS | SURVIVES | INDETERMINATE`) instead of choosing one.
+  Verdict extraction must filter it; synthesis examines the content for the
+  implicit verdict.
 
 Synthesis writer should test each voice's report for these failure modes before clustering its findings.
 
@@ -498,7 +520,9 @@ Synthesis writer should test each voice's report for these failure modes before 
 
 - **Voice roster + verdict table** — at the top, one row per voice with: model id, family, channel, elapsed, finish_reason, verdict, byte count of visible content.
 - **Verdict tally** — bucketed counts (BREAKS / SURVIVES / INDETERMINATE / ERROR).
+<!-- OMP-EXCLUDE-START -->
 - **Per-voice reports (verbatim)** — concatenation appendix; the `colosseum_run.py synthesize` tool produces this deterministically.
+<!-- OMP-EXCLUDE-END -->
 
 ### Revision punch list (recommended)
 
@@ -532,13 +556,25 @@ that the intent requires? Ground every claim in quoted text.
 
 Independent rediscovery corroborates and raises priority; it does not close. Inlining the suspected conclusion converts the reviewer into a confirmation oracle and voids the round.
 
-**Dispatch.** OpenCode uses `colosseum/scripts/critique_dispatch.py` for config-driven cross-critique pairs, defense triples, and re-critique rounds with blinding in its prompt builders. OMP-native runs pass the same blinded per-reviewer prompts through `omp_fanout.py`'s `prompt_by_voice` argument and use a fresh run directory per phase. When a run spans transports, `colosseum_run.py init --phase critique|defense|re-critique` stamps the phase into shared `run.json` state.
+**Dispatch.**
+<!-- OMP-EXCLUDE-START -->
+OpenCode uses `colosseum/scripts/critique_dispatch.py` for config-driven
+cross-critique pairs, defense triples, and re-critique rounds with blinding in
+its prompt builders.
+<!-- OMP-EXCLUDE-END -->
+OMP-native runs pass the same blinded per-reviewer prompts through
+`omp_fanout.py`'s `prompt_by_voice` argument and use a fresh run directory per
+phase.
+<!-- OMP-EXCLUDE-START -->
+When a run spans transports, `colosseum_run.py init --phase
+critique|defense|re-critique` stamps the phase into shared `run.json` state.
+<!-- OMP-EXCLUDE-END -->
 
 ## Step 8: Summarize for the user
 
 After persisting, report:
 
-- One-line per-voice verdict summary using explicit registry IDs: `claude-agent: BREAKS (3 critical, 5 serious) | gpt-5.6-sol: BREAKS (2 critical) | kimi-k2.6: SURVIVES | glm-5.2: BREAKS (1 critical)`
+- One-line per-voice verdict summary using explicit registry IDs: `claude-agent: BREAKS (3 critical, 5 serious) | gpt-5.6-sol: BREAKS (2 critical) | kimi-k3: SURVIVES | glm-5.2: BREAKS (1 critical)`
 - **Shared-finding count** — bugs surfaced by ≥2 models (high signal)
 - **Unique-finding count** per model — blind-spot escapes
 - The absolute path to the saved report directory (or single file)

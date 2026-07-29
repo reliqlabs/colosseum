@@ -28,16 +28,30 @@ The operator of this stage **MUST be a different agent than the code-implementat
 
 Two practical shapes:
 
-- **Cross-session in the same harness** — the code author runs in session A; a fresh Claude Code session B runs this skill with no transcript of A's work loaded. Session B reads the commit, the intent, the ledger, and nothing else.
-- **Cross-harness** — code author runs in Claude Code; code-adversarial runs in OpenCode with a different model (frontier-tier preferred — verify pins per the adversarial skill's drift note). Frontier voices, generated from the registry:
+- **Cross-session in the same harness**: the code author runs in session A; a
+  fresh session B in that harness runs this skill with no transcript of A.
+  Session B reads the commit, intent, and ledger only.
+- **OMP-native**: the code author completed work in a different OMP session;
+  invoke the installed `colosseum-code-adversary` wrapper through OMP's
+  `agent()` bridge. Pass `PROJECT_ROOT`, `IMPLEMENTATION_AUTHOR`, and
+  `CODE_COMMIT` in the invocation. The read-only wrapper returns the report;
+  this skill persists that verbatim response to the canonical new report path.
+  Do not invoke OpenCode from an OMP session.
+- **Non-OMP cross-harness**: the code author runs in Claude Code and a fresh
+  OpenCode session with a different frontier model runs the adversarial pass.
+  Verify model pins per the adversarial skill's drift note. Frontier voices,
+  generated from the registry:
 
 <!-- BEGIN GENERATED: voice-roster (source: registry/voices.json via scripts/gen_roster_docs.py — do not edit by hand) -->
-`openai/gpt-5.6-sol` (OpenAI, canonical-panel), `fireworks-ai/accounts/fireworks/models/glm-5p2` (Zhipu, canonical-panel), `burnt/cloudflare-100/@cf/moonshotai/kimi-k2.6` (Moonshot, canonical-panel)
+`openai/gpt-5.6-sol` (OpenAI, canonical-panel), `fireworks-ai/accounts/fireworks/models/glm-5p2` (Zhipu, canonical-panel), `fireworks-ai/accounts/fireworks/models/kimi-k3` (Moonshot, canonical-panel)
 <!-- END GENERATED: voice-roster -->
 
   The OpenCode agent reads files via its native tool.
 
-Before starting, confirm with the user which shape applies. If the user is asking the SAME agent that authored the code to run this skill, stop and explain the isolation requirement. The user may override (with awareness of the drift cost), but the override must be explicit.
+Before starting, confirm with the user which shape applies. If the user is
+asking the SAME agent that authored the code to run this skill, stop and
+explain the isolation requirement. The user may override with awareness of the
+drift cost, but the override must be explicit.
 
 ## Step 1: Locate the artifacts
 

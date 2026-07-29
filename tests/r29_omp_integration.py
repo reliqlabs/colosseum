@@ -12,8 +12,10 @@ and doctor drift checks. Exit 0 pass, 1 fail.
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -33,8 +35,8 @@ def check(label: str, ok: bool, detail: str = "") -> None:
         FAILURES.append(label)
 
 
-def run(argv: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(argv, capture_output=True, text=True, timeout=120)
+def run(argv: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(argv, capture_output=True, text=True, timeout=120, env=env)
 
 
 def init(project: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -42,6 +44,13 @@ def init(project: Path, *extra: str) -> subprocess.CompletedProcess:
         "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
         str(project), "--harness", "omp", *extra,
     ])
+
+
+def _load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def main() -> int:
@@ -64,6 +73,8 @@ def main() -> int:
         if (path / "SKILL.md").is_file()
     }
     canonical_mcp = json.loads((REPO / "templates" / "omp-mcp.json").read_text())
+    canonical_dispatch = json.loads(
+        (SCRIPTS / "dispatch.config.example.json").read_text())
 
     with tempfile.TemporaryDirectory(prefix="r29-omp-") as td:
         project = Path(td) / "project"
@@ -81,9 +92,37 @@ def main() -> int:
               {path.name for path in installed_skills.glob("colosseum-*")}
               == set(canonical_skills))
         for name, canonical in canonical_skills.items():
-            check(f"OMP skill {name} includes SKILL.md",
-                  (installed_skills / name / "SKILL.md").read_bytes()
-                  == (canonical / "SKILL.md").read_bytes())
+            source = (canonical / "SKILL.md").read_text()
+            frontmatter_end = source.find("\n---\n", len("---\n")) + len("\n---\n")
+            installed = (installed_skills / name / "SKILL.md").read_text()
+            if name == "colosseum-adversarial":
+                preserved = (
+                    installed.startswith(source[:frontmatter_end])
+                    and "### OMP-native agent fan-out" in installed
+                    and "## Step 5: Quint-adversarial trace generation" in installed
+                    and "OMP-EXCLUDE-" not in installed
+                )
+            else:
+                preserved = (installed.startswith(source[:frontmatter_end])
+                             and installed.endswith(source[frontmatter_end:]))
+            check(f"OMP skill {name} preserves its applicable source body",
+                  preserved)
+            check(f"OMP skill {name} requires native dispatch",
+                  "## OMP deployment boundary" in installed
+                  and "Never invoke `opencode`" in installed)
+        omp_adversarial = (
+            installed_skills / "colosseum-adversarial" / "SKILL.md"
+        ).read_text()
+        check("OMP adversarial skill dispatches only through native agents",
+              "`colosseum-spec-adversary` through OMP `task`" in omp_adversarial
+              and "### OMP-native agent fan-out" in omp_adversarial
+              and "### OpenCode + spec-adversary agent (ReAct)"
+              not in omp_adversarial
+              and "opencode run --agent spec-adversary" not in omp_adversarial
+              and "Claude Code Agent subagent" not in omp_adversarial
+              and "colosseum_run.py" not in omp_adversarial
+              and "critique_dispatch.py" not in omp_adversarial
+              and "OpenCode writes its documented" not in omp_adversarial)
         check("OMP adversarial skill installs native fanout helper",
               (installed_skills / "colosseum-adversarial" / "omp_fanout.py").read_bytes()
               == (canonical_skills["colosseum-adversarial"] / "omp_fanout.py").read_bytes())
@@ -106,7 +145,7 @@ def main() -> int:
         dispatch = json.loads(dispatch_path.read_text())
         check("OMP init installs native canonical voice routes",
               [voice["id"] for voice in dispatch["omp_native"]["voices"]]
-              == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k2.6"])
+              == ["claude-agent", "gpt-5.6-sol", "glm-5.2", "kimi-k3"])
         check("OMP native routes are explicitly uncalibrated",
               dispatch["omp_native"]["calibration"] == "pending")
         check("OMP init installs the panel resolver extension",
@@ -131,6 +170,13 @@ def main() -> int:
         check("OMP adversary is read-only",
               "tools: [read, grep, glob]" in adversary
               and "tools: [read, grep, glob, bash" not in adversary)
+        code_adversary = (installed_agents / "colosseum-code-adversary.md").read_text()
+        code_adversary_frontmatter = code_adversary.split("---", 2)[1]
+        check("OMP code adversary is read-only",
+              "tools: [read, grep, glob]" in code_adversary_frontmatter
+              and "bash" not in code_adversary_frontmatter.lower()
+              and "write" not in code_adversary_frontmatter.lower()
+              and "edit" not in code_adversary_frontmatter.lower())
 
         # A normal rerun preserves owned files but fills a missing MCP definition.
         agent_path = installed_agents / "colosseum-spec-adversary.md"
@@ -160,15 +206,86 @@ def main() -> int:
         check("normal rerun preserves unrelated MCP server",
               rerun_mcp["mcpServers"]["custom"]["command"] == "custom-server")
 
+        managed_dispatch = json.loads(dispatch_path.read_text())
+        managed_dispatch["target_spec"] = "/project-managed/intent.md"
+        managed_dispatch["run_tag_prefix"] = "project-managed-tag"
+        # A canonical roster change must reach an existing project. All four of
+        # these keys are registry-generated by gen_roster_docs; a stale copy
+        # cites a panel membership that no longer exists.
+        managed_dispatch["omp_native"]["voices"] = [
+            {"id": "stale-voice", "model": "stale/model", "family": "Stale",
+             "calibration": "pending"}
+        ]
+        managed_dispatch["omp_native"]["route_hash"] = "sha256:0000000000000000"
+        managed_dispatch["omp_native"]["profile"] = "canonical-4@sha256:staleprofile"
+        managed_dispatch["_comment_canonical_panel"] = (
+            "Canonical membership canonical-4@sha256:staleprofile.")
+        managed_dispatch["_comment_excluded_voices"] = "stale excluded-voice provenance"
+        managed_dispatch["default_variant"] = "max"
+        managed_dispatch["voices"] = [
+            {"id": "stale-voice", "model": "stale/model", "note": "stale"}
+        ]
+        dispatch_path.write_text(json.dumps(managed_dispatch, indent=2) + "\n")
+        stale_rerun = init(project)
+        stale_after = json.loads(dispatch_path.read_text())
+        check("normal rerun leaves drifted registry keys alone (purely additive)",
+              stale_rerun.returncode == 0
+              and [v["id"] for v in stale_after["omp_native"]["voices"]] == ["stale-voice"]
+              and [v["id"] for v in stale_after["voices"]] == ["stale-voice"]
+              and "staleprofile" in stale_after["_comment_canonical_panel"]
+              and stale_after["_comment_excluded_voices"]
+              == "stale excluded-voice provenance")
+        refreshed = init(project, "--refresh-omp")
+        check("OMP targeted refresh exits 0",
+              refreshed.returncode == 0, refreshed.stderr[-300:])
+        check("targeted refresh restores canonical OMP agent",
+              agent_path.read_bytes()
+              == canonical_agents["colosseum-spec-adversary.md"].read_bytes())
+        refreshed_skill = skill_path.read_text()
+        check("targeted refresh restores OMP dispatch boundary",
+              "## OMP deployment boundary" in refreshed_skill
+              and "Never invoke `opencode`" in refreshed_skill
+              and "skill-local-change" not in refreshed_skill)
+        refreshed_mcp = json.loads(mcp_path.read_text())
+        check("targeted refresh restores conflicting Colosseum MCP server",
+              refreshed_mcp["mcpServers"]["kani"] == canonical_mcp["mcpServers"]["kani"])
+        check("targeted refresh preserves unrelated MCP server",
+              refreshed_mcp["mcpServers"]["custom"]["command"] == "custom-server")
+        refreshed_dispatch = json.loads(dispatch_path.read_text())
+        check("targeted refresh preserves project dispatch",
+              refreshed_dispatch["target_spec"] == "/project-managed/intent.md"
+              and refreshed_dispatch["run_tag_prefix"] == "project-managed-tag")
+        check("targeted refresh restores the canonical OMP route",
+              [v["id"] for v in refreshed_dispatch["omp_native"]["voices"]]
+              == [v["id"] for v in canonical_dispatch["omp_native"]["voices"]]
+              and refreshed_dispatch["omp_native"]["route_hash"]
+              == canonical_dispatch["omp_native"]["route_hash"])
+        check("targeted refresh leaves no stale panel provenance",
+              all(refreshed_dispatch[key] == canonical_dispatch[key]
+                  for key in ("omp_native", "_comment_omp_native",
+                              "_comment_canonical_panel", "voices",
+                              "_comment_excluded_voices",
+                              "default_variant", "_comment_variant"))
+              and "staleprofile" not in json.dumps(refreshed_dispatch)
+              and "stale excluded-voice provenance"
+              not in json.dumps(refreshed_dispatch))
+        check("targeted refresh restores the one-below-max effort policy",
+              refreshed_dispatch["omp_native"]["thinking_policy"] == "one-below-max"
+              and refreshed_dispatch["default_variant"] == "high"
+              and all(v["dispatch_selector"] == f"{v['model']}:{v['thinking_level']}"
+                      for v in refreshed_dispatch["omp_native"]["voices"]))
+
         forced = init(project, "--force")
         check("OMP init --force exits 0", forced.returncode == 0, forced.stderr[-300:])
         forced_mcp = json.loads(mcp_path.read_text())
         check("--force restores canonical OMP agent",
               agent_path.read_bytes()
               == canonical_agents["colosseum-spec-adversary.md"].read_bytes())
-        check("--force restores canonical OMP skill",
-              skill_path.read_bytes()
-              == (canonical_skills["colosseum-intent"] / "SKILL.md").read_bytes())
+        forced_skill = skill_path.read_text()
+        check("--force restores OMP dispatch boundary",
+              "## OMP deployment boundary" in forced_skill
+              and "Never invoke `opencode`" in forced_skill
+              and "skill-local-change" not in forced_skill)
         check("--force restores conflicting Colosseum MCP server",
               forced_mcp["mcpServers"]["kani"] == canonical_mcp["mcpServers"]["kani"])
         check("--force preserves unrelated MCP server",
@@ -185,6 +302,59 @@ def main() -> int:
             report = {}
             parsed = False
         check("OMP doctor emits JSON", parsed, doctor.stderr[-300:])
+        check("OMP doctor omits OpenCode toolchain and plumbing checks",
+              not any(item.get("category") == "toolchain"
+                      and item.get("name") == "opencode"
+                      for item in report.get("checks", []))
+              and not any(item.get("category") == "plumbing"
+                          for item in report.get("checks", [])))
+        fake_bin = project / "fake-bin"
+        fake_bin.mkdir()
+        sentinel = project / "opencode-called"
+        fake_opencode = fake_bin / "opencode"
+        fake_opencode.write_text(
+            "#!/bin/sh\n"
+            "printf '%s\\n' \"$*\" >> \"$OPENCODE_SENTINEL\"\n"
+            "if [ \"$1\" = \"--version\" ]; then\n"
+            "  printf '%s\\n' '1.18.4'\n"
+            "  exit 0\n"
+            "fi\n"
+            "exit 99\n"
+        )
+        fake_opencode.chmod(0o755)
+        guarded_env = {
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "OPENCODE_SENTINEL": str(sentinel),
+        }
+        generic_doctor = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_doctor.py"),
+            "--skip-home-drift", "--json",
+        ], env=guarded_env)
+        try:
+            generic_report = json.loads(generic_doctor.stdout)
+            generic_parsed = True
+        except json.JSONDecodeError:
+            generic_report = {}
+            generic_parsed = False
+        generic_tools = {
+            item["name"]: item for item in generic_report.get("checks", [])
+            if item.get("category") == "toolchain"
+        }
+        check("no-project doctor retains the OpenCode toolchain check",
+              generic_parsed and sentinel.exists()
+              and generic_tools.get("opencode", {}).get("status") == "ok",
+              generic_doctor.stderr[-300:])
+        sentinel.unlink(missing_ok=True)
+        live_omp = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_doctor.py"),
+            "--project", str(project), "--skip-home-drift", "--live",
+        ], env=guarded_env)
+        check("OMP doctor rejects OpenCode --live probes without invoking them",
+              live_omp.returncode == 2
+              and "--live is unavailable for an OMP project" in live_omp.stderr
+              and not sentinel.exists(),
+              live_omp.stderr[-300:])
         omp_checks = [
             item for item in report.get("checks", [])
             if item.get("category", "").startswith("drift/omp")
@@ -236,6 +406,125 @@ def main() -> int:
         check("OMP doctor detects agent drift",
               len(drift_checks) == 1 and drift_checks[0]["status"] == "fail")
 
+    # User-level OMP install: boundary-rendered skills + generated wrappers in
+    # OMP's agent dir, and NO project-scoped artifacts (a user install must
+    # never imply a project is scaffolded).
+    with tempfile.TemporaryDirectory(prefix="r29-omp-user-") as td:
+        agent_dir = Path(td) / "agent"
+        # Hermetic HOME: the doctor's user-level checks read ~/.claude and
+        # ~/.omp, so a real-machine HOME would make this block assert ambient
+        # state and go red the day someone legitimately reinstalls the Claude
+        # harness. uv's cache/interpreter dirs are pinned back to the real ones
+        # so the sandboxed HOME does not trigger a re-download.
+        env = {
+            **os.environ,
+            "HOME": td,
+            "USERPROFILE": td,
+            "PI_CODING_AGENT_DIR": str(agent_dir),
+            "UV_CACHE_DIR": os.environ.get(
+                "UV_CACHE_DIR", str(Path.home() / ".cache" / "uv")),
+            "UV_PYTHON_INSTALL_DIR": os.environ.get(
+                "UV_PYTHON_INSTALL_DIR",
+                str(Path.home() / ".local" / "share" / "uv" / "python")),
+        }
+        user = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+            "--user", "--harness", "omp",
+        ], env=env)
+        check("OMP user install exits 0", user.returncode == 0, user.stderr[-300:])
+        check("user install writes every OMP agent wrapper",
+              {p.name for p in (agent_dir / "agents").glob("*.md")}
+              == set(canonical_agents))
+        check("user install writes every Colosseum skill",
+              {p.name for p in (agent_dir / "skills").glob("colosseum-*")}
+              == set(canonical_skills))
+        user_adversarial = (agent_dir / "skills" / "colosseum-adversarial"
+                            / "SKILL.md").read_text()
+        check("user-installed skill carries the OMP boundary",
+              "## OMP deployment boundary" in user_adversarial
+              and "Never invoke `opencode`" in user_adversarial)
+        check("user-installed skill leaks no non-OMP transport",
+              "opencode run" not in user_adversarial
+              and "colosseum_run.py" not in user_adversarial
+              and "OMP-EXCLUDE-" not in user_adversarial)
+        check("user-installed boundary names no project-only agent path",
+              ".omp/agents/colosseum-*.md" not in user_adversarial)
+        check("user install ships no project-scoped artifact",
+              not (agent_dir / "mcp.json").exists()
+              and not (agent_dir / "skills" / "dispatch.json").exists()
+              and not (Path(td) / ".colosseum").exists())
+        rerun = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+            "--user", "--harness", "omp",
+        ], env=env)
+        check("user install is idempotent without --force",
+              rerun.returncode == 0 and "skip" in rerun.stdout)
+        doctor_user = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_doctor.py"), "--json",
+        ], env=env)
+        user_report = json.loads(doctor_user.stdout)
+        user_checks = [c for c in user_report["checks"]
+                       if c["category"].startswith("drift/omp-user")]
+        check("doctor sees a clean user-level OMP install",
+              bool(user_checks) and all(c["status"] == "ok" for c in user_checks),
+              str([c for c in user_checks if c["status"] != "ok"]))
+        check("doctor reports no Claude install for an OMP-only machine",
+              not [c for c in user_report["checks"]
+                   if c["category"].startswith("drift/claude")])
+        (agent_dir / "skills" / "colosseum-verify" / "SKILL.md").write_text("drift\n")
+        drifted_user = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_doctor.py"), "--json",
+        ], env=env)
+        drifted_checks = [
+            c for c in json.loads(drifted_user.stdout)["checks"]
+            if c["category"] == "drift/omp-user-skills"
+            and c["name"].endswith("colosseum-verify")
+        ]
+        check("doctor detects drift in a user-installed skill",
+              len(drifted_checks) == 1 and drifted_checks[0]["status"] == "fail")
+
+        # Pin the installer's ignore deterministically: a clean source tree
+        # would make "no bytecode in the install" pass vacuously, so plant a
+        # __pycache__ in the SOURCE, reinstall, and assert none is deployed.
+        source_cache = REPO / "skills" / "colosseum-verify" / "__pycache__"
+        planted = not source_cache.exists()
+        try:
+            source_cache.mkdir(parents=True, exist_ok=True)
+            (source_cache / "probe.cpython-313.pyc").write_bytes(b"\x00probe")
+            reinstall = run([
+                "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+                "--user", "--harness", "omp", "--force",
+            ], env=env)
+            check("install copies no bytecode from a dirty source tree",
+                  reinstall.returncode == 0
+                  and not list((agent_dir / "skills").rglob("*.pyc"))
+                  and not list((agent_dir / "skills").rglob("__pycache__")),
+                  str(sorted(p.name for p in (agent_dir / "skills").rglob("*.pyc"))))
+        finally:
+            if planted:
+                shutil.rmtree(source_cache, ignore_errors=True)
+            else:
+                (source_cache / "probe.cpython-313.pyc").unlink(missing_ok=True)
+        # Running a skill's helper writes __pycache__ into the DEPLOYED tree.
+        # The drift hash must not treat that as content, or merely using the
+        # fan-out makes a clean install look drifted.
+        cache = agent_dir / "skills" / "colosseum-adversarial" / "__pycache__"
+        cache.mkdir(parents=True, exist_ok=True)
+        (cache / "omp_fanout.cpython-313.pyc").write_bytes(b"\x00stale bytecode")
+        cached_doctor = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_doctor.py"), "--json",
+        ], env=env)
+        cached_checks = [
+            c for c in json.loads(cached_doctor.stdout)["checks"]
+            if c["category"] == "drift/omp-user-skills"
+            and c["name"].endswith("colosseum-adversarial")
+        ]
+        check("bytecode in a deployed skill is not drift",
+              len(cached_checks) == 1 and cached_checks[0]["status"] == "ok",
+              str(cached_checks))
+
+    check_dispatch_key_ownership()
+
     print()
     if FAILURES:
         print(f"R29: {len(FAILURES)} failure(s)")
@@ -244,5 +533,57 @@ def main() -> int:
     return 0
 
 
+def check_dispatch_key_ownership() -> None:
+    """The ownership table must match what the generator actually writes.
+
+    The recurring defect this guards is not a wrong value, it is an unnoticed
+    membership change: a key gets added to the generator or to the refresh set
+    and the other side is never updated. Rather than trust prose, poison every
+    key in the canonical config with a sentinel, re-render, and see which keys
+    the generator overwrites. That is the real "generated" set.
+    """
+    init = _load_module("colosseum_init", SCRIPTS / "colosseum_init.py")
+    gen = _load_module("gen_roster_docs", SCRIPTS / "gen_roster_docs.py")
+    reg = gen.load_registry(REPO / "registry" / "voices.json")
+
+    canonical = json.loads((SCRIPTS / "dispatch.config.example.json").read_text())
+    sentinel = "SENTINEL-NOT-GENERATED"
+    poisoned = json.dumps({key: sentinel for key in canonical})
+    rendered = json.loads(gen.render_dispatch_config(reg, poisoned))
+    generated = {key for key, value in rendered.items() if value != sentinel}
+
+    declared_generated = {k for k, origin, _ in init.DISPATCH_KEY_OWNERSHIP
+                          if origin == "generated"}
+    declared_authored = {k for k, origin, _ in init.DISPATCH_KEY_OWNERSHIP
+                         if origin == "authored"}
+    static_prose = set(init.STATIC_PROSE_DISPATCH_KEYS)
+
+    check("every key declared 'generated' really is generated",
+          declared_generated <= generated,
+          f"declared but not generated: {sorted(declared_generated - generated)}")
+    check("no key declared 'authored' is generated",
+          not (declared_authored & generated),
+          f"authored but generated: {sorted(declared_authored & generated)}")
+    check("every generated key is either owned or declared static prose",
+          generated == declared_generated | static_prose,
+          f"unclassified generator keys: "
+          f"{sorted(generated - declared_generated - static_prose)}")
+    check("static-prose keys are not silently refreshed",
+          not (static_prose & set(init.COLOSSEUM_OWNED_DISPATCH_KEYS)))
+    check("the owned set is exactly the ownership table",
+          set(init.COLOSSEUM_OWNED_DISPATCH_KEYS)
+          == declared_generated | declared_authored)
+    check("additive keys are a subset of the owned set",
+          set(init.ADDITIVE_DISPATCH_KEYS)
+          <= set(init.COLOSSEUM_OWNED_DISPATCH_KEYS))
+    check("every owned key exists in the canonical config",
+          set(init.COLOSSEUM_OWNED_DISPATCH_KEYS) <= set(canonical),
+          f"missing: {sorted(set(init.COLOSSEUM_OWNED_DISPATCH_KEYS) - set(canonical))}")
+    check("every owned key carries a stated reason",
+          all(reason.strip() for _, _, reason in init.DISPATCH_KEY_OWNERSHIP))
+
+
+
 if __name__ == "__main__":
     sys.exit(main())
+
