@@ -1,0 +1,73 @@
+{
+  "target": "ledger",
+  "target_snapshot": "26231da348a3+worktree-clean",
+  "line_tolerance": 5,
+  "defect_count": 8,
+  "voices": [
+    "kimi-k2.6",
+    "kimi-k3"
+  ],
+  "per_voice": {
+    "kimi-k2.6": {
+      "recall": 0.75,
+      "caught": [
+        "D1",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D8"
+      ],
+      "unmatched_detections": 6
+    },
+    "kimi-k3": {
+      "recall": 0.875,
+      "caught": [
+        "D1",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8"
+      ],
+      "unmatched_detections": 4
+    }
+  },
+  "shared_blind_spot": [
+    "D2"
+  ],
+  "shared_blind_spot_count": 1,
+  "panel_union_recall": 0.875,
+  "caught_by": {
+    "D1": [
+      "kimi-k2.6",
+      "kimi-k3"
+    ],
+    "D2": [],
+    "D3": [
+      "kimi-k2.6",
+      "kimi-k3"
+    ],
+    "D4": [
+      "kimi-k2.6",
+      "kimi-k3"
+    ],
+    "D5": [
+      "kimi-k2.6",
+      "kimi-k3"
+    ],
+    "D6": [
+      "kimi-k2.6",
+      "kimi-k3"
+    ],
+    "D7": [
+      "kimi-k3"
+    ],
+    "D8": [
+      "kimi-k2.6",
+      "kimi-k3"
+    ]
+  },
+  "unmatched_note": "unmatched detections are candidate false positives; precision is not computed without ground-truth labels"
+}

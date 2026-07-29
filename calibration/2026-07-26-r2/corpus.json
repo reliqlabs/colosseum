@@ -1,0 +1,97 @@
+{
+  "schema": "colosseum-seeded-corpus/v1",
+  "target": "ledger",
+  "target_snapshot": "26231da348a3+worktree-clean",
+  "line_tolerance": 5,
+  "_comment": "Ground truth for calibration run 2026-07-26-r2. Blinded: this file never enters the dispatch directory (/tmp/ledger-dispatch, single commit 26231da348a3). Match rule per docs/benchmark-protocol.md: file basename + exact category + line within tolerance. Corpus deliberately harder than 2026-07-13-r1 per that run's ceiling-effect note: it plants concurrency (D1), cross-file symptom-far-from-cause (D2, D4), and a no-op-implementation leak (D7).",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "src/api.rs",
+      "line": 58,
+      "category": "race-condition",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "append() reads next_offset() under a read lock, releases it, then inserts under a write lock; two concurrent appends observe the same offset and B1's uniqueness/density guarantee breaks. Symptom surfaces later as a duplicate/skipped offset in replay.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/api.rs:58:race-condition"
+    },
+    {
+      "id": "D2",
+      "file": "src/checkpoint.rs",
+      "line": 26,
+      "category": "invariant-violation",
+      "severity": "critical",
+      "planted_by": "corpus-author",
+      "description": "capture() discards retention_watermark and records the index max as last_applied; B5 requires the checkpoint to sit at or above the watermark, so retention can reclaim the segment the checkpoint names and replay then cannot find it.",
+      "cheapest_capable_layer": "proof",
+      "detection_key": "src/checkpoint.rs:26:invariant-violation"
+    },
+    {
+      "id": "D3",
+      "file": "src/segment.rs",
+      "line": 48,
+      "category": "off-by-one",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "push() seals on `len() > max_records` after the push, so a segment holds max_records+1 records, violating B3.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/segment.rs:48:off-by-one"
+    },
+    {
+      "id": "D4",
+      "file": "src/index.rs",
+      "line": 50,
+      "category": "unchecked-arithmetic",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "relative_position() computes `absolute - seg.base_offset` with no check that the offset belongs to that segment; a mismatched segment underflows u64 and yields a huge position, violating B8.",
+      "cheapest_capable_layer": "bounded-model-check",
+      "detection_key": "src/index.rs:50:unchecked-arithmetic"
+    },
+    {
+      "id": "D5",
+      "file": "src/replay.rs",
+      "line": 30,
+      "category": "error-swallowed",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "replay_from() uses `if let Ok(..)` and silently skips undecodable records, returning Ok; B4 requires aborting with ReplayError::Corrupt.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/replay.rs:30:error-swallowed"
+    },
+    {
+      "id": "D6",
+      "file": "src/api.rs",
+      "line": 40,
+      "category": "missing-validation",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "open() guards checkpoint_threshold instead of the segment capacity and then coerces max_records_per_segment with .max(1), so a zero capacity is silently accepted rather than rejected with ZeroSegmentCapacity per B2.",
+      "cheapest_capable_layer": "types",
+      "detection_key": "src/api.rs:40:missing-validation"
+    },
+    {
+      "id": "D7",
+      "file": "src/index.rs",
+      "line": 58,
+      "category": "resource-leak",
+      "severity": "medium",
+      "planted_by": "corpus-author",
+      "description": "prune_before() ignores its watermark and drops nothing, so index entries for reclaimed records accumulate without bound, violating B7.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/index.rs:58:resource-leak"
+    },
+    {
+      "id": "D8",
+      "file": "src/checkpoint.rs",
+      "line": 34,
+      "category": "logic-inversion",
+      "severity": "high",
+      "planted_by": "corpus-author",
+      "description": "should_checkpoint() returns `pending < threshold`, the inverse of B6; checkpoints fire only while under the threshold and stop once one is due.",
+      "cheapest_capable_layer": "property-tests",
+      "detection_key": "src/checkpoint.rs:34:logic-inversion"
+    }
+  ]
+}
