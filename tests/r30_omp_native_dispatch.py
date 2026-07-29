@@ -397,6 +397,39 @@ def main() -> int:
             finally:
                 os.chmod(opaque, 0o644)
 
+        # Derived trees are out of scope, but the narrowing must be signature-
+        # based and recorded -- never "a directory named target is probably
+        # build output". A real Cargo target carries CACHEDIR.TAG; a REVIEW
+        # target sharing the name does not and stays in scope.
+        cargo_target = sroot / "target"
+        (cargo_target / "deps").mkdir(parents=True)
+        (cargo_target / "CACHEDIR.TAG").write_text(
+            "Signature: 8a477f597d28d172789f06886806bc55\n")
+        (cargo_target / "deps" / "lib.rmeta").write_text(
+            "docs\n-----BEGIN PRIVATE KEY-----\nPKCS#8 example\n")
+        modules = sroot / "node_modules" / "pkg"
+        modules.mkdir(parents=True)
+        (modules / "fixture.pem").write_text("-----BEGIN PRIVATE KEY-----\n")
+        skipped: list[str] = []
+        v = mod.preflight_scan(sroot, skipped)
+        check("a CACHEDIR.TAG tree is out of scope, not a violation",
+              not any("target/" in x for x in v)
+              and not any("node_modules" in x for x in v), v)
+        check("every skipped root is recorded for audit",
+              {"target", "node_modules"} <= set(skipped), skipped)
+
+        review = sroot / "review" / "target"
+        (review / "src").mkdir(parents=True)
+        (review / "Cargo.toml").write_text("[package]\nname='x'\n")
+        (review / "src" / "planted.rs").write_text(
+            "// -----BEGIN PRIVATE KEY-----\n")
+        skipped2: list[str] = []
+        v2 = mod.preflight_scan(sroot, skipped2)
+        check("a review target without the tag stays in scope",
+              any("planted.rs" in x for x in v2)
+              and "review/target" not in skipped2,
+              {"violations": v2, "skipped": skipped2})
+
     print()
     if FAILURES:
         print(f"R30: {len(FAILURES)} failure(s)")

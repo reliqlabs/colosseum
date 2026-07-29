@@ -53,8 +53,42 @@ def _file_has_key_marker(path: Path, *, cap: int = 8 * 1024 * 1024) -> bool:
     return _PEM_PRIVATE_KEY_RE.search(head) is not None
 
 
-def preflight_scan(root: str | Path) -> list[str]:
-    """Find secret-bearing files or escaping symlinks in the agent-visible tree."""
+_DERIVED_DIR_NAMES = frozenset({
+    ".git", "__pycache__", "node_modules", ".venv", "venv", ".tox",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".gradle", ".next",
+})
+
+
+def _is_derived_dir(path: Path) -> bool:
+    """Whether this directory is machine-generated rather than authored.
+
+    Two independent signals, neither keyed on a bare directory name being
+    "probably a build dir":
+
+    * A small allowlist of unambiguous tool directories (`.git`,
+      `node_modules`, virtualenvs, tool caches).
+    * `CACHEDIR.TAG`, the cross-tool cache marker Cargo and others write. This
+      is what distinguishes a real Cargo `target/` from a REVIEW target that
+      merely shares the name: this repo's own `calibration/<run>/target` holds
+      the seeded crate a calibration scored and carries no tag, so it stays in
+      scope, while `zkdcap/target` carries one and does not.
+    """
+    if path.name in _DERIVED_DIR_NAMES:
+        return True
+    return (path / "CACHEDIR.TAG").is_file()
+
+def preflight_scan(root: str | Path,
+                   skipped: list[str] | None = None) -> list[str]:
+    """Find secret-bearing files or escaping symlinks in the agent-visible tree.
+
+    Derived trees are OUT OF SCOPE and their paths are reported through
+    ``skipped`` so the narrowing is auditable, never silent. Rationale: build
+    output is reproducible from source, so a secret there is a copy of one that
+    is in scope, while compiled artifacts routinely embed the PEM armor as data
+    (ed25519_dalek's PKCS#8 doc comment lands in every .rmeta). Scanning them
+    produced dozens of false positives on an ordinary Rust project, and a gate
+    that always fires is a gate that gets bypassed.
+    """
     project = Path(root).resolve()
     violations: list[str] = []
     secret_names = (
@@ -62,28 +96,43 @@ def preflight_scan(root: str | Path) -> list[str]:
         "*.key", "*.p8", "*.jks", "*.keystore", ".git-credentials",
         "id_rsa*", "id_dsa*", "id_ecdsa*", "id_ed25519*",
     )
-    for path in sorted(project.rglob("*")):
-        rel = path.relative_to(project)
-        if rel.parts and rel.parts[0] == ".git":
-            continue
-        if "__pycache__" in rel.parts:
-            continue
-        if path.is_symlink():
-            target = Path(os.path.realpath(path))
-            if not target.is_relative_to(project):
-                violations.append(f"symlink escapes root: {rel} -> {target}")
-            continue
-        if not path.is_file():
-            continue
-        if any(fnmatch.fnmatch(path.name, pattern) for pattern in secret_names):
-            violations.append(f"secret-named file: {rel}")
-            continue
-        try:
-            if _file_has_key_marker(path):
-                violations.append(f"private-key material: {rel}")
-        except OSError:
-            violations.append(f"unreadable file (cannot scan for secrets): {rel}")
-    return violations
+    for current, dirnames, filenames in os.walk(project, followlinks=False):
+        here = Path(current)
+        pruned = []
+        for name in sorted(dirnames):
+            child = here / name
+            if child.is_symlink():
+                target = Path(os.path.realpath(child))
+                if not target.is_relative_to(project):
+                    violations.append(
+                        f"symlink escapes root: {child.relative_to(project)} -> {target}")
+                continue  # never descend a symlinked directory
+            if _is_derived_dir(child):
+                if skipped is not None:
+                    skipped.append(str(child.relative_to(project)))
+                continue
+            pruned.append(name)
+        dirnames[:] = pruned
+
+        for name in sorted(filenames):
+            path = here / name
+            rel = path.relative_to(project)
+            if path.is_symlink():
+                target = Path(os.path.realpath(path))
+                if not target.is_relative_to(project):
+                    violations.append(f"symlink escapes root: {rel} -> {target}")
+                continue
+            if not path.is_file():
+                continue
+            if any(fnmatch.fnmatch(name, pattern) for pattern in secret_names):
+                violations.append(f"secret-named file: {rel}")
+                continue
+            try:
+                if _file_has_key_marker(path):
+                    violations.append(f"private-key material: {rel}")
+            except OSError:
+                violations.append(f"unreadable file (cannot scan for secrets): {rel}")
+    return sorted(violations)
 
 
 def _route_hash(route: Mapping[str, Any]) -> str:
@@ -437,13 +486,17 @@ def run_omp_fanout(
         raise ValueError(f"run_dir must be inside {attacks_root}")
     destination.mkdir(parents=True, exist_ok=False)
 
-    violations = preflight_scan(project)
+    skipped_dirs: list[str] = []
+    violations = preflight_scan(project, skipped_dirs)
     preflight = {
         "status": "blocked" if violations else "ok",
         "project_root": str(project),
         "target_spec": str(target.relative_to(project)),
         "target_spec_sha256": _sha256_file(target),
         "violations": violations,
+        # What the scan did NOT read. Recorded so a clean preflight states its
+        # scope instead of implying the whole tree was examined.
+        "scan_skipped_dirs": sorted(skipped_dirs),
     }
     (destination / "preflight.json").write_text(
         json.dumps(preflight, indent=2, ensure_ascii=False) + "\n")
