@@ -257,6 +257,34 @@ Two operational notes. The path is profile-scoped, so rerun under each
 `OMP_PROFILE` you use. Rerun with `--force` after any canonical skill or agent
 change; `colosseum_doctor.py` reports drift under `drift/omp-user-*`.
 
+Once the user-level install exists, scaffold each project **lean** so it holds
+no redundant copies of the skills and agents:
+
+```bash
+$COLOSSEUM/scripts/colosseum_init.py <project> --harness omp --lean
+```
+
+A lean project keeps only what nothing else can own: `.colosseum/dispatch.json`
+(its `project_root`, `target_spec` and slice plan), `.omp/mcp.json`,
+`.colosseum/panel-profiles.json`, the panel-resolver extension, and the
+`.colosseum/` evidence tree. Skills and agents resolve from the user-level
+install, which OMP discovers in every session.
+
+The choice is recorded in `.colosseum/layout`, so a later `--refresh-omp` will
+not reinstate copies the project deliberately dropped. It is recorded rather
+than inferred from whether a user-level install happens to exist: inferring
+would make scaffolding depend on ambient machine state and behave differently
+on a fresh checkout than on a developer box.
+
+`colosseum_doctor.py` accepts either layout. For a lean project it verifies the
+user-level copy that will actually be used and reports it as
+`user-wide <name>`, so a stale user artifact is still caught — presence alone
+is never accepted as proof.
+
+MCP servers stay per project on purpose. Installing them user-wide would inject
+kani, quint, verus, aeneas, goedel and lm-studio into every OMP session,
+including projects that are not Colosseum projects at all.
+
 Because OMP also discovers Claude Code's user skills (`~/.claude/skills`, via
 `skills.enableClaudeUser`, default on) at a lower priority than its own, a
 Claude-harness install of Colosseum is visible to OMP as un-rendered generic

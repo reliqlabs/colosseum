@@ -403,6 +403,10 @@ def main() -> int:
                     help="replace every Colosseum-owned artifact, including dispatch.json")
     ap.add_argument("--refresh-omp", action="store_true",
                     help="refresh OMP-owned artifacts without replacing dispatch.json")
+    ap.add_argument("--lean", action="store_true",
+                    help="OMP only: install no project-local skills or agents; "
+                         "rely on the user-level install (colosseum_init.py --user). "
+                         "Recorded in .colosseum/layout so refreshes stay lean.")
     args = ap.parse_args()
 
     if args.user:
@@ -413,6 +417,8 @@ def main() -> int:
         if args.harness != "omp":
             ap.error("--user is OMP-only; pass --harness omp")
         return run_user_install(args.force)
+    if args.lean and args.harness != "omp":
+        ap.error("--lean requires --harness omp")
     if args.project is None:
         ap.error("a project root is required unless --user is given")
 
@@ -460,10 +466,31 @@ def main() -> int:
             project / ".opencode" / "agent", "opencode",
             OPENCODE_AGENT_FILES, args.force, results))
     if args.harness == "omp":
-        errors.extend(install_agents(
-            project / ".omp" / "agents", "omp",
-            OMP_AGENT_FILES, omp_force, results))
-        install_omp_skills(project / ".omp" / "skills", omp_force, results)
+        # Layout marker, persisted like the harness marker so a refresh does
+        # not silently reinstate copies a project deliberately dropped. NOT
+        # inferred from whether a user-level install happens to exist: that
+        # would make scaffolding depend on ambient machine state and behave
+        # differently here than on a fresh CI box.
+        layout_marker = project / ".colosseum" / "layout"
+        recorded = (layout_marker.read_text().strip()
+                    if layout_marker.exists() else None)
+        layout = "lean" if args.lean else (recorded or "full")
+        if recorded != layout:
+            layout_marker.write_text(layout + "\n")
+            results.append(("overwrote" if recorded else "wrote", layout_marker))
+        else:
+            results.append(("skip", layout_marker))
+
+        if layout == "lean":
+            # Skills and agents come from the user-level OMP install; the
+            # project keeps only what names it (dispatch plan, MCP, panel).
+            results.append(("user-wide", project / ".omp" / "agents"))
+            results.append(("user-wide", project / ".omp" / "skills"))
+        else:
+            errors.extend(install_agents(
+                project / ".omp" / "agents", "omp",
+                OMP_AGENT_FILES, omp_force, results))
+            install_omp_skills(project / ".omp" / "skills", omp_force, results)
         errors.extend(install_omp_mcp(
             project, omp_force, replace_invalid=args.force, results=results))
         _copy_owned_file(OMP_PANEL_PROFILE,

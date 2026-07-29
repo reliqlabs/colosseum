@@ -562,6 +562,41 @@ def main() -> int:
 
         tampered = agent_dir / "skills" / "colosseum-verify" / "SKILL.md"
         original = tampered.read_text()
+
+        # Lean layout: no project-local skills/agents, recorded in
+        # .colosseum/layout so a later refresh does not silently reinstate the
+        # copies a project deliberately dropped. Recorded rather than inferred
+        # from whether a user install exists -- inferring would make init
+        # depend on ambient machine state and behave differently in CI.
+        leanp = Path(td) / "lean-init"
+        first = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+            str(leanp), "--harness", "omp", "--lean",
+        ], env=env)
+        check("lean init exits 0", first.returncode == 0, first.stderr[-300:])
+        check("lean init records the layout",
+              (leanp / ".colosseum" / "layout").read_text().strip() == "lean")
+        check("lean init writes no project-local skills or agents",
+              not (leanp / ".omp" / "skills").exists()
+              and not (leanp / ".omp" / "agents").exists())
+        check("lean init still writes what only a project can own",
+              (leanp / ".colosseum" / "dispatch.json").is_file()
+              and (leanp / ".omp" / "mcp.json").is_file()
+              and (leanp / ".omp" / "extensions"
+                   / "colosseum-panel-resolver.ts").is_file()
+              and (leanp / ".colosseum" / "panel-profiles.json").is_file())
+        again = run([
+            "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+            str(leanp), "--harness", "omp", "--refresh-omp",
+        ], env=env)
+        check("a refresh does not reinstate a lean project's local copies",
+              again.returncode == 0
+              and not (leanp / ".omp" / "skills").exists()
+              and not (leanp / ".omp" / "agents").exists(),
+              again.stdout[-200:])
+        check("--lean is rejected for a non-OMP harness",
+              run(["uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
+                   str(Path(td) / "nope"), "--lean"], env=env).returncode == 2)
         tampered.write_text(original + "tampered\n")
         drifted_user_checks = [
             c for c in lean_report()
