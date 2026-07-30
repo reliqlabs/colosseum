@@ -133,17 +133,24 @@ run that produced the fitness citation.
 equal-selector result does not establish which provider answered: OMP may retry
 through `retry.fallbackChains`, and the eval bridge may only echo the requested
 selector. A calibration run MUST instead suppress the retry chains for exactly
-the voices under test, using the process-local `--config` overlay produced by
+the voices under test, using the process-local overlay produced by
 `scripts/omp_calibration_session.py`. It prechecks the effective chain before
 launching OMP, archives the overlay, precheck, and launch record in the
 calibration evidence directory, and never writes global or project settings.
 
+The precheck runs `omp config get retry.fallbackChains` with the overlay in
+`PI_CONFIG_FILES`, because OMP's `config` subcommand accepts no launch flags.
+The launch then passes the same overlay through both `--config` and
+`PI_CONFIG_FILES`, so the precheck and the run read one identical file.
+
 Launch the calibration OMP process through that script before any voice is
 dispatched. Pass its selected voice IDs and the calibration evidence directory;
-the script rejects a caller-supplied `--config` so the recorded overlay is the
-only one OMP loads. The suppression proves only that OMP's configured retry
-chain had zero candidates for each tested route. It does not claim anything
-about provider-internal failover.
+the script rejects a caller-supplied `--config` so it owns the recorded overlay.
+An inherited `PI_CONFIG_FILES` is preserved and the generated overlay is
+appended last, so it outranks caller overlays on the suppressed selectors; the
+precheck is what proves the effective chain is empty. The suppression proves
+only that OMP's configured retry chain had zero candidates for each tested
+route. It does not claim anything about provider-internal failover.
 
 From the resulting OMP Python `eval` cell, load the validated certificate and
 pass it into the fan-out. The helper records it in both `meta.json` and

@@ -9,8 +9,12 @@ The OMP eval bridge may echo a requested selector even when its retry layer
 served another provider. Calibration therefore needs a process-local overlay
 that sets ``retry.fallbackChains[provider/model] = []`` for exactly the voices
 being measured. This launcher generates and prechecks that overlay, archives
-both artifacts, then starts OMP with the same ``--config`` file. It never edits
-user or project OMP configuration.
+both artifacts, then starts OMP with the same file through ``--config`` and
+``PI_CONFIG_FILES``. The precheck must use ``PI_CONFIG_FILES`` because OMP's
+``config`` subcommand accepts no launch flags. An inherited ``PI_CONFIG_FILES``
+is preserved and the generated overlay is appended last, so it outranks caller
+overlays on the suppressed selectors. It never edits user or project OMP
+configuration.
 
 USAGE
     omp_calibration_session.py --project <project> --evidence-dir <dir>
