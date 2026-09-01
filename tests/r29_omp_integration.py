@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import json
 import shutil
 import subprocess
@@ -72,6 +73,50 @@ def main() -> int:
         path.name: path for path in sorted((REPO / "skills").glob("colosseum-*"))
         if (path / "SKILL.md").is_file()
     }
+    quickstart = (REPO / "QUICKSTART.md").read_text()
+    documented_skills = (
+        "colosseum-intent",
+        "colosseum-reverse-intent",
+        "colosseum-adversarial",
+        "colosseum-verify",
+        "colosseum-code-adversarial",
+        "colosseum-compose",
+        "colosseum-change",
+    )
+    missing_command_forms = [
+        name for name in documented_skills
+        if f"/{name}" not in quickstart or f"/skill:{name}" not in quickstart
+    ]
+    check("quickstart pairs Claude Code and OMP skill commands",
+          not missing_command_forms, ", ".join(missing_command_forms))
+    agent_reference_patterns = (
+        re.compile(r"`(colosseum-[a-z][a-z0-9-]+)`\s+(?:agent|wrapper)", re.I),
+        re.compile(r"(?:agent|wrapper)\s+`(colosseum-[a-z][a-z0-9-]+)`", re.I),
+        re.compile(
+            r"\b[a-z_]*agent\s*(?::[^=\n]+)?=\s*[\"']"
+            r"(colosseum-[a-z][a-z0-9-]+)[\"']",
+            re.I,
+        ),
+        re.compile(r"installed\s+`(colosseum-[a-z][a-z0-9-]+)`", re.I),
+        re.compile(
+            r"agent\s*=\s*[\"'](colosseum-[a-z][a-z0-9-]+)[\"']",
+            re.I,
+        ),
+    )
+    reference_sources = [REPO / "QUICKSTART.md"]
+    reference_sources.extend(
+        path for path in sorted((REPO / "skills").rglob("*"))
+        if path.is_file() and (path.name == "SKILL.md" or path.suffix == ".py")
+    )
+    explicit_agent_refs: set[str] = set()
+    for source in reference_sources:
+        content = source.read_text()
+        for pattern in agent_reference_patterns:
+            explicit_agent_refs.update(pattern.findall(content))
+    installed_agent_names = {Path(name).stem for name in canonical_agents}
+    missing_agent_wrappers = sorted(explicit_agent_refs - installed_agent_names)
+    check("every explicitly named OMP agent has a wrapper",
+          not missing_agent_wrappers, ", ".join(missing_agent_wrappers))
     canonical_mcp = json.loads((REPO / "templates" / "omp-mcp.json").read_text())
     canonical_dispatch = json.loads(
         (SCRIPTS / "dispatch.config.example.json").read_text())
@@ -110,6 +155,15 @@ def main() -> int:
             check(f"OMP skill {name} requires native dispatch",
                   "## OMP deployment boundary" in installed
                   and "Never invoke `opencode`" in installed)
+        omp_reverse_intent = (
+            installed_skills / "colosseum-reverse-intent" / "SKILL.md"
+        ).read_text()
+        normalized_reverse_intent = " ".join(omp_reverse_intent.split())
+        check("OMP reverse-intent remains self-executing",
+              "Execute its workflow in the current session" in normalized_reverse_intent
+              and "Never derive an agent name from a skill name" in normalized_reverse_intent
+              and "A self-executing skill does not require" in normalized_reverse_intent
+              and not (installed_agents / "colosseum-reverse-intent.md").exists())
         omp_adversarial = (
             installed_skills / "colosseum-adversarial" / "SKILL.md"
         ).read_text()

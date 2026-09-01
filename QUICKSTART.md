@@ -48,18 +48,18 @@ is in CONCEPTS.md under "Project layout".
 Each stage produces an artifact that anchors the next. Claude Code exposes the
 skills as `/colosseum-*`; OMP exposes them as `/skill:colosseum-*`.
 
-1. **Intent.** Run `/colosseum-intent` (new system) or `/colosseum-reverse-intent` (existing code). Produces `.colosseum/intent.md`, the human-anchored source of truth. Do not skip sections; everything downstream is bounded by this document's quality.
+1. **Intent.** Run `/colosseum-intent` in Claude Code or `/skill:colosseum-intent` in OMP for a new system. For existing code, run `/colosseum-reverse-intent` in Claude Code or `/skill:colosseum-reverse-intent` in OMP. Produces `.colosseum/intent.md`, the human-anchored source of truth. Do not skip sections; everything downstream is bounded by this document's quality.
 2. **Tracer prototype.** Fast, ugly, throwaway Rust that proves the design is feasible. Apply the discard gates from README stage 2 before promoting or discarding it.
 3. **Intent v2.** Fold what the tracer taught you back into the intent.
 4. **System spec.** Quint or TLA+, only if distributed or concurrent semantics matter. Skip explicitly otherwise.
 5. **Implementation spec.** Lean specs and/or Verus annotations derived from the intent. For crypto-touching code, build on VCV-io rather than axiomatic stubs (INSTALL §4.5).
-6. **Adversarial spec review.** Run `/colosseum-adversarial`. Single-voice for routine drafts; use an explicit multi-family subset or the canonical 4-voice profile for milestones. Reports persist verbatim under `.colosseum/attacks/`. Revise and re-attack until the spec survives.
+6. **Adversarial spec review.** Run `/colosseum-adversarial` in Claude Code or `/skill:colosseum-adversarial` in OMP. Single-voice is for routine drafts; use an explicit multi-family subset or the canonical 4-voice profile for milestones. Reports persist verbatim under `.colosseum/attacks/`. Revise and re-attack until the spec survives.
 7. **Implementation.** Rust against the validated specs. Pure cores, narrow effects, explicit state.
-8. **Verification.** Run `/colosseum-verify` continuously. The pyramid routes each property to the cheapest tool that can check it. Run `/colosseum-code-adversarial` here to read the implementation against the intent.
+8. **Verification.** Run `/colosseum-verify` in Claude Code or `/skill:colosseum-verify` in OMP continuously. The pyramid routes each property to the cheapest tool that can check it. Run `/colosseum-code-adversarial` in Claude Code or `/skill:colosseum-code-adversarial` in OMP here to read the implementation against the intent.
 9. **Failure classification.** When verification fails, dispatch the `colosseum-failure-classifier` agent: spec wrong, code wrong, prover stuck, tool mismatch, state-space blowup, or infrastructure — `INDETERMINATE` when the evidence cannot decide. Route the fix accordingly.
-10. **Coverage dashboard.** Run `scripts/coverage_dashboard.py` over typed G1 evidence for per-claim status, and `/colosseum-compose` or `/skill:colosseum-compose` to maintain `.colosseum/ledger.md`. The initializer installs `check_ledger_references.py` and `check_evidence_records.py` under `.colosseum/scripts/`; wire both into CI so reference drift and stale or incomplete evidence fail loudly.
+10. **Coverage dashboard.** Run `scripts/coverage_dashboard.py` over typed G1 evidence for per-claim status. Run `/colosseum-compose` in Claude Code or `/skill:colosseum-compose` in OMP to maintain `.colosseum/ledger.md`. The initializer installs `check_ledger_references.py` and `check_evidence_records.py` under `.colosseum/scripts/`; wire both into CI so reference drift and stale or incomplete evidence fail loudly.
 
-After the project is spec'd, every later change goes through `/colosseum-change`, which triages whether the change touches intent and walks the upstream-first revision sequence.
+After the project is spec'd, every later change goes through `/colosseum-change` in Claude Code or `/skill:colosseum-change` in OMP. It triages whether the change touches intent and walks the upstream-first revision sequence.
 
 ## 3. The first adversarial pass, concretely
 

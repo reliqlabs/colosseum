@@ -60,16 +60,22 @@ OMP_PANEL_RESOLVER = REPO / "templates" / "omp-panel-resolver.ts"
 OMP_SKILL_BOUNDARY = """\
 ## OMP deployment boundary
 
-This is an OMP-installed skill. Invoke Colosseum agents only through OMP-native
-`task` or `eval` `agent()` calls, naming the `colosseum-*` agent directly and
-letting OMP resolve it: wrappers install either project-locally
-(`<project>/.omp/agents/`) or user-wide (`~/.omp/agent/agents/`), and a
-user-level wrapper is discovered even in a project with no Colosseum scaffold.
-Never invoke `opencode`, OpenCode agents, Claude Code's Agent tool, or a
-single-shot model API from this skill. The renderer omits executable non-OMP
-transport sections. Do not revive or follow a non-OMP route from residual
-reference text. If OMP cannot resolve the named agent from any location, stop
-and report the installation defect rather than substituting another transport.
+This is an OMP-installed skill. Execute its workflow in the current session
+unless the skill body explicitly delegates work to a named Colosseum agent.
+Skills and agents use separate registries. Never derive an agent name from a
+skill name or assume that a same-named wrapper exists.
+
+When the skill body explicitly names an agent, invoke it only through OMP-native
+`task` or `eval` `agent()` calls and let OMP resolve the exact name. Wrappers
+install either project-locally (`<project>/.omp/agents/`) or user-wide
+(`~/.omp/agent/agents/`). Never invoke `opencode`, OpenCode agents, Claude
+Code's Agent tool, or a single-shot model API from this skill. The renderer
+omits executable non-OMP transport sections. Do not revive or follow a non-OMP
+route from residual reference text.
+
+If an explicitly required named agent cannot be resolved from either location,
+stop and report the installation defect. A self-executing skill does not require
+or imply any same-named agent.
 
 """
 OMP_EXCLUDE_START = "<!-- OMP-EXCLUDE-START -->"
