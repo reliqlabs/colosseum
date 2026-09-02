@@ -76,7 +76,10 @@ const factory: CustomToolFactory = pi => {
 			// the lineup hash are OMP's; FV keeps the registry semantics on top —
 			// declared families, calibration references, and per-seat effort.
 			type ProfileSeat = (typeof profile.seats)[number];
-			const seatRole = (seats: ProfileSeat[], distinct: boolean, where: string): PanelRole => ({
+			// Both lineups are `independent`, which carries served-family
+			// distinctness by default; only the panel proper takes the floor. The
+			// one-seat synthesizer lineup makes no diversity claim.
+			const seatRole = (seats: ProfileSeat[], floor: boolean, where: string): PanelRole => ({
 				strategy: "independent",
 				members: seats.map((seat, index) => {
 					const [primary, ...fallbacks] = seat.candidates;
@@ -85,16 +88,15 @@ const factory: CustomToolFactory = pi => {
 					}
 					return { model: primary, fallbacks };
 				}),
-				distinctFamilies: distinct,
-				...(distinct ? { minFamilies } : {}),
+				...(floor ? { minFamilies } : {}),
 			});
 			const context = { modelRegistry: ctx.modelRegistry, settings: ctx.settings };
-			const resolveSeats = (seats: ProfileSeat[], distinct: boolean, where: string): ResolvedPanelLineup => {
+			const resolveSeats = (seats: ProfileSeat[], floor: boolean, where: string): ResolvedPanelLineup => {
 				try {
 					return resolveLineup({
 						context,
 						roleId: `${params.profile}.${where}`,
-						role: seatRole(seats, distinct, where),
+						role: seatRole(seats, floor, where),
 						taskMode: "plan",
 					});
 				} catch (error) {
