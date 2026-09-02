@@ -63,6 +63,7 @@ SEATS = [
     {"seat_id": "moonshot", "declared_family": "Moonshot", "resolved_family": "moonshot", "resolved_model": "m/z", "thinking_level": "max"},
 ]
 SYNTH = {"seat_id": "synth", "declared_family": "OpenAI", "resolved_family": "openai", "resolved_model": "o/plan", "thinking_level": "max"}
+LINEUP_HASH = "sha256:" + "ab" * 32
 
 
 def _project(tmp: Path) -> Path:
@@ -508,7 +509,7 @@ def main() -> int:  # noqa: C901 — one linear fixture, readability over decomp
                                           "proposed_verdict": "PASS"}}
         return a
 
-    def ms_run(g, agent, status, rundir, seats=SEATS):
+    def ms_run(g, agent, status, rundir, seats=SEATS, lineup_hash=LINEUP_HASH):
         task, ev = pc.split_brief((g / "m.md").read_text())
         mdb, mrb, msb = pc.make_builders("milestone-review", task, ev)
         ids = pc.parse_acceptance_ids(task)
@@ -520,7 +521,7 @@ def main() -> int:  # noqa: C901 — one linear fixture, readability over decomp
             review_schema=MS["review"], synthesis_schema=MS["synthesis"],
             required_criteria=ids, evidence_gate=lambda _snap, _arch: status,
             verdict_guard_factory=lambda st: pc.milestone_verdict_guard(ids, st),
-            profile_mode="milestone-review",
+            profile_mode="milestone-review", lineup_hash=lineup_hash,
             allow_unverified_isolation=True)
 
     with tempfile.TemporaryDirectory(prefix="r31-msreq-") as td:
@@ -531,7 +532,7 @@ def main() -> int:  # noqa: C901 — one linear fixture, readability over decomp
         base = dict(agent_fn=ok_agent, parallel_fn=serial, secure=secure, mode="milestone-review",
                     seats=SEATS, synthesizer_seat=SYNTH, project_root=g, brief_path="m.md",
                     draft_prompt_builder=mdb, review_prompt_builder=mrb, synthesis_prompt_builder=msb,
-                    draft_schema=MS["draft"], review_schema=MS["review"], synthesis_schema=MS["synthesis"],
+                    lineup_hash=LINEUP_HASH,
                     allow_unverified_isolation=True)
         check("milestone requires evidence_gate + verdict_guard_factory",
               raises(lambda: panel.run_panel(
@@ -549,6 +550,17 @@ def main() -> int:  # noqa: C901 — one linear fixture, readability over decomp
         s = ms_run(g, ms_agent(crit(("A1", "PASS"), ("A2", "PASS"))), {"A1": "PASS", "A2": "PASS"}, "pass")
         check("milestone PASS: G1 pass + full coverage + COMPLETE + git-stable",
               s["adjudication"]["verdict"] == "PASS" and s["run_status"] == "COMPLETE", s["adjudication"])
+        check("milestone summary names the resolver's frozen lineup",
+              s["lineup_hash"] == LINEUP_HASH, s.get("lineup_hash"))
+        route = json.loads((g / ".fv" / "panels" / "pass" / "route.json").read_text())
+        check("route record carries the lineup hash beside the route hash",
+              route["lineup_hash"] == LINEUP_HASH and route["route_hash"] == s["route_hash"], route)
+        check("milestone-review without a resolver lineup hash is rejected",
+              raises(lambda: ms_run(g, ok_agent, {"A1": "PASS", "A2": "PASS"}, "nolineup",
+                                    lineup_hash=None), "requires the resolver's lineup_hash"))
+        check("a lineup hash that is not a real digest is rejected",
+              raises(lambda: ms_run(g, ok_agent, {"A1": "PASS", "A2": "PASS"}, "badlineup",
+                                    lineup_hash="sha256:not-a-digest"), "must be sha256:<64 hex>"))
 
     with tempfile.TemporaryDirectory(prefix="r31-msfab-") as td:
         g = git_ms(Path(td))
@@ -592,6 +604,7 @@ def main() -> int:  # noqa: C901 — one linear fixture, readability over decomp
             draft_schema=MS["draft"], review_schema=MS["review"], synthesis_schema=MS["synthesis"],
             required_criteria=ids, evidence_gate=cap_gate,
             verdict_guard_factory=lambda st: pc.milestone_verdict_guard(ids, st),
+            lineup_hash=LINEUP_HASH,
             allow_unverified_isolation=True)
         head = subprocess.run(["git", "-C", str(g), "rev-parse", "HEAD"],
                               capture_output=True, text=True).stdout.strip()
@@ -717,6 +730,7 @@ def main() -> int:  # noqa: C901 — one linear fixture, readability over decomp
                     check_script=script, records_dir=str(records_dir),
                     manifest_path=str(manifest), required_ids=["B1"], intent_hash=gate_intent),
                 verdict_guard_factory=lambda st: pc.milestone_verdict_guard(["B1"], st),
+                lineup_hash=LINEUP_HASH,
                 allow_unverified_isolation=True)
 
         recs.write_text(json.dumps([rec("PASS")]))

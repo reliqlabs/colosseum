@@ -318,6 +318,15 @@ route. The resolver freezes the roster before wave 1 and never substitutes a
 model mid-run; a runtime call failure is recorded as a seat error, and lost
 family quorum yields `INCOMPLETE`.
 
+`fv_panel_resolve` delegates candidate priority, availability, served-family
+distinctness, and lineup hashing to OMP's `resolvePanelLineup`, then applies
+the registry semantics OMP has no opinion about: declared families, calibration
+references, and per-seat effort. Each resolved seat therefore carries both the
+`requested_selector` and the served `resolved_model`, and the roster carries a
+`lineup_hash` over the served routes. `run_panel` records that hash in
+`route.json`, `meta.json`, and `summary.json`; a `milestone-review` run without
+it is rejected, because a verdict must name the panel that produced it.
+
 ## What this skill does not do
 
 - It does not run automatically. You invoke it, having judged the gate above.

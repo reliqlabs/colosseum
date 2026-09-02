@@ -348,6 +348,7 @@ def check_toolchain(report: Report, project: Path, omp_command: str = "omp") -> 
         "perCallTimeout": True,
         "servedModel": True,
         "servedFamily": True,
+        "panelLineupFreeze": True,
     }
     try:
         contract_data = json.loads(contract.stdout) if contract.returncode == 0 else None
@@ -356,7 +357,7 @@ def check_toolchain(report: Report, project: Path, omp_command: str = "omp") -> 
     report.add(
         "toolchain", "omp-agent-bridge-contract",
         "ok" if contract_data == expected_contract else "fail",
-        "Track A bridge capabilities present"
+        "bridge capabilities present, including panel lineup freeze"
         if contract_data == expected_contract
         else (contract.stdout + contract.stderr).strip() or "agent bridge contract unavailable",
     )

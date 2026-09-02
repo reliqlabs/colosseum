@@ -5,9 +5,14 @@
 # ///
 """R32 - the panel-resolver extension's dispatch-identity contract.
 
-Runs the real ``templates/omp-panel-resolver.ts`` under Bun with a faked
-``ExtensionAPI`` and a faked ``ctx.models``, so the resolver's own logic is
-exercised without an OMP session and without a single model call.
+Runs the real ``tools/panel-resolver.ts`` under Bun with a faked
+``CustomToolAPI`` and a faked ``ctx.modelRegistry``, so the resolver's own logic
+is exercised without an OMP session and without a single model call.
+
+Seat resolution itself now lives in OMP (``resolvePanelLineup``), which the tool
+reaches through the injected ``pi.pi`` exports. The harness locates that module
+from ``OMP_SOURCE`` or from the ``omp`` on PATH and injects it, so these
+assertions exercise the real delegation rather than a stand-in.
 
 Covers the defect found by ``calibration/2026-07-24-resolver-live/``: the
 resolver must emit OMP's canonical ``provider/id`` selector (``omp_panel.py``
@@ -15,11 +20,13 @@ dispatches ``resolved_model``), must record the real ``model.provider``, and
 must key availability by ``provider/id`` so a model that *resolves* but whose
 provider is absent is not accepted on a bare-id collision.
 
-Exit 0 pass, 1 fail, 2 could-not-run (Bun absent -> INCOMPLETE via run_all).
+Exit 0 pass, 1 fail, 2 could-not-run (Bun or the OMP source absent ->
+INCOMPLETE via run_all).
 """
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -30,9 +37,30 @@ REPO = Path(__file__).resolve().parents[1]
 RESOLVER = REPO / "tools" / "panel-resolver.ts"
 FAILURES: list[str] = []
 
+
+def omp_panel_module() -> Path | None:
+    """Locate OMP's panel module: an extension package is outside its graph."""
+    candidates: list[Path] = []
+    source = os.environ.get("OMP_SOURCE")
+    if source:
+        candidates.append(Path(source))
+    omp = shutil.which("omp")
+    if omp:
+        entry = Path(omp).resolve()
+        # ~/.local/bin/omp -> <repo>/packages/coding-agent/src/cli.ts
+        candidates.extend(entry.parents)
+    for candidate in candidates:
+        module = candidate / "packages" / "coding-agent" / "src" / "panel" / "index.ts"
+        if module.is_file():
+            return module
+    return None
+
 HARNESS_TS = r"""
-const [, , resolverPath, projectRoot, profile] = process.argv;
+const [, , resolverPath, projectRoot, profile, panelModule] = process.argv;
 const mod = await import(resolverPath);
+const injected = panelModule === "none"
+  ? {}
+  : { resolvePanelLineup: (await import(panelModule)).resolvePanelLineup };
 const stub: any = {};
 for (const key of ["min", "max", "optional", "describe", "default", "nullable", "array"]) stub[key] = () => stub;
 stub.parse = (value: any) => value;
@@ -43,11 +71,13 @@ const MODELS = [
   { id: "m2", provider: "pb", identity: { class: "pb", family: "two" } },
   { id: "m3", provider: "pa", identity: { class: "pa", family: "one" } },
 ];
-const api: any = { cwd: projectRoot, zod };
+// `pi.pi` is OMP's injected export surface in production; the harness injects
+// the real module so seat resolution is exercised, not simulated.
+const api: any = { cwd: projectRoot, zod, pi: injected };
 const tool = await mod.default(api);
 try {
   const result = await tool.execute("tc", { profile, project_root: projectRoot }, undefined,
-    { modelRegistry: { getAvailable: () => MODELS } });
+    { modelRegistry: { getAvailable: () => MODELS, hasConfiguredAuth: () => true } });
   console.log(JSON.stringify({ ok: true, roster: result.details, tool_name: tool.name }));
 } catch (error: any) {
   console.log(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
@@ -143,6 +173,10 @@ def main() -> int:
     if not RESOLVER.is_file():
         print(f"[FAIL] resolver template missing: {RESOLVER}")
         return 1
+    panel_module = omp_panel_module()
+    if panel_module is None:
+        print("SKIP: OMP panel module not found; set OMP_SOURCE to the oh-my-pi checkout")
+        return 2
 
     with tempfile.TemporaryDirectory(prefix="r32-") as td:
         root = Path(td)
@@ -152,9 +186,10 @@ def main() -> int:
         harness = root / "harness.ts"
         harness.write_text(HARNESS_TS)
 
-        def run(profile: str) -> dict:
+        def run(profile: str, inject_panel: bool = True) -> dict:
             proc = subprocess.run(
-                ["bun", "run", str(harness), str(RESOLVER), str(root), profile],
+                ["bun", "run", str(harness), str(RESOLVER), str(root), profile,
+                 str(panel_module) if inject_panel else "none"],
                 capture_output=True, text=True, timeout=120)
             line = (proc.stdout or "").strip().splitlines()
             if not line:
@@ -178,6 +213,11 @@ def main() -> int:
             check("synthesizer is provider-qualified too",
                   dup["roster"]["synthesizer"]["resolved_model"] == "pa/m1",
                   dup["roster"]["synthesizer"])
+            check("roster names the frozen lineup with OMP's content hash",
+                  isinstance(dup["roster"].get("lineup_hash"), str)
+                  and dup["roster"]["lineup_hash"].startswith("sha256:")
+                  and len(dup["roster"]["lineup_hash"]) == 71,
+                  dup["roster"].get("lineup_hash"))
             check("thinking_level is carried per seat, unmodified",
                   [s["thinking_level"] for s in seats] == ["max", "low"], seats)
             check("resolver persists model-registry family identities for engine verification",
@@ -198,13 +238,23 @@ def main() -> int:
 
         collide = run("collide")
         check("two seats on one real family are rejected despite distinct labels",
-              not collide.get("ok") and "same model family" in collide.get("error", ""),
+              not collide.get("ok")
+              and "duplicate resolved model family" in collide.get("error", "")
+              and "seats" in collide.get("error", ""),
               collide)
 
         none = run("none")
         check("a seat with no available candidate fails closed",
-              not none.get("ok") and "no available model" in none.get("error", ""),
+              not none.get("ok")
+              and "nope/nothing" in none.get("error", "")
+              and "unavailable" in none.get("error", ""),
               none)
+
+        # The tool must not silently degrade on an OMP without the capability.
+        legacy = run("dup", inject_panel=False)
+        check("a harness without resolvePanelLineup fails closed with a capability error",
+              not legacy.get("ok") and "panelLineupFreeze" in legacy.get("error", ""),
+              legacy)
 
     if FAILURES:
         print(f"\nR32: {len(FAILURES)} failure(s)")

@@ -124,11 +124,14 @@ def main() -> int:
         contract = {
             "version": 1, "restrictTools": True, "perCallModel": True,
             "perCallTimeout": True, "servedModel": True, "servedFamily": True,
+            "panelLineupFreeze": True,
         }
         omp_stub = Path(temporary) / "omp-stub"
         omp_stub.write_text(
             "#!/usr/bin/env python3\nimport os, sys\n"
-            f"version = {repr('omp/18.0.11')}\n"
+            # From the BOM, so a deliberate pin bump cannot leave this fixture
+            # asserting compatibility against a version the repo no longer pins.
+            f"version = {repr('omp/' + json.loads((REPO / 'bom.json').read_text())['tools']['omp'])}\n"
             f"contract = {repr(json.dumps(contract))}\n"
             f"catalog = {repr(json.dumps(catalog))}\n"
             f"expected_cwd = {repr(str(project.resolve()))}\n"

@@ -41,9 +41,11 @@ from typing import Any
 import re
 
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+_LINEUP_HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _RESERVED_SUMMARY = {
     "version", "harness", "mode", "started_at", "finished_at", "run_status",
     "drafts", "reviews", "synthesis", "quorum", "metadata", "route_hash",
+    "lineup_hash",
 }
 _VALID_MODES = ("project-plan", "milestone-review")
 
@@ -260,6 +262,7 @@ def run_panel(
     synthesis_schema: Mapping[str, Any] | None = None,
     min_families: int = 3,
     seat_timeout_seconds: float = 1800,
+    lineup_hash: str | None = None,
     profile_mode: str | None = None,
     run_seed: str | None = None,
     metadata: Mapping[str, Any] | None = None,
@@ -307,6 +310,13 @@ def run_panel(
         raise ValueError("metadata contains a reserved summary key")
     if not isinstance(min_families, int) or min_families < 1:
         raise ValueError("min_families must be a positive integer")
+    # The resolver's lineup hash is the harness's own content address for the
+    # served routes. A run may omit it (project-plan drafting), but a supplied
+    # value must be the real digest, never prose standing in for one.
+    if lineup_hash is not None and not _LINEUP_HASH_RE.match(lineup_hash):
+        raise ValueError("lineup_hash must be sha256:<64 hex> from fv_panel_resolve")
+    if mode == "milestone-review" and lineup_hash is None:
+        raise ValueError("milestone-review requires the resolver's lineup_hash")
 
     checked = [_validate_seat(s, where="seats") for s in seats]
     if len(checked) < 2:
@@ -443,6 +453,7 @@ def run_panel(
         "version": 1,
         "mode": mode,
         "route_hash": route_hash,
+        "lineup_hash": lineup_hash,
         "min_families": min_families,
         "family_distinctness_checked": False,
         "family_distinctness_source": None,
@@ -461,6 +472,7 @@ def run_panel(
         "panelist_agent": panelist_agent,
         "synthesizer_agent": synthesizer_agent,
         "route_hash": route_hash,
+        "lineup_hash": lineup_hash,
         "seat_timeout_seconds": seat_timeout_seconds,
         "run_seed": effective_run_seed,
         "preflight": preflight,
@@ -663,6 +675,7 @@ def run_panel(
             "run_status": run_status,
             "status": run_status,
             "route_hash": route_hash,
+            "lineup_hash": lineup_hash,
             "quorum": quorum,
             "brief_sha256": brief_hash,
             "brief_sha256_after": brief_after,
