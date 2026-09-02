@@ -21,6 +21,7 @@ Exit 0 pass, 1 fail.
 from __future__ import annotations
 
 import concurrent.futures
+import hashlib
 import json
 import os
 import subprocess
@@ -30,7 +31,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RUN = REPO / "scripts" / "colosseum_run.py"
+RUN = REPO / "scripts" / "fv_run.py"
 LEDGER_CHECK = REPO / "scripts" / "check_ledger_references.py"
 FAILURES: list[str] = []
 
@@ -56,7 +57,7 @@ def r5_trial(tmp: Path, trial: int) -> int:
     run_dir = tmp / f"trial{trial}"
     target = tmp / "intent.md"
     r = crun("init", str(target), f"--voices={','.join(voices)}",
-             "--owners=" + ",".join(f"{v}:opencode" for v in voices),
+             "--owners=" + ",".join(f"{v}:omp" for v in voices),
              f"--run-dir={run_dir}")
     if r.returncode != 0:
         raise RuntimeError(f"init failed: {r.stderr}")
@@ -89,7 +90,7 @@ def main() -> int:
         # complete refuses empty and stale outputs; reset moves output aside.
         run_dir = tmp / "guards"
         crun("init", str(tmp / "intent.md"), "--voices=g1",
-             "--owners=g1:opencode", f"--run-dir={run_dir}")
+             "--owners=g1:omp", f"--run-dir={run_dir}")
         manifest = json.loads((run_dir / "run.json").read_text())
         vfile = run_dir / manifest["voices"][0]["file"]
 
@@ -117,23 +118,25 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="r2-") as td:
         tmp = Path(td)
         root = tmp / "proj"
-        (root / ".colosseum").mkdir(parents=True)
+        (root / ".fv").mkdir(parents=True)
         (root / "src").mkdir()
         (root / "src" / "lib.rs").write_text("fn main() {}\nlet x = 1;\n")
         (root / "src" / "my file.rs").write_text("fn spaced() {}\n")
+        lib_hash = hashlib.sha256("let x = 1;".encode()).hexdigest()[:12]
+        spaced_hash = hashlib.sha256("fn spaced() {}".encode()).hexdigest()[:12]
         outside = tmp / "outside.rs"
         outside.write_text("secret code\n")
         (root / "src" / "link.rs").symlink_to(outside)
 
         def gate(ledger_text: str) -> tuple[int, str]:
-            ledger = root / ".colosseum" / "ledger.md"
+            ledger = root / ".fv" / "ledger.md"
             ledger.write_text(ledger_text)
             proc = subprocess.run(
                 [sys.executable, str(LEDGER_CHECK), str(ledger), "--root", str(root)],
                 capture_output=True, text=True, timeout=60)
             return proc.returncode, proc.stdout + proc.stderr
 
-        code, out = gate("- L1 enforced at `src/lib.rs:2`. kani: skipped because fixture.\n")
+        code, out = gate(f"- L1 enforced at `src/lib.rs:2@sha256:{lib_hash}`. kani: skipped because fixture.\n")
         check("R2: clean citation passes", code == 0, out[-200:])
 
         code, out = gate("- L1 at `../outside.rs:1`. kani: skipped because fixture.\n")
@@ -148,7 +151,7 @@ def main() -> int:
         check("R2: symlink-escape citation rejected",
               code == 1 and "symlink escape" in out)
 
-        code, out = gate("- L1 at `src/my file.rs:1`. kani: skipped because fixture.\n")
+        code, out = gate(f"- L1 at `src/my file.rs:1@sha256:{spaced_hash}`. kani: skipped because fixture.\n")
         check("R2: backtick-quoted space path supported", code == 0, out[-200:])
 
         code, out = gate("- L1 code: src/my file.rs:1 . kani: skipped because fixture.\n")

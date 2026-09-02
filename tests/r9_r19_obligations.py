@@ -129,7 +129,7 @@ def main() -> int:
         check("R9: safety verify alone would have passed the weakened spec",
               safety and all(r["ok"] for r in safety))
 
-    body = (REPO / "agents" / "quint-spec-generator-body.md").read_text()
+    body = (REPO / "agents" / "fv-quint-spec-generator.md").read_text()
     check("generator: STATUS is a proposal, checker accepts",
           "STATUS: proposal" in body and "STATUS: ok" not in body
           and "obligation_check.py" in body)
@@ -143,9 +143,9 @@ def main() -> int:
     check("generator: project-specific section refs parameterized",
           "§2.5 blocks" not in body and "B9's negligibility" not in body)
 
-    wrapper = (REPO / "agents" / "opencode" / "quint-spec-generator.md").read_text()
-    check("wrapper: obligation manifest generator-unwritable",
-          '"**/.colosseum/obligations*": deny' in wrapper)
+    intent_skill = (REPO / "skills" / "fv-intent" / "SKILL.md").read_text()
+    check("generator: isolated proposal cannot mutate parent before acceptance",
+          "isolated=True, apply=False" in intent_skill and "obligation_check.py" in intent_skill)
 
     print()
     if FAILURES:

@@ -1,10 +1,10 @@
 {
-  "schema": "colosseum-dogfood-evidence/v1",
+  "schema": "fv-dogfood-evidence/v2",
   "status": "observation",
   "project": "verified-rcv",
   "scope": "Instant-runoff voting CosmWasm contract + TDX enclave tabulation; greenfield methodology dogfood",
   "generated_at": "2026-07-12T00:00:00Z",
-  "_source": "Facts drawn from colosseum's own docs (README.md 'Dogfood projects' table and methodology-improvements.md). No field here was captured from the verified-rcv repo at run time; every value not stated in those docs is null. status=observation because the load-bearing bindings (commit, hashes, seeds, raw-report hashes, bounds) were never recorded.",
+  "_source": "Facts drawn from fv's own docs (README.md 'Dogfood projects' table and methodology-improvements.md). No field here was captured from the verified-rcv repo at run time; every value not stated in those docs is null. status=observation because the load-bearing bindings (commit, hashes, seeds, raw-report hashes, bounds) were never recorded.",
   "commits": [
     {
       "repo": "verified-rcv",
@@ -14,7 +14,7 @@
     }
   ],
   "intent": {
-    "path": ".colosseum/intent.md",
+    "path": ".fv/intent.md",
     "version": "0.3.15",
     "version_prior_for_ledger": "0.3.5",
     "sha256": null,
@@ -38,19 +38,19 @@
   ],
   "commands": [
     {
-      "stage": "colosseum-adversarial (cross-critique / defense / re-cross-critique)",
+      "stage": "fv-adversarial (cross-critique / defense / re-cross-critique)",
       "command": null,
-      "reference_script": ".colosseum/scripts/critique_and_defense_dispatch.py",
+      "reference_script": ".fv/scripts/critique_and_defense_dispatch.py",
       "note": "Dispatched at --variant high; exact command lines were not recorded. See also revised_canonical_critique.py."
     },
     {
-      "stage": "colosseum-verify (Kani)",
+      "stage": "fv-verify (Kani)",
       "command": null,
       "note": "10 Kani harnesses, all targeting IRV result structure; no attestation/registry/gnark/serialization harnesses (bottom-up catalog gap)."
     }
   ],
   "tool_versions": {
-    "_cite": "colosseum/bom.json (locked compatibility BOM, E6)",
+    "_cite": "fv/bom.json (locked compatibility BOM, E6)",
     "opencode": "1.18.5",
     "quint": "0.32.0",
     "apalache": "0.56.1",
@@ -76,28 +76,28 @@
   },
   "raw_reports": [
     {
-      "stage": "colosseum-adversarial",
-      "path": ".colosseum/attacks/",
+      "stage": "fv-adversarial",
+      "path": ".fv/attacks/",
       "sha256": null,
-      "note": "Attack reports live under the project's .colosseum/attacks/; individual report hashes were never captured."
+      "note": "Attack reports live under the project's .fv/attacks/; individual report hashes were never captured."
     },
     {
       "stage": "compose",
-      "path": ".colosseum/ledger.md",
+      "path": ".fv/ledger.md",
       "sha256": null,
       "note": "Integration ledger; stale at intent v0.3.5."
     }
   ],
   "canonical_paths_exercised": [
-    { "stage": "colosseum-intent", "ran": true, "evidence": "Intent authored and revised to v0.3.15; encoding-discipline notes added at v0.3.1/v0.3.2." },
-    { "stage": "colosseum-compose (Quint spec)", "ran": true, "evidence": "Quint protocol model authored (specs/rcv.qnt)." },
-    { "stage": "colosseum-verify (Lean spec layer)", "ran": true, "evidence": "Lean spec layer complete via Lake project (specs/lakefile.lean)." },
-    { "stage": "colosseum-adversarial", "ran": true, "evidence": "Cross-critique, defense, and re-cross-critique rounds dispatched at --variant high; caught tautological-shadow, scope-name, and coverage-hole defects." },
-    { "stage": "colosseum-verify (Kani)", "ran": true, "evidence": "10 harnesses over IRV result structure; trust-boundary surfaces uncovered." },
-    { "stage": "colosseum-lifecycle-adversary", "ran": false, "evidence": "NOT run when the registry-rotation timelock landed; auditor later found a multi-tx DoS sequence a lifecycle-adversary pass would have caught." },
-    { "stage": "colosseum-code-adversarial", "ran": false, "evidence": "NOT run; 8 of 13 high-severity audit findings would have been caught by the six-lens code-adversarial stage." },
+    { "stage": "fv-intent", "ran": true, "evidence": "Intent authored and revised to v0.3.15; encoding-discipline notes added at v0.3.1/v0.3.2." },
+    { "stage": "fv-compose (Quint spec)", "ran": true, "evidence": "Quint protocol model authored (specs/rcv.qnt)." },
+    { "stage": "fv-verify (Lean spec layer)", "ran": true, "evidence": "Lean spec layer complete via Lake project (specs/lakefile.lean)." },
+    { "stage": "fv-adversarial", "ran": true, "evidence": "Cross-critique, defense, and re-cross-critique rounds dispatched at --variant high; caught tautological-shadow, scope-name, and coverage-hole defects." },
+    { "stage": "fv-verify (Kani)", "ran": true, "evidence": "10 harnesses over IRV result structure; trust-boundary surfaces uncovered." },
+    { "stage": "fv-lifecycle-adversary", "ran": false, "evidence": "NOT run when the registry-rotation timelock landed; auditor later found a multi-tx DoS sequence a lifecycle-adversary pass would have caught." },
+    { "stage": "fv-code-adversarial", "ran": false, "evidence": "NOT run; 8 of 13 high-severity audit findings would have been caught by the six-lens code-adversarial stage." },
     { "stage": "compose ledger (integration)", "ran": true, "evidence": "Ledger generated at intent v0.3.5; stale vs current v0.3.15, regeneration pending in the verified-rcv repo." }
   ],
   "waivers": [],
-  "notes": "This is a dogfood OBSERVATION, not a manifested evidence base. Per the rule in docs/dogfood-evidence.md, verified-rcv may be described only as a dogfood observation until a status=manifested manifest (real commit, hashes, seeds, raw-report hashes, bounds) exists. Regenerating the verified-rcv integration ledger against the current intent is pending work in that project's own repo and is out of scope for the colosseum repo."
+  "notes": "This is a dogfood OBSERVATION, not a manifested evidence base. Per the rule in docs/dogfood-evidence.md, verified-rcv may be described only as a dogfood observation until a status=manifested manifest (real commit, hashes, seeds, raw-report hashes, bounds) exists. Regenerating the verified-rcv integration ledger against the current intent is pending work in that project's own repo and is out of scope for the fv repo."
 }

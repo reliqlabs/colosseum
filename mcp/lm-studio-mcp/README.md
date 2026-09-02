@@ -2,7 +2,7 @@
 
 General-purpose wrapper for local models served via LM Studio's OpenAI-compatible endpoint. Provides health checks, model listing, and ad-hoc single-shot local completions.
 
-> **Adversarial dispatch is not done through this MCP.** Local adversarial voices are dispatched through OpenCode's `lmstudio/` provider (see `skills/colosseum-adversarial/SKILL.md`), which hits the same LM Studio server but gives each voice an agentic ReAct loop with file access. Single-shot completions do no agentic work, so they are not the dispatch path. This MCP remains useful for confirming the LM Studio server is up, listing loaded models, and quick one-off local queries.
+> **Adversarial dispatch is not done through this MCP.** Local adversarial voices use OMP's `lm-studio/` provider through structured `agent()` calls. This MCP remains useful for health checks, loaded-model listing, and one-off local queries.
 
 Separate from [`goedel-mcp`](../goedel-mcp/), which is specialized for Lean tactic proposal.
 
@@ -12,7 +12,7 @@ The methodology's "adversarial beats consensus" claim depends on family diversit
 
 Local models like Qwen and Gemma have **different blind spots** from Claude — different pretraining data, different RLHF, different fine-tuning. They are not frontier-quality on most tasks, but for adversarial review of a spec they don't need to be: they need to be wrong in different ways than Claude.
 
-Local also means free. The floor of adversarial review (local voices via OpenCode's `lmstudio/` provider) can run on every spec without budget anxiety; cloud and gateway voices are reserved for high-stakes milestones.
+Local models also provide a low-cost diversity floor through OMP's `lm-studio/` provider.
 
 ## Tools
 
@@ -43,32 +43,11 @@ Same prompt against multiple loaded local models in parallel. Returns a dict key
 - Enable the **Developer** tab → **Server** → start the server on the default port (1234)
 - Confirm the OpenAI-compatible endpoint is reachable: `curl http://localhost:1234/v1/models`
 
-### 2. Register with Claude Code
+### 2. Register through the FV package manifest
 
-```json
-{
-  "mcpServers": {
-    "lm-studio": {
-      "command": "/Users/you/path/to/colosseum/mcp/lm-studio-mcp/lm_studio_mcp.py"
-    }
-  }
-}
-```
-
-To set a default model:
-
-```json
-{
-  "mcpServers": {
-    "lm-studio": {
-      "command": "/Users/you/path/to/colosseum/mcp/lm-studio-mcp/lm_studio_mcp.py",
-      "env": {
-        "LMSTUDIO_DEFAULT_MODEL": "qwen-3.6-27b-instruct"
-      }
-    }
-  }
-}
-```
+The root [`.mcp.json`](../../.mcp.json) registers this server as `lm-studio`.
+Set `FV_ROOT` to the package checkout before starting OMP. No project-local
+MCP copy is required.
 
 ### 3. Verify
 
@@ -100,13 +79,13 @@ Models smaller than ~7B are usually too weak for spec-attack quality. The sweet 
 
 ## Typical usage pattern
 
-This MCP's role in a Colosseum session is operational, not dispatch:
+This MCP's role in a FV session is operational, not dispatch:
 
 1. Before a multi-voice run, confirm the LM Studio server is up and the intended local models are loaded: `check_lmstudio_health()` / `list_loaded_models()`.
-2. Pre-load a model that JIT-evicts under contention (`lms load <model> --gpu max`) so OpenCode's dispatch doesn't race a cold load.
+2. Pre-load a model that JIT-evicts under contention (`lms load <model> --gpu max`) so OMP's dispatch doesn't race a cold load.
 3. Use `query_local(...)` for a quick one-off local sanity check outside an adversarial run.
 
-The adversarial dispatch itself — local voices attacking the spec in parallel — runs through OpenCode's `lmstudio/` provider via `opencode_dispatch.py`, so each local voice gets a ReAct loop with file access. The local floor's job is *not* to find the same bugs Claude or GPT would find; it is to occasionally find something they all missed because of their shared lineage. One genuine catch per quarter justifies the always-on cost (which is zero).
+Adversarial dispatch itself uses OMP's `lm-studio/` model provider and restricted static agents. The MCP's single-shot tools remain diagnostic only.
 
 ## Status
 

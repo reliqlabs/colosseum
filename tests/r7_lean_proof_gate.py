@@ -56,6 +56,12 @@ def main() -> int:
     if shutil.which("lake") is None or shutil.which("lean") is None:
         print("SKIP-FAIL: lean/lake not on PATH; R7 cannot run", file=sys.stderr)
         return 2
+    for command in (["lean", "--version"], ["lake", "--version"]):
+        probe = subprocess.run(command, capture_output=True, text=True)
+        if probe.returncode != 0:
+            print(f"SKIP-FAIL: Lean toolchain is not configured: {(probe.stderr or probe.stdout).strip()}",
+                  file=sys.stderr)
+            return 2
 
     with tempfile.TemporaryDirectory(prefix="r7-") as td:
         project = Path(td) / "proj"
@@ -94,7 +100,7 @@ def main() -> int:
     check("gate has no text-scan mode", "grep" not in gate_src.lower()
           or "proves nothing" in gate_src)
 
-    skill = (REPO / "skills" / "colosseum-verify" / "SKILL.md").read_text()
+    skill = (REPO / "skills" / "fv-verify" / "SKILL.md").read_text()
     check("Layer 8: text-scan fallback removed from verify skill",
           "scan for `sorry` markers" not in skill
           and "no text-scan fallback" in skill)

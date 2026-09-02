@@ -13,7 +13,7 @@ Two failure modes, both caught here:
      --exclude-standard` finds these.
   2. HIDDEN-IGNORED: a fixture swallowed by a global .gitignore rule — e.g.
      the Rust `target/` build-output rule hiding tests/fixtures/m3b/target,
-     or the global `.colosseum/` rule hiding the r22/r28 manifests. The
+     or the global `.fv/` rule hiding the r22/r28 manifests. The
      untracked scan never lists ignored files, so it misses these. We hit
      this class twice; this check closes it.
 
@@ -21,7 +21,7 @@ An ignored path under tests/fixtures is TOLERATED only if it is a recognized
 build/run artifact — regenerated locally, never needed from a clone:
   - a Cargo build dir: a `target/` component whose crate parent holds a
     Cargo.toml (so tests/fixtures/r22/adapter/target stays ignored);
-  - a dispatch run artifact: a `.colosseum/verify/` component.
+  - a dispatch run artifact: a `.fv/verify/` component.
 Anything else ignored under tests/fixtures is a broken-clone risk: `git add`
 it (negating the ignore in .gitignore), or move it so it is a real build dir.
 
@@ -52,7 +52,7 @@ def is_build_artifact(root: Path, path: str) -> bool:
     """A regenerable build/run artifact that a clone never needs."""
     parts = path.split("/")
     for i in range(len(parts) - 1):
-        if parts[i] == ".colosseum" and parts[i + 1] == "verify":
+        if parts[i] == ".fv" and parts[i + 1] == "verify":
             return True
     for i, p in enumerate(parts):
         if p == "target":
@@ -101,7 +101,7 @@ def _selftest() -> int:
         git(root, "init", "-q")
         git(root, "config", "user.email", "t@t")
         git(root, "config", "user.name", "t")
-        (root / ".gitignore").write_text("target/\n.colosseum/\n")
+        (root / ".gitignore").write_text("target/\n.fv/\n")
         fx = root / FIXTURES
         (fx / "good").mkdir(parents=True)
         (fx / "good" / "data.txt").write_text("x\n")
@@ -132,13 +132,13 @@ def _selftest() -> int:
         expect("real Cargo target/ tolerated",
                not any("crate/target" in f for _, f in probs))
 
-        # .colosseum/verify run artifact -> tolerated
-        ver = fx / "good" / ".colosseum" / "verify"
+        # .fv/verify run artifact -> tolerated
+        ver = fx / "good" / ".fv" / "verify"
         ver.mkdir(parents=True)
         (ver / "run.json").write_text("{}\n")
         probs = find_problems(root)
-        expect(".colosseum/verify artifact tolerated",
-               not any(".colosseum/verify" in f for _, f in probs))
+        expect(".fv/verify artifact tolerated",
+               not any(".fv/verify" in f for _, f in probs))
 
     print()
     if fails:

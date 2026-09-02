@@ -1,10 +1,10 @@
-# Colosseum concepts
+# FV concepts
 
 The names and ideas this methodology uses. Authoritative; SKILLs and docs use these terms.
 
 ## The five pillars
 
-The five complementary trust mechanisms Colosseum composes. Always referred to by name, not number.
+The five complementary trust mechanisms FV composes. Always referred to by name, not number.
 
 | Pillar | What it does |
 |---|---|
@@ -47,40 +47,40 @@ The verbs you actually run. Each is a SKILL the harness can invoke.
 
 | SKILL | Verb | Stage |
 |---|---|---|
-| `colosseum-intent` | Author an intent doc forward (elicitation) | 1 |
-| `colosseum-reverse-intent` | Distill an intent doc from existing code | 1 (retro) |
-| `colosseum-adversarial` | Run spec adversarial review with intent + Quint trace generation | 6 |
-| `colosseum-code-adversarial` | Read implementation against intent through six lenses | between 7 and 8 |
-| `colosseum-lifecycle-adversary` | Red-team multi-tx admin features against Quint | when contract gains admin features |
-| `colosseum-verify` | Run the verification pyramid | 8 |
-| `colosseum-compose` | Maintain cross-component trust ledger with code-line citations | 8 (continuous) |
-| `colosseum-change` | Upstream-first change loop with re-verification | when changing a spec'd project |
+| `fv-intent` | Author an intent doc forward (elicitation) | 1 |
+| `fv-reverse-intent` | Distill an intent doc from existing code | 1 (retro) |
+| `fv-adversarial` | Run spec adversarial review with intent + Quint trace generation | 6 |
+| `fv-code-adversarial` | Read implementation against intent through six lenses | between 7 and 8 |
+| `fv-lifecycle-adversary` | Red-team multi-tx admin features against Quint | when contract gains admin features |
+| `fv-verify` | Run the verification pyramid | 8 |
+| `fv-compose` | Maintain cross-component trust ledger with code-line citations | 8 (continuous) |
+| `fv-change` | Upstream-first change loop with re-verification | when changing a spec'd project |
 
 ## Project layout
 
-Canonical locations within a Colosseum-managed project. Skills cite these; do not invent alternatives per skill.
+Canonical locations within a FV-managed project. Skills cite these; do not invent alternatives per skill.
 
-- `<project>/.colosseum/intent.md` — the intent document (canonical). `<project>/intent.md` at the root is the recognized alternative for projects that want the intent visible at top level; a skill that needs the intent checks `.colosseum/intent.md` first, then `intent.md`, then asks.
-- `<project>/.colosseum/ledger.md` — the trust ledger
-- `<project>/.colosseum/attacks/` — spec adversarial reports, verbatim (`colosseum-adversarial`)
-- `<project>/.colosseum/code-adversarial/` — code adversarial review reports (`colosseum-code-adversarial`)
-- `<project>/.colosseum/lifecycle-adversary/` — lifecycle red-team reports (`colosseum-lifecycle-adversary`)
-- `<project>/.colosseum/changes/` — change impact reports (`colosseum-change`)
-- `<project>/.colosseum/verify/` — pyramid run reports (`colosseum-verify`)
-- `<project>/.colosseum/classifications/` — failure-classifier reports (`colosseum-verify`)
-- `<project>/.colosseum/evidence/` — typed G1 evidence records, one JSON per claim ID (`colosseum-compose`, Gate B)
-- `<project>/.colosseum/scripts/` — project-local copies of dispatch + CI-gate scripts
-- `<project>/.opencode/agent/` — per-project OpenCode agents, built from `colosseum/agents/*-body.md` (never hand-edited)
+- `<project>/.fv/intent.md` — the intent document (canonical). `<project>/intent.md` at the root is the recognized alternative for projects that want the intent visible at top level; a skill that needs the intent checks `.fv/intent.md` first, then `intent.md`, then asks.
+- `<project>/.fv/ledger.md` — the trust ledger
+- `<project>/.fv/attacks/` — spec adversarial reports, verbatim (`fv-adversarial`)
+- `<project>/.fv/code-adversarial/` — code adversarial review reports (`fv-code-adversarial`)
+- `<project>/.fv/lifecycle-adversary/` — lifecycle red-team reports (`fv-lifecycle-adversary`)
+- `<project>/.fv/changes/` — change impact reports (`fv-change`)
+- `<project>/.fv/verify/` — pyramid run reports (`fv-verify`)
+- `<project>/.fv/classifications/` — failure-classifier reports (`fv-verify`)
+- `<project>/.fv/evidence/` — typed G1 evidence records, one JSON per claim ID (`fv-compose`, Gate B)
+- `<project>/.fv/scripts/` — project-local copies of dispatch + CI-gate scripts
+- `<fv>/agents/` — static OMP agents loaded from the extension package
 
 ## The trust ledger
 
-A project's `.colosseum/ledger.md` records every cross-component trust claim with:
+A project's `.fv/ledger.md` records every cross-component trust claim with:
 - the named theorem
 - the tools that contribute (Quint property, Lean theorem, Verus annotation, Kani harness)
 - code-line citations for each link
 - axiom inventory (which axioms each theorem's closure depends on)
 
-`colosseum-compose` maintains it. CI gates fail when a link drifts from executable code.
+`fv-compose` maintains it. CI gates fail when a link drifts from executable code.
 
 ## Trust-assumption categories
 
@@ -126,4 +126,4 @@ For traceability only — never load-bearing for new work.
 
 - `archive/` — old MEMORY snapshots
 - `methodology-improvements.md` — current improvements; previous "Ask X" labels appear in a single archive table at the end mapping old label → current practice name
-- Per-project `.colosseum/ledger.md` — frozen historical artifacts (e.g., Quartz's `Cycle 7.x` ledger entries) — stay as-is; they are the audit trail
+- Per-project `.fv/ledger.md` — frozen historical artifacts (e.g., Quartz's `Cycle 7.x` ledger entries) — stay as-is; they are the audit trail

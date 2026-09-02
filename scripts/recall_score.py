@@ -16,7 +16,7 @@ executed; this tool computes recall over whatever corpus + detections it is
 given and invents nothing.
 
 CORPUS (templates/seeded-defect-corpus.example.json; schema
-colosseum-seeded-corpus/v1)
+fv-seeded-corpus/v2)
     { "schema": "...", "target": "...", "target_snapshot": "<commit>+<hash>",
       "line_tolerance": 5,
       "defects": [ {"id","file","line","category","severity",
@@ -50,6 +50,8 @@ import json
 import os
 import sys
 from pathlib import Path
+
+CORPUS_SCHEMA = "fv-seeded-corpus/v2"
 
 
 def basename(p: str) -> str:
@@ -174,6 +176,12 @@ def main() -> int:
     if not isinstance(corpus, dict) or "defects" not in corpus:
         print("error: corpus must be an object with a 'defects' list",
               file=sys.stderr)
+        return 2
+    if corpus.get("schema") != CORPUS_SCHEMA:
+        print(
+            f"error: unsupported corpus schema {corpus.get('schema')!r}; expected {CORPUS_SCHEMA!r}",
+            file=sys.stderr,
+        )
         return 2
     if not corpus["defects"]:
         print("INCOMPLETE: corpus has zero seeded defects; recall is undefined",

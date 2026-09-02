@@ -2,7 +2,7 @@
 
 MCP server that exposes a locally-running Goedel-Prover-V2 instance (served via LM Studio) as a tactic-proposal tool for Claude Code or any MCP-compatible client.
 
-This is the first piece of the Colosseum v1 backbone. It lets a generalist orchestrator (Claude) delegate Lean 4 tactic generation to a specialist prover (Goedel) while retaining orchestration, error recovery, and verification routing.
+This is the first piece of the FV v1 backbone. It lets a generalist orchestrator (Claude) delegate Lean 4 tactic generation to a specialist prover (Goedel) while retaining orchestration, error recovery, and verification routing.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ Add to `.mcp.json` in your project root, or to `~/.claude/mcp.json` globally:
 {
   "mcpServers": {
     "goedel": {
-      "command": "/Users/you/path/to/colosseum/mcp/goedel-mcp/goedel_mcp.py"
+      "command": "/Users/you/path/to/fv/mcp/goedel-mcp/goedel_mcp.py"
     }
   }
 }
@@ -124,7 +124,7 @@ The intended composition pattern in Claude Code, given lean-lsp-mcp is also regi
 4. Claude commits the first candidate that closes or advances the goal
 5. On failure across all candidates: backtrack, decompose, or escalate
 
-This is "Claude orchestrates, Goedel proposes, Lean verifies" — the three-specialist pipeline the Colosseum methodology calls for at the proof layer.
+This is "Claude orchestrates, Goedel proposes, Lean verifies" — the three-specialist pipeline the FV methodology calls for at the proof layer.
 
 ## Status
 

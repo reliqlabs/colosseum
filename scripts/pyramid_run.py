@@ -9,7 +9,7 @@ pyramid_run — headless runner for the deterministic pyramid layers (E4, G2).
 Runs the layers that need no agent (types, lints, property tests, fuzz,
 Kani, Verus) so the pyramid can gate CI. The agent remains responsible for
 failure classification and for the Aeneas/Lean layers (extraction and the
-axiom gate run in the agent flow; see colosseum-verify SKILL Layer 7-8 and
+axiom gate run in the agent flow; see fv-verify SKILL Layer 7-8 and
 scripts/lean_axiom_gate.py).
 
 ASSURANCE PROFILES (named, G2-scoped)
@@ -20,7 +20,7 @@ ASSURANCE PROFILES (named, G2-scoped)
              names the layers the agent flow must supply)
 
 ENGINEERING BASELINE FLOORS (C8, required under every profile)
-    The `floors` layer reads <crate>/.colosseum/floors.json when present and
+    The `floors` layer reads <crate>/.fv/floors.json when present and
     falls back to DEFAULT_FLOORS otherwise. Three mechanical sub-checks:
       feature_matrix  cargo check over each declared --features/--no-default-
                       features/--release combo (with --workspace when the
@@ -79,9 +79,9 @@ PROFILES: dict[str, list[str]] = {
 
 TERMINAL_OK = "passed"
 
-FLOORS_SCHEMA = "colosseum-floors/v1"
+FLOORS_SCHEMA = "fv-floors/v2"
 
-# Documented defaults applied when <crate>/.colosseum/floors.json is absent or
+# Documented defaults applied when <crate>/.fv/floors.json is absent or
 # omits a section. Sections present in the file layer over these.
 DEFAULT_FLOORS: dict = {
     "schema": FLOORS_SCHEMA,
@@ -98,18 +98,20 @@ _QUICKCHECK_RE = re.compile(r"\bquickcheck\s*!|#\[\s*quickcheck\b")
 
 
 def load_floors(crate: Path) -> dict:
-    """Read <crate>/.colosseum/floors.json, layering present sections over
+    """Read <crate>/.fv/floors.json, layering present sections over
     DEFAULT_FLOORS. Absent file -> documented defaults (a pure function)."""
     cfg = {k: (dict(v) if isinstance(v, dict) else v)
            for k, v in DEFAULT_FLOORS.items()}
-    path = crate / ".colosseum" / "floors.json"
+    path = crate / ".fv" / "floors.json"
     if path.is_file():
         user = json.loads(path.read_text())
+        if "schema" in user and user["schema"] != FLOORS_SCHEMA:
+            raise ValueError(
+                f"{path}: unsupported schema {user['schema']!r}; expected {FLOORS_SCHEMA!r}"
+            )
         for section in ("features", "property_tests", "fuzz"):
             if isinstance(user.get(section), dict):
                 cfg[section] = {**cfg[section], **user[section]}
-        if "schema" in user:
-            cfg["schema"] = user["schema"]
     return cfg
 
 
@@ -350,10 +352,14 @@ def main() -> int:
             if "floors" in args.skip:
                 record("floors", "skipped", "skipped by flag")
             else:
-                cfg = load_floors(crate)
-                status, detail = floors_layer(
-                    crate, cfg, is_workspace(crate), layers.get("fuzz"))
-                record("floors", status, detail)
+                try:
+                    cfg = load_floors(crate)
+                except (OSError, ValueError, json.JSONDecodeError) as error:
+                    record("floors", "failed", {"error": str(error)})
+                else:
+                    status, detail = floors_layer(
+                        crate, cfg, is_workspace(crate), layers.get("fuzz"))
+                    record("floors", status, detail)
 
         if "kani" in required:
             if "kani" in args.skip:
@@ -395,7 +401,7 @@ def main() -> int:
         "floors": layers.get("floors", {}).get("detail", {}),
         "verdict": verdict,
     }
-    out_dir = crate / ".colosseum" / "verify"
+    out_dir = crate / ".fv" / "verify"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"headless-{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H%M%SZ')}.json"
     out_path.write_text(json.dumps(report, indent=2) + "\n")

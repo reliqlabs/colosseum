@@ -28,9 +28,10 @@
         "max_steps": 10
       },
       "seeds": null,
-      "raw_output_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
       "parser_schema_version": "quint-cli-0.32",
-      "run_id": "m1-fixture-run-b1"
+      "run_id": "m1-fixture-run-b1",
+      "raw_output_path": "tests/fixtures/r19/intent.md"
     },
     "waiver": null
   },
@@ -57,14 +58,15 @@
       "toolchain_digests": {
         "gnark": "0.11.0"
       },
-      "command": "n/a \u2014 externally assumed",
+      "command": "n/a — externally assumed",
       "configuration": {
         "note": "no local re-derivation"
       },
       "seeds": null,
-      "raw_output_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
       "parser_schema_version": "n/a",
-      "run_id": "m1-fixture-run-w1"
+      "run_id": "m1-fixture-run-w1",
+      "raw_output_path": "tests/fixtures/r19/intent.md"
     },
     "waiver": {
       "by": "reviewer",

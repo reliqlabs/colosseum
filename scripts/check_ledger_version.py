@@ -15,7 +15,7 @@ schema version as well as the per-record source_snapshot bindings.
 ENVELOPE
 
     {
-      "ledger_schema_version": "colosseum-ledger/v1",
+      "ledger_schema_version": "fv-ledger/v2",
       "records": [ <G1 record>, ... ]
     }
 
@@ -45,7 +45,7 @@ from pathlib import Path
 # ledger schema evolves; an envelope naming a version not in this set is
 # rejected so a forward-incompatible ledger fails loudly rather than being
 # read under the wrong assumptions.
-KNOWN_VERSIONS = {"colosseum-ledger/v1"}
+KNOWN_VERSIONS = {"fv-ledger/v2"}
 UNVERSIONED = "unversioned/v0"
 
 

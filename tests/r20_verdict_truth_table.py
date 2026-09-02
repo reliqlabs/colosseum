@@ -110,7 +110,7 @@ def main() -> int:
         code, out = run(crate, "tested")
         check("runner: tested profile on clean crate -> VERIFIED[tested], exit 0",
               code == 0 and "VERIFIED[tested]" in out, f"exit={code}")
-        reports = list((crate / ".colosseum" / "verify").glob("headless-*.json"))
+        reports = list((crate / ".fv" / "verify").glob("headless-*.json"))
         check("runner: JSON report persisted with verdict",
               reports and json.loads(reports[-1].read_text())["verdict"] == "VERIFIED[tested]")
 

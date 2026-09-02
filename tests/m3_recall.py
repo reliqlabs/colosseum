@@ -28,6 +28,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -141,6 +142,14 @@ def main() -> int:
                      "--expect-snapshot", "zzzznope")
     check("snapshot mismatch -> exit 3 INCOMPLETE",
           rc == 3 and "INCOMPLETE" in err, f"rc={rc}")
+    with tempfile.TemporaryDirectory(prefix="m3-schema-") as td:
+        invalid = Path(td) / "corpus.json"
+        payload = json.loads(corpus.read_text())
+        payload["schema"] = "fv-seeded-corpus/v999"
+        invalid.write_text(json.dumps(payload))
+        rc, _, err = run("--corpus", str(invalid), "--detections", str(detections))
+        check("non-v2 corpus schema -> exit 2 error",
+              rc == 2 and "unsupported corpus schema" in err, f"rc={rc} err={err}")
 
     rc, _, err = run("--corpus", str(corpus), "--detections", str(detections),
                      "--expect-snapshot", "abc1234")

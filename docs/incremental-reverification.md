@@ -3,7 +3,7 @@
 Scaffolding for the system-of-intents change loop. This document defines the
 ledger schema envelope, the rule for reusing component evidence when a system
 changes, and how the assurance tiers map onto non-Rust components. It is the
-reference the `colosseum-boundary` skill and `colosseum-change` point at when
+reference the `fv-boundary` skill and `fv-change` point at when
 they bound the blast radius of a change.
 
 Status: the bidboard system-of-intents run this scaffolding is built for has
@@ -17,7 +17,7 @@ a bare JSON list. M5 wraps a record set in a versioned envelope:
 
 ```json
 {
-  "ledger_schema_version": "colosseum-ledger/v1",
+  "ledger_schema_version": "fv-ledger/v2",
   "records": [ { "claim_id": "...", "...": "..." } ]
 }
 ```
@@ -49,7 +49,7 @@ these drifting makes the record stale. For a single component the rule is: if th
 component's `source_snapshot` no longer matches the tree, its records must be
 re-earned.
 
-Decomposition (via `colosseum-boundary`) turns that per-component rule into a
+Decomposition (via `fv-boundary`) turns that per-component rule into a
 bounded re-verification strategy for the whole system. When a system changes,
 re-verify only:
 
@@ -96,7 +96,7 @@ A component reaches a tier with whatever tool delivers that strength for its
 language. The tiers are:
 
 - **tested** — types plus lints plus property tests plus a fuzz surface, per the
-  engineering floors (C8, `.colosseum/floors.json`).
+  engineering floors (C8, `.fv/floors.json`).
 - **bounded** — a bounded model check or bounded proof: the property holds up to
   a stated bound (depth, steps, input size), and the bound is named in scope.
 - **proved** — an unbounded proof: the property holds for all inputs, discharged
@@ -120,7 +120,7 @@ exists, exactly as for Rust.
 
 ## What is scaffolded versus run
 
-Scaffolded here and in `colosseum-boundary` / `templates/system-intent.template.md`:
+Scaffolded here and in `fv-boundary` / `templates/system-intent.template.md`:
 the boundary skill, the system-intent template, the ledger version field, the
 reuse rule, and the tier mapping.
 

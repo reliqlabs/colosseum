@@ -1,6 +1,6 @@
 # kani-mcp
 
-MCP server wrapping cargo-kani — Rust's bounded model checker — as a Claude-callable tool. Part of the Colosseum v1 verification-pyramid backbone.
+MCP server wrapping cargo-kani — Rust's bounded model checker — as a Claude-callable tool. Part of the FV v1 verification-pyramid backbone.
 
 Kani sits between property tests and theorem proving on the pyramid: it gives exhaustive guarantees within loop-unwinding bounds, with fast turnaround (seconds-to-minutes per harness). Bugs Kani finds are real counterexamples, not statistical artifacts.
 
@@ -45,7 +45,7 @@ Add to `.mcp.json` in your project root, or to `~/.claude/mcp.json` globally:
 {
   "mcpServers": {
     "kani": {
-      "command": "/Users/you/path/to/colosseum/mcp/kani-mcp/kani_mcp.py"
+      "command": "/Users/you/path/to/fv/mcp/kani-mcp/kani_mcp.py"
     }
   }
 }
@@ -75,7 +75,7 @@ Environment variables (defaults shown):
 
 ## Typical usage pattern
 
-In a Colosseum verification session against a Rust crate:
+In a FV verification session against a Rust crate:
 
 1. Claude calls `list_kani_harnesses(crate_path)` to inventory the verification surface
 2. For each harness, Claude calls `run_kani_harness(crate_path, harness_name)` and inspects `summary.verdict`

@@ -24,7 +24,7 @@ but not yet portable evidence.
   manifest promotes from `observation` to `manifested` only by capturing the
   missing evidence, never by relabeling.
 
-## Schema (`colosseum-dogfood-evidence/v1`)
+## Schema (`fv-dogfood-evidence/v2`)
 
 One JSON object per project. Every listed key is required; values may be `null`
 only in an `observation`-status manifest and only where the evidence was never
@@ -33,7 +33,7 @@ for a filled-in observation.
 
 | Field | Meaning |
 |---|---|
-| `schema` | `colosseum-dogfood-evidence/v1` |
+| `schema` | `fv-dogfood-evidence/v2` |
 | `status` | `observation` \| `manifested` (the rule above) |
 | `project` | project name |
 | `scope` | one-line description of what was exercised |
@@ -66,14 +66,14 @@ manifest is the envelope that makes a project's G1 records reproducible.
 
 Regenerating verified-rcv's integration ledger against its current intent
 (v0.3.15; the ledger was generated at v0.3.5) is pending work in the
-**verified-rcv repository itself** and is out of scope for the colosseum repo.
+**verified-rcv repository itself** and is out of scope for the fv repo.
 The example manifest records the staleness as an observation; it does not
 regenerate anything.
 
 ## Producing a manifest
 
 1. Copy `templates/dogfood-evidence.example.json` into the project at
-   `.colosseum/dogfood-evidence.json`.
+   `.fv/dogfood-evidence.json`.
 2. Fill every field from captured evidence. Where you have no captured value,
    leave `null` and keep `status: observation`.
 3. Capture the missing bindings (commit, hashes, seeds, bounds, raw-report

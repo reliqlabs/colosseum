@@ -103,7 +103,7 @@ def main() -> int:
     audit_src = f"import {args.module}\n" + "".join(
         f"#print axioms {t}\n" for t in theorems)
     with tempfile.NamedTemporaryFile("w", suffix=".lean", dir=project,
-                                     prefix=".colosseum-audit-", delete=False) as f:
+                                     prefix=".fv-audit-", delete=False) as f:
         audit_path = Path(f.name)
         f.write(audit_src)
     try:

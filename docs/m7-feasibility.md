@@ -41,7 +41,7 @@ closing M7.
 
 ## What this establishes and what it does not
 
-- Establishes: the extraction toolchain works on a Colosseum fixture with no
+- Establishes: the extraction toolchain works on a FV fixture with no
   source edits, and a real behavioral clause (B1, bounded retries) is
   provable over the extracted code, machine-checked and sorry-free.
 - Surfaced, independently of the panel: the extracted `fail` can overflow on

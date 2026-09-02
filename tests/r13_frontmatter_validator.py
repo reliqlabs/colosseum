@@ -3,22 +3,10 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""
-R13 — frontmatter validator green over all skills, agents, wrappers (E6).
-
-Runs scripts/validate_frontmatter.py over the repo (must pass), then
-self-tests the validator against known-bad fixtures: an unquoted colon in
-the description (the exact defect colosseum-adversarial shipped with), an
-over-limit description, a missing permission block on an opencode
-wrapper, and a skill whose name does not match its directory. Each must
-be caught — a validator that passes everything validates nothing.
-
-Exit 0 pass, 1 fail.
-"""
+"""R13: static OMP frontmatter validator and known-bad fixtures."""
 from __future__ import annotations
 
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
@@ -27,64 +15,52 @@ VALIDATOR = REPO / "scripts" / "validate_frontmatter.py"
 FAILURES: list[str] = []
 
 
-def check(label: str, ok: bool, detail: str = "") -> None:
-    if ok:
+def check(label: str, condition: bool, detail: str = "") -> None:
+    if condition:
         print(f"  [ok]   {label}")
     else:
-        suffix = f" ({detail})" if detail else ""
-        print(f"  [FAIL] {label}{suffix}")
+        print(f"  [FAIL] {label}" + (f" ({detail})" if detail else ""))
         FAILURES.append(label)
 
 
 def run_validator(repo: Path) -> tuple[int, str]:
-    proc = subprocess.run(
+    result = subprocess.run(
         ["uv", "run", "--script", str(VALIDATOR), "--repo", str(repo)],
-        capture_output=True, text=True, timeout=120)
-    return proc.returncode, proc.stdout + proc.stderr
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return result.returncode, result.stdout + result.stderr
 
 
 def main() -> int:
-    code, out = run_validator(REPO)
-    check("validator green over all real skills, agents, and wrappers",
-          code == 0 and "VALIDATOR PASSED" in out, out[-300:])
+    code, output = run_validator(REPO)
+    check("real package frontmatter passes", code == 0 and "VALIDATOR PASSED" in output, output[-300:])
+    with tempfile.TemporaryDirectory(prefix="r13-") as temporary:
+        repo = Path(temporary)
+        agents = repo / "agents"
+        skills = repo / "skills"
+        agents.mkdir()
 
-    with tempfile.TemporaryDirectory(prefix="r13-") as td:
-        repo = Path(td)
-        (repo / "agents" / "opencode").mkdir(parents=True)
-        (repo / "agents" / "omp").mkdir(parents=True)
+        bad_skill = skills / "bad-colon" / "SKILL.md"
+        bad_skill.parent.mkdir(parents=True)
+        bad_skill.write_text("---\nname: bad-colon\ndescription: dispatch (`x`: `y`)\n---\nbody\n")
+        code, output = run_validator(repo)
+        check("unquoted colon rejected", code == 1 and "not valid YAML" in output)
+        bad_skill.write_text(f"---\nname: bad-colon\ndescription: \"{'x' * 1300}\"\n---\nbody\n")
+        code, output = run_validator(repo)
+        check("over-limit description rejected", code == 1 and "limit 1024" in output)
+        bad_skill.write_text("---\nname: wrong-name\ndescription: fine\n---\nbody\n")
+        code, output = run_validator(repo)
+        check("skill directory mismatch rejected", code == 1 and "!= directory" in output)
+        bad_skill.unlink()
 
-        bad = repo / "skills" / "bad-colon" / "SKILL.md"
-        bad.parent.mkdir(parents=True)
-        bad.write_text("---\nname: bad-colon\ndescription: dispatches via (`x`: `y`) roster\n---\nbody\n")
-        code, out = run_validator(repo)
-        check("self-test: unquoted colon in description caught",
-              code == 1 and "not valid YAML" in out)
-
-        bad.write_text(f"---\nname: bad-colon\ndescription: \"{'x' * 1300}\"\n---\nbody\n")
-        code, out = run_validator(repo)
-        check("self-test: over-limit description caught",
-              code == 1 and "limit 1024" in out)
-
-        bad.write_text("---\nname: other-name\ndescription: \"fine\"\n---\nbody\n")
-        code, out = run_validator(repo)
-        check("self-test: skill name/directory mismatch caught",
-              code == 1 and "!= directory" in out)
-        bad.unlink()
-
-        wrapper = repo / "agents" / "opencode" / "old-agent.md"
-        wrapper.write_text("---\ndescription: \"fine\"\nmode: all\ntools:\n  read: true\n---\nbody\n")
-        code, out = run_validator(repo)
-        check("self-test: opencode wrapper without permission block caught",
-              code == 1 and "permission block" in out)
-        check("self-test: deprecated tools booleans caught",
-              "deprecated tools booleans" in out)
-
-        omp_wrapper = repo / "agents" / "omp" / "old-agent.md"
-        omp_wrapper.write_text(
-            "---\nname: old-agent\ndescription: fine\ntools: [Read, Grep]\n---\nbody\n")
-        code, out = run_validator(repo)
-        check("self-test: uppercase OMP tool ids caught",
-              code == 1 and "lowercase OMP tool ids" in out)
+        agent = agents / "bad-agent.md"
+        agent.write_text("---\nname: wrong-agent\ndescription: fine\ntools: [Read]\nrestrictTools: \"yes\"\n---\nbody\n")
+        code, output = run_validator(repo)
+        check("agent filename mismatch rejected", code == 1 and "!= filename" in output)
+        check("uppercase tool rejected", "lowercase OMP tool ids" in output)
+        check("non-boolean restrictTools rejected", "restrictTools must be boolean" in output)
 
     print()
     if FAILURES:
@@ -95,4 +71,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

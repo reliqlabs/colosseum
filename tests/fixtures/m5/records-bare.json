@@ -10,15 +10,23 @@
       "intent_hash": "0000000000000000000000000000000000000000000000000000000000000001",
       "obligation_manifest_hash": "0000000000000000000000000000000000000000000000000000000000000002",
       "profile": "bounded",
-      "required_targets": ["B1", "S1"],
+      "required_targets": [
+        "B1",
+        "S1"
+      ],
       "environment_policy": "z2-worktree",
-      "toolchain_digests": {"quint": "0.44.0"},
+      "toolchain_digests": {
+        "quint": "0.44.0"
+      },
       "command": "quint verify --invariant=inv main.qnt",
-      "configuration": {"max_steps": 8},
+      "configuration": {
+        "max_steps": 8
+      },
       "seeds": "0x1",
-      "raw_output_hash": "0000000000000000000000000000000000000000000000000000000000000003",
-      "parser_schema_version": "opencode-events-v1",
-      "run_id": "sys-v1-2026-07-12T000000Z"
+      "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
+      "parser_schema_version": "fv-events-v2",
+      "run_id": "fv-v2-2026-07-12T000000Z",
+      "raw_output_path": "tests/fixtures/r19/intent.md"
     },
     "waiver": null
   },
@@ -33,15 +41,23 @@
       "intent_hash": "0000000000000000000000000000000000000000000000000000000000000001",
       "obligation_manifest_hash": "0000000000000000000000000000000000000000000000000000000000000002",
       "profile": "bounded",
-      "required_targets": ["B1", "S1"],
+      "required_targets": [
+        "B1",
+        "S1"
+      ],
       "environment_policy": "z2-worktree",
-      "toolchain_digests": {"rustc": "1.79.0"},
+      "toolchain_digests": {
+        "rustc": "1.79.0"
+      },
       "command": "cargo check",
-      "configuration": {"features": "default"},
+      "configuration": {
+        "features": "default"
+      },
       "seeds": null,
-      "raw_output_hash": "0000000000000000000000000000000000000000000000000000000000000004",
-      "parser_schema_version": "opencode-events-v1",
-      "run_id": "sys-v1-2026-07-12T000000Z"
+      "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
+      "parser_schema_version": "fv-events-v2",
+      "run_id": "fv-v2-2026-07-12T000000Z",
+      "raw_output_path": "tests/fixtures/r19/intent.md"
     },
     "waiver": null
   }

@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
-FANOUT = REPO / "skills" / "colosseum-adversarial" / "omp_fanout.py"
+FANOUT = REPO / "skills" / "fv-adversarial" / "omp_fanout.py"
 
 
 def iso_now() -> str:
@@ -57,7 +57,7 @@ def atomic_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def load_fanout():
-    spec = importlib.util.spec_from_file_location("colosseum_omp_fanout", FANOUT)
+    spec = importlib.util.spec_from_file_location("fv_omp_fanout", FANOUT)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load {FANOUT}")
     module = importlib.util.module_from_spec(spec)
@@ -68,7 +68,7 @@ def load_fanout():
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--project", required=True, type=Path,
-                        help="initialized project containing .colosseum/dispatch.json")
+                        help="initialized project containing .fv/dispatch.json")
     result.add_argument("--evidence-dir", required=True, type=Path,
                         help="existing calibration evidence directory")
     result.add_argument("--voice", dest="voices", action="append", default=[],
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         parser().error(f"project is not a directory: {project}")
     if not evidence_dir.is_dir():
         parser().error(f"evidence directory does not exist: {evidence_dir}")
-    dispatch = project / ".colosseum" / "dispatch.json"
+    dispatch = project / ".fv" / "dispatch.json"
     if not dispatch.is_file():
         parser().error(f"project lacks generated OMP dispatch config: {dispatch}")
     omp_args = list(args.omp_args)
@@ -169,8 +169,8 @@ def main(argv: list[str] | None = None) -> int:
 
     launch_command = [args.omp, "--cwd", str(project), "--config", str(overlay_path), *omp_args]
     environment = os.environ.copy()
-    environment["COLOSSEUM_OMP_FALLBACK_OVERLAY"] = str(overlay_path)
-    environment["COLOSSEUM_OMP_FALLBACK_PRECHECK"] = str(precheck_path)
+    environment["FV_OMP_FALLBACK_OVERLAY"] = str(overlay_path)
+    environment["FV_OMP_FALLBACK_PRECHECK"] = str(precheck_path)
     environment["PI_CONFIG_FILES"] = config_sources
     launch = {
         "version": 1,

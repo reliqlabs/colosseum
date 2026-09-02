@@ -4,7 +4,7 @@
 # dependencies = []
 # ///
 """
-R6 — manifest fail-closed control flow in colosseum_run.py (E4, contract G2).
+R6 — manifest fail-closed control flow in fv_run.py (E4, contract G2).
 
 Zero-voice manifests are invalid runs everywhere they could be read;
 duplicate voice ids are rejected at init and at load; an all-errored
@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RUN = REPO / "scripts" / "colosseum_run.py"
+RUN = REPO / "scripts" / "fv_run.py"
 FAILURES: list[str] = []
 
 
@@ -53,7 +53,7 @@ def main() -> int:
         check("init: empty --voices rejected",
               r.returncode != 0 and "zero-voice" in (r.stdout + r.stderr))
 
-        r = crun("init", str(target), "--voices=a,a", "--owners=a:opencode")
+        r = crun("init", str(target), "--voices=a,a", "--owners=a:omp")
         check("init: duplicate voice ids rejected",
               r.returncode != 0 and "duplicate" in (r.stdout + r.stderr))
 
@@ -74,7 +74,7 @@ def main() -> int:
         # Real run: two voices.
         run_dir = tmp / "run"
         r = crun("init", str(target), "--voices=v1,v2",
-                 "--owners=v1:opencode,v2:opencode", f"--run-dir={run_dir}")
+                 "--owners=v1:omp,v2:omp", f"--run-dir={run_dir}")
         check("init: two-voice run created", r.returncode == 0, r.stderr[-200:])
 
         # All-errored wait -> nonzero (zero evidence).

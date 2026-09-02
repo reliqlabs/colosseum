@@ -46,7 +46,7 @@ CONFIG (JSON; paths relative to the config file)
     {
       "spec": "specs/flow.qnt",
       "adapter": ["adapter/target/debug/r24-adapter"],
-      "adapter_env": {"COLOSSEUM_R24_BUG": "1"},   // optional
+      "adapter_env": {"FV_R24_BUG": "1"},   // optional
       "n_traces": 5, "max_steps": 15, "max_samples": 200, "seed": "0x1",
       "claim_id": "CONF1",              // required for --record
       "intent": "intent.md",            // required for --record
@@ -243,9 +243,6 @@ def main() -> int:
                 if first_divergence is None:
                     first_divergence = entry
 
-        raw_hash = sha256_bytes(
-            b"".join(t.read_bytes() for t in traces)
-            + "\n".join(transcript).encode())
 
     result = "FAIL" if first_divergence else "PASS"
     report = {
@@ -265,6 +262,14 @@ def main() -> int:
                   + (f" step {e['step']}: {e['detail']}" if mark != "ok" else ""))
 
     if args.record:
+        raw_dir = base / ".fv" / "evidence" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        raw_path = raw_dir / f"{cfg['claim_id']}-itf-replay.log"
+        raw_text = json.dumps(report, indent=2) + "\n"
+        if result == "PASS":
+            raw_text += "CONFORMANCE_TESTED: PASS\n"
+        raw_text += f"--- fv-evidence: exit={0 if result == 'PASS' else 1} ---\n"
+        raw_path.write_text(raw_text)
         quint_ver = subprocess.run(["quint", "--version"], capture_output=True,
                                    text=True).stdout.strip()
         git = subprocess.run(["git", "-C", str(base), "rev-parse", "HEAD"],
@@ -298,7 +303,8 @@ def main() -> int:
                 "configuration": {"n_traces": n_traces, "max_steps": max_steps,
                                   "max_samples": max_samples},
                 "seeds": seed,
-                "raw_output_hash": raw_hash,
+                "raw_output_hash": sha256_bytes(raw_path.read_bytes()),
+                "raw_output_path": str(raw_path.relative_to(base)),
                 "parser_schema_version": "itf-replay-v1",
                 "run_id": f"{cfg['claim_id']}-conformance-"
                           f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H%M%SZ')}",

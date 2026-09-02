@@ -1,9 +1,9 @@
 <!--
-  Colosseum system-intent template (M5).
+  FV system-intent template (M5).
 
   A system-intent joins several component intents at explicit assume/guarantee
-  boundaries. Author it with the colosseum-boundary skill. Each component still
-  gets its own intent document (colosseum-intent / colosseum-reverse-intent);
+  boundaries. Author it with the fv-boundary skill. Each component still
+  gets its own intent document (fv-intent / fv-reverse-intent);
   this document names the components, states the cross-component A*/G* contracts,
   and records how the component verdicts compose into one system verdict under G2.
 
@@ -12,7 +12,7 @@
 
 # System Intent: <System Name>
 
-- **Ledger schema version:** colosseum-ledger/v1
+- **Ledger schema version:** fv-ledger/v2
 - **System version:** v0.1.0
 - **Status:** DRAFT | REVIEWED | COMMITTED
 - **Composition profile:** tested | bounded | proved
@@ -41,7 +41,7 @@ List removed IDs under **Retired**.
 - **Name:** <system name>
 - **Scope:** <what surface the system covers; what is explicitly outside it>
 - **One-sentence purpose:** <what the system does, as a whole>
-- **Entry skill:** <colosseum-reverse-intent (brownfield) | colosseum-intent (greenfield)>
+- **Entry skill:** <fv-reverse-intent (brownfield) | fv-intent (greenfield)>
 
 ## 2. Components
 

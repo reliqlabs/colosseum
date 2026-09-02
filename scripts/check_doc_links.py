@@ -102,8 +102,8 @@ def tracked_md(root: Path) -> list[Path]:
     out = subprocess.run(["git", "-C", str(root), "ls-files", "*.md"],
                          capture_output=True, text=True)
     files = [root / line for line in out.stdout.splitlines() if line.strip()]
-    return [f for f in files
-            if not any(ex in str(f.relative_to(root)) for ex in EXCLUDED_DIRS)]
+    return [f for f in files if f.is_file()
+            and not any(ex in str(f.relative_to(root)) for ex in EXCLUDED_DIRS)]
 
 
 def main() -> int:

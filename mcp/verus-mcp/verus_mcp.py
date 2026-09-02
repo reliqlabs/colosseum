@@ -8,7 +8,7 @@
 """
 verus-mcp: Wrap Verus (SMT-backed verification for Rust) as an MCP tool.
 
-Verus sits above Kani on the Colosseum verification pyramid: SMT-based,
+Verus sits above Kani on the FV verification pyramid: SMT-based,
 faster than full theorem proving but more expressive than bounded model
 checking. Annotations (`requires`, `ensures`, `invariant`, `spec`) are
 discharged by Z3.

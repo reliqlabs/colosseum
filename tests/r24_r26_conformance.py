@@ -8,7 +8,7 @@ R24 + R26 — conformance bridge and label surfaces (C2, contract G3).
 
 R24: seeded ITF traces replayed through the fixture Rust adapter. The
 faithful adapter passes with the label carrying trace scope; the seeded
-divergence (COLOSSEUM_R24_BUG=1 saturates dbl at 64, a bound the spec
+divergence (FV_R24_BUG=1 saturates dbl at 64, a bound the spec
 does not have) is caught at the exact step, nonzero exit; the --record
 output validates through Gate B (check_evidence_records.py) as a
 conformance-tested record whose scope survives aggregation.
@@ -84,7 +84,7 @@ def main() -> int:
         check("R24: pass label is conformance-tested with trace scope",
               "conformance-tested[traces=5, depth=15, seed=0x1] PASS" in out)
 
-        bug_cfg = {**cfg, "adapter_env": {"COLOSSEUM_R24_BUG": "1"}}
+        bug_cfg = {**cfg, "adapter_env": {"FV_R24_BUG": "1"}}
         bug_path = work / "replay-bug.json"
         bug_path.write_text(json.dumps(bug_cfg))
         r = run(["uv", "run", "--script", str(REPLAY), "--config", str(bug_path)])
@@ -107,7 +107,7 @@ def main() -> int:
               and record["bindings"]["parser_schema_version"] == "itf-replay-v1")
 
         g = run(["uv", "run", "--script", str(GATE_B), "--records", str(rec_path),
-                 "--require", "CONF1", "--json"])
+                 "--root", str(work), "--allow-unbound", "--require", "CONF1", "--json"])
         check("R24: record validates through Gate B (exit 0)", g.returncode == 0,
               g.stderr[-200:])
         gj = json.loads(g.stdout)

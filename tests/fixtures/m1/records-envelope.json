@@ -1,5 +1,5 @@
 {
-  "ledger_schema_version": "colosseum-ledger/v1",
+  "ledger_schema_version": "fv-ledger/v2",
   "records": [
     {
       "claim_id": "B1",
@@ -30,9 +30,10 @@
           "max_steps": 10
         },
         "seeds": null,
-        "raw_output_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
         "parser_schema_version": "quint-cli-0.32",
-        "run_id": "m1-fixture-run-b1"
+        "run_id": "m1-fixture-run-b1",
+        "raw_output_path": "tests/fixtures/r19/intent.md"
       },
       "waiver": null
     },
@@ -65,7 +66,7 @@
           "max_steps": 10
         },
         "seeds": null,
-        "raw_output_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
         "parser_schema_version": "quint-cli-0.32",
         "run_id": "m1-fixture-run-b2"
       },
@@ -76,7 +77,7 @@
       "required": true,
       "evidence_class": "test-witnessed",
       "result": "INCOMPLETE",
-      "scope": "witness reachability, trace length 4, seed 0x1 \u2014 run timed out",
+      "scope": "witness reachability, trace length 4, seed 0x1 — run timed out",
       "bindings": {
         "source_snapshot": "aaaaaaa1+worktree-clean",
         "intent_hash": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -100,7 +101,7 @@
           "max_samples": 200
         },
         "seeds": "0x1",
-        "raw_output_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
         "parser_schema_version": "quint-cli-0.32",
         "run_id": "m1-fixture-run-b3"
       },
@@ -129,14 +130,15 @@
         "toolchain_digests": {
           "gnark": "0.11.0"
         },
-        "command": "n/a \u2014 externally assumed",
+        "command": "n/a — externally assumed",
         "configuration": {
           "note": "no local re-derivation"
         },
         "seeds": null,
-        "raw_output_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
         "parser_schema_version": "n/a",
-        "run_id": "m1-fixture-run-w1"
+        "run_id": "m1-fixture-run-w1",
+        "raw_output_path": "tests/fixtures/r19/intent.md"
       },
       "waiver": {
         "by": "reviewer",
@@ -166,14 +168,15 @@
         "toolchain_digests": {
           "note": "no toolchain, asserted"
         },
-        "command": "n/a \u2014 unverified",
+        "command": "n/a — unverified",
         "configuration": {
           "note": "no local re-derivation"
         },
         "seeds": null,
-        "raw_output_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
         "parser_schema_version": "n/a",
-        "run_id": "m1-fixture-run-s1"
+        "run_id": "m1-fixture-run-s1",
+        "raw_output_path": "tests/fixtures/r19/intent.md"
       },
       "waiver": null
     }

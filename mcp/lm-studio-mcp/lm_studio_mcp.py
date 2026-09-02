@@ -12,11 +12,9 @@ OpenAI-compatible endpoint.
 
 Separate from `goedel-mcp` (which is specialized for Lean tactic proposal). This
 MCP is a convenience helper for ad-hoc local-model queries and parallel fan-out
-(quick sanity checks, one-off comparisons) — nothing more. It is NOT part of the
-adversarial dispatch path: adversarial review of local voices runs through
-OpenCode's `lmstudio/` provider so each voice gets an agentic ReAct loop with
-file access. External- and local-model dispatch for review goes through
-OpenCode, never a single-shot MCP completion.
+(quick sanity checks, one-off comparisons). It is diagnostic, not the
+adversarial dispatch path. Adversarial review of local voices uses OMP's
+`lm-studio/` provider and restricted static agents.
 
 Exposes:
   - list_loaded_models — what's available in the LM Studio session
@@ -27,7 +25,7 @@ Exposes:
 Run standalone:
     ./lm_studio_mcp.py
 
-Or register with Claude Code via .mcp.json (see README.md).
+The FV root `.mcp.json` registers this server for OMP.
 """
 
 from __future__ import annotations
@@ -208,10 +206,9 @@ async def fan_out_local(
     """Send the same prompt to multiple loaded local models in parallel.
 
     A convenience for ad-hoc parallel local queries (quick sanity checks,
-    one-off comparisons). NOT the adversarial dispatch path: adversarial
-    review of local voices runs through OpenCode's `lmstudio/` provider so
-    each voice gets an agentic ReAct loop with file access. Single-shot
-    completions like this one do no agentic work.
+    one-off comparisons). Adversarial review of local voices uses OMP's
+    `lm-studio/` provider and restricted static agents; this single-shot
+    completion is diagnostic only.
 
     Note: parallel local inference contends for the same GPU/CPU resources.
     On consumer hardware, two parallel calls to two large models will

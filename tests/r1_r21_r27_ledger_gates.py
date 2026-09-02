@@ -55,7 +55,7 @@ def line_hash(line: str) -> str:
 
 
 def gate_a(root: Path, ledger_text: str, *extra: str) -> tuple[int, str]:
-    ledger = root / ".colosseum" / "ledger.md"
+    ledger = root / ".fv" / "ledger.md"
     ledger.parent.mkdir(parents=True, exist_ok=True)
     ledger.write_text(ledger_text)
     proc = subprocess.run(
@@ -70,7 +70,8 @@ def gate_b(records, *extra: str) -> tuple[int, str]:
         path = Path(f.name)
     try:
         proc = subprocess.run(
-            ["uv", "run", "--script", str(GATE_B), "--records", str(path), *extra],
+            ["uv", "run", "--script", str(GATE_B), "--records", str(path),
+             "--allow-unbound", *extra],
             capture_output=True, text=True, timeout=120)
         return proc.returncode, proc.stdout + proc.stderr
     finally:
@@ -86,8 +87,10 @@ def main() -> int:
         root = Path(td) / "proj"
         shutil.copytree(FIXTURE / "proj", root)
         guard = root / "src" / "guard.rs"
-        enforce_line = guard.read_text().splitlines()[1]  # "    x != 0"
-        h = line_hash(enforce_line)
+        guard_lines = guard.read_text().splitlines()
+        h1 = line_hash(guard_lines[0])
+        h = line_hash(guard_lines[1])
+        h5 = line_hash(guard_lines[4])
 
         # ── R1: no vacuous pass ────────────────────────────────────────
         code, out = gate_a(root, "")
@@ -125,7 +128,7 @@ def main() -> int:
         moved.write_text(original)
 
         # ── attribute lines are valid targets ──────────────────────────
-        code, out = gate_a(root, f"- harness at `src/guard.rs:5`. {KANI_OK}\n"
+        code, out = gate_a(root, f"- harness at `src/guard.rs:5@sha256:{h5}`. {KANI_OK}\n"
                                  f"- {GOOD_AXIOM}\n")
         check("R21: #[...] attribute line accepted as citation target",
               code == 0, out[-300:])
@@ -142,8 +145,8 @@ def main() -> int:
 
         # ── per-link kani coverage ──────────────────────────────────────
         linked = (f"Depends on:\n"
-                  f"  - inv_b1 at `src/guard.rs:2` [proven]  code: src/guard.rs:2  {KANI_OK}\n"
-                  f"  - helper at `src/guard.rs:1` [proven]  code: src/guard.rs:1\n"
+                  f"  - inv_b1 at `src/guard.rs:2@sha256:{h}` [proven]  code: src/guard.rs:2@sha256:{h}  {KANI_OK}\n"
+                  f"  - helper at `src/guard.rs:1@sha256:{h1}` [proven]  code: src/guard.rs:1@sha256:{h1}\n"
                   f"\n- {GOOD_AXIOM}\n")
         code, out = gate_a(root, linked)
         check("R21: link without kani warns by default",
@@ -201,8 +204,8 @@ def main() -> int:
           code == 3 and "without a waiver" in out)
     assumed[0]["waiver"] = {"by": "reviewer", "rationale": "upstream gnark verifier accepted"}
     code, out = gate_b(assumed, "--require", "B1,W1")
-    check("Gate B: waived assumption passes with the claim named in scope",
-          code == 0 and "waived-or-assumed=B1" in out)
+    check("Gate B: waived assumption remains visibly qualified",
+          code == 0 and "VERIFIED[profile=bounded] (waived: B1)" in out)
 
     code, out = gate_b(valid, "--require", "")
     check("Gate B: empty required-claims list is an error, not a pass",

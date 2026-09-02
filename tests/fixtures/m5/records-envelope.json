@@ -1,5 +1,5 @@
 {
-  "ledger_schema_version": "colosseum-ledger/v1",
+  "ledger_schema_version": "fv-ledger/v2",
   "records": [
     {
       "claim_id": "B1",
@@ -25,9 +25,10 @@
           "max_steps": 8
         },
         "seeds": "0x1",
-        "raw_output_hash": "0000000000000000000000000000000000000000000000000000000000000003",
-        "parser_schema_version": "opencode-events-v1",
-        "run_id": "sys-v1-2026-07-12T000000Z"
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
+        "parser_schema_version": "fv-events-v2",
+        "run_id": "fv-v2-2026-07-12T000000Z",
+        "raw_output_path": "tests/fixtures/r19/intent.md"
       },
       "waiver": null
     },
@@ -55,9 +56,10 @@
           "features": "default"
         },
         "seeds": null,
-        "raw_output_hash": "0000000000000000000000000000000000000000000000000000000000000004",
-        "parser_schema_version": "opencode-events-v1",
-        "run_id": "sys-v1-2026-07-12T000000Z"
+        "raw_output_hash": "92b4a5abca06785c082fc411bf56e2cb67b4ac4bf37c7b6852b72fa2f7fad339",
+        "parser_schema_version": "fv-events-v2",
+        "run_id": "fv-v2-2026-07-12T000000Z",
+        "raw_output_path": "tests/fixtures/r19/intent.md"
       },
       "waiver": null
     }

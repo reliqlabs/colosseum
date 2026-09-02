@@ -8,7 +8,7 @@ obligation_check — frozen obligation manifest checker (E3, contracts G1-G3).
 
 The obligation manifest is orchestrator-owned: it derives obligations from
 immutable intent IDs, and generators cannot write it (their permission
-profile denies `**/.colosseum/obligations*`). Generators PROPOSE spec
+profile denies `**/.fv/obligations*`). Generators PROPOSE spec
 files; this checker is the only thing that ACCEPTS them, by re-running
 every obligation mechanically:
 
@@ -28,7 +28,7 @@ every obligation mechanically:
                probe search; if the probe survives `quint verify` the
                transition is disabled within the bound
 
-MANIFEST SCHEMA (.colosseum/obligations.json), orchestrator-owned:
+MANIFEST SCHEMA (.fv/obligations.json), orchestrator-owned:
     {
       "version": 1,
       "intent_path": "intent.md",          # relative to manifest dir

@@ -11,8 +11,8 @@ gate (`check_evidence_records.py`, Gate B), which validates claim-ID-keyed
 G1 records. A ledger can pass this gate and still describe an unverified
 system; passing here means only that nothing it points at has drifted.
 
-Reference implementation for Step 8 of skills/colosseum-compose/SKILL.md.
-Copy to <project>/.colosseum/scripts/ and invoke from CI on every revision.
+Reference implementation for Step 8 of skills/fv-compose/SKILL.md.
+Copy to <project>/.fv/scripts/ and invoke from CI on every revision.
 
 Checks:
 
@@ -24,13 +24,10 @@ Checks:
    comment-only line (Rust `#[...]` attribute lines are valid targets).
    A citation pointing at `// TODO` is the same shape of drift as a
    missing citation.
-3. Content-hash binding — a citation may bind the cited line's content
-   with an `@sha256:<12hex>` suffix (first 12 hex chars of the SHA-256 of
-   the line with trailing whitespace stripped). When present, a changed
-   line — moved symbol, inserted lines above, enforcement stubbed out —
-   fails the gate instead of silently pointing at the wrong code. Use
-   --suggest-hashes to print the binding suffix for every unhashed
-   citation.
+3. Content-hash binding — every citation MUST carry an `@sha256:<12hex>`
+   suffix over the cited line with trailing whitespace stripped. Missing or
+   mismatched hashes fail the gate. Use `--suggest-hashes` to print the
+   required suffix for each unhashed citation.
 4. No vacuous pass — an empty ledger, or one containing zero citations,
    FAILS. A gate with nothing to check has checked nothing.
 5. Kani coverage — every trust-chain link (a `Depends on:` entry line)
@@ -48,7 +45,7 @@ USAGE
         [--strict-kani] [--suggest-hashes]
 
     --root defaults to the ledger's grandparent directory (i.e. the
-    project root when the ledger lives at <project>/.colosseum/ledger.md).
+    project root when the ledger lives at <project>/.fv/ledger.md).
 
 EXIT CODES
     0 — all checks passed
@@ -197,8 +194,12 @@ def main() -> int:
                         f"(bound @sha256:{bound_hash}, line now hashes @sha256:{actual}): the cited "
                         f"line changed — moved symbol, inserted lines, or stubbed enforcement"
                     )
-            elif args.suggest_hashes:
-                suggestions.append(f"{rel}:{cited_line}@sha256:{line_hash(cited)}")
+            else:
+                failures.append(
+                    f"ledger:{lineno}: citation `{rel}:{cited_line}` — missing required content hash"
+                )
+                if args.suggest_hashes:
+                    suggestions.append(f"{rel}:{cited_line}@sha256:{line_hash(cited)}")
 
         for um in UNPARSED_CODE_RE.finditer(text):
             overlaps = any(s <= um.start() < e or s < um.end() <= e

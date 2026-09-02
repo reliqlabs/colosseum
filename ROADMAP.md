@@ -19,22 +19,13 @@ committed on `main`, one commit per item:
 | P2 instruments | M1 coverage dashboard, M2 self-measurement, M3 recall scorer + pre-registered benchmark protocol, M5 boundary skill / system-intent / ledger versioning | done |
 | M3 live calibration | `calibration/2026-07-13-r1`: blinded seeded-defect run, six scoreable voices | done |
 | OMP-native integration | ModelRegistry-backed adversary fan-out, generated routes, fail-closed session-root gate, live-tree preflight, process-local fallback suppression, failure-isolated evidence, initializer/doctor support (R29/R30/R33) | implemented on `feature/omp-integration`; the canonical 4-voice run is recorded at `calibration/2026-07-28-r3/`. Native calibration remains pending at the route level: one voice is attested and cited; two are unattested and one degraded. |
-| OMP-native deliberation panel | Three-wave `colosseum-panel` skill (drafts → blinded cross-review → synthesis): family/coverage quorum, randomized-label blinding + deferred identity, brief + git target-drift gating (binary-safe, full-digest, `.colosseum`-excluded), harness-aware doctor, `project-plan` + `milestone-review` modes (R31, ~50 assertions incl. a real Gate B end-to-end; R32 resolver dispatch-identity contract executed under Bun) | committed on `feature/omp-integration`; **`project-plan` live-verified** project-rooted (`calibration/2026-07-23-omp-panel-e2e/`, 3-family COMPLETE) but uncalibrated; **`milestone-review` EXPERIMENTAL** — evidence-bound fail-closed guard + Gate B `--expect-intent`/`--snapshot-exact`/dup-rejection are correct and deterministically tested, but not yet run against a real project's itf_replay G1 records + live panel; roster-resolver extension live-verified in a real OMP session (`calibration/2026-07-24-resolver-live/`: `ctx.models.family` distinctness positive + negative, canonical `provider/id` dispatch identity, both active seats serving real inference at `:max`); active roster is Sol+GLM (min_families=2) with Fable/Kimi-k3 pending; full three-wave run on that roster and calibration pending |
+| OMP-native deliberation panel | Three-wave `fv-panel` skill (drafts → blinded cross-review → synthesis): family/coverage quorum, randomized-label blinding + deferred identity, brief + git target-drift gating (binary-safe, full-digest, `.fv`-excluded), harness-aware doctor, `project-plan` + `milestone-review` modes (R31, ~50 assertions incl. a real Gate B end-to-end; R32 resolver dispatch-identity contract executed under Bun) | committed on `feature/omp-integration`; **`project-plan` live-verified** project-rooted (`calibration/2026-07-23-omp-panel-e2e/`, 3-family COMPLETE) but uncalibrated; **`milestone-review` EXPERIMENTAL** — evidence-bound fail-closed guard + Gate B `--expect-intent`/`--snapshot-exact`/dup-rejection are correct and deterministically tested, but not yet run against a real project's itf_replay G1 records + live panel; roster-resolver extension live-verified in a real OMP session (`calibration/2026-07-24-resolver-live/`: `ctx.models.family` distinctness positive + negative, canonical `provider/id` dispatch identity, both active seats serving real inference at `:max`); active roster is Sol+GLM (min_families=2) with Fable/Kimi-k3 pending; full three-wave run on that roster and calibration pending |
 
-Gate: `./scripts/ci.py` — frontmatter, agent-lint, roster-drift, doc-links,
-dispatch-config, fixture-tracking, and the full regression suite
-(`tests/run_all.py`, 30 suites). Green locally as of this writing (7/7 checks,
-30/30 suites). The `opencode` pin was bumped 1.18.4 -> 1.18.5 on 2026-07-28
-after the installed binary drifted ahead of it. The bump was validated, not
-rubber-stamped: every `opencode run` flag contract the BOM encodes
-(`--agent`, `--model`, `--format`, `--variant`) passes under 1.18.5, and the
-canonical dispatch path was smoke-tested end-to-end in a scaffolded project
-(`--format json --variant max --agent spec-adversary --model
-openai/gpt-5.6-sol`), verified by parsing the event stream to an assistant
-`PONG` and a `step_finish` with `reason: stop` rather than by exit code. The
-GitHub Actions mirror (`colosseum-ci` on `main`) is green since 2026-07-14;
-on its toolchain-less runner the toolchain-dependent suites degrade to a
-tolerated INCOMPLETE rather than failing (see the CI section below).
+Gate: `./scripts/ci.py` validates frontmatter, agent policy, roster drift,
+documentation links, dispatch configuration, fixture tracking, and the full
+regression suite. OMP-native dispatch uses structured `agent()` calls and
+extension custom tools; retired subprocess-runner behavior remains only in
+historical calibration artifacts.
 
 The default adversarial panel is pinned as
 `canonical-4@sha256:0f73580ef4e3fdf2`: `claude-agent` (Fable 5, or the
@@ -43,21 +34,19 @@ strongest available Opus when Fable is absent), `gpt-5.6-sol`, `glm-5.2`, and
 `registry/voices.json` is the source of truth; roster docs are generated from it
 by `scripts/gen_roster_docs.py`.
 
-OMP has a native multi-voice transport through its `eval` `agent()` bridge. The
+OMP has a native multi-voice transport through its eval `agent()` bridge. The
 exact ModelRegistry routes and their content hash are generated into
-`.colosseum/dispatch.json`; `omp_fanout.py` preflights the live tree, binds the
-target hash, runs bounded per-model adversary agents, and preserves partial
-evidence. Native dispatch is fail-closed on the session root: it refuses unless
-the caller opts in AND the OMP session cwd (from the documented `PI_SESSION_FILE`
-header) equals `project_root`, and it stamps `isolation:"unverified"` because the
-subagent filesystem is not confined.
+`.fv/dispatch.json`; the `fv-adversarial` skill preflights the
+live tree, binds the target hash, runs bounded adversary agents, and preserves
+partial evidence. Native dispatch validates the OMP session root and records
+filesystem isolation as unverified because subagent filesystems are not confined.
 
 The four-voice native run at `calibration/2026-07-28-r3/` produced usable
 outputs, but it did not validate the whole native route. Its registry grades are
 machine-readable: `kimi-k3` is `attested` and carries its native citation;
 `claude-agent` and `gpt-5.6-sol` are `unattested`; `glm-5.2` is `degraded`.
 The generated profile therefore remains `calibration: "pending"`. Native
-calibration never inherits the reference OpenCode or Claude Code claim.
+calibration never inherits the reference OMP or Claude Code claim.
 
 Future calibration runs must use `scripts/omp_calibration_session.py`. It
 appends a process-local `retry.fallbackChains` suppression overlay to any caller
@@ -136,12 +125,12 @@ content-hash; prior panels stay pinnable.
 
 The gate for "validated" returning to the README. Needs:
 
-1. DONE 2026-07-14: `main` is pushed to github.com:reliqlabs/colosseum and
+1. DONE 2026-07-14: `main` is pushed to the repository remote and
    CI is green there, so a replicator's fresh clone matches what local CI
    gates (two broken-clone bugs found and fixed on the way; see the CI
    section).
 2. An independent person/team who follows INSTALL.md + QUICKSTART.md on their
-   machine (`colosseum_doctor` validates their environment), runs the workflow
+   machine (`fv_doctor` validates their environment), runs the workflow
    on a target, and returns their evidence trail.
 3. Optional but recommended: they author the W2 corpus, closing the
    orchestrator-blindness gap.
@@ -191,40 +180,12 @@ should participate.
 - `deepseek-v4-flash`: requires the local ds4 endpoint (DwarfStar4 at
   `http://127.0.0.1:8000`) to be running; then calibrate on the W2 corpus.
 - `gemini-3.1-pro-preview`: requires `GOOGLE_GENERATIVE_AI_API_KEY` (or an
-  opencode Google credential); then calibrate on the W2 corpus.
-- `colosseum_doctor` OAuth false-warn: FIXED 2026-07-13 (checks all three
-  opencode credential paths, not just env vars).
-- Push `main`: DONE 2026-07-14 (github.com:reliqlabs/colosseum). The
+  omp Google credential); then calibrate on the W2 corpus.
+- `fv_doctor` OAuth false-warn: FIXED 2026-07-13 (checks all three
+  omp credential paths, not just env vars).
+- Push `main`: DONE 2026-07-14 (repository remote). The
   `scratchpad/` private review narrative is gitignored so a stray
   `git add -A` can never sweep it into a push.
-- Dispatch fail-open (2026-07-24): the rc=0 observation is RETRACTED, but a
-  separate structured-error acceptance/reporting gap remains open. A report that
-  `opencode run` exits 0 while printing an `Error: {...}` payload came from a
-  bad measurement, `opencode ... 2>&1 | tail; echo $?`, which reads the
-  pipeline's status (`tail`) rather than opencode's. Measured directly,
-  opencode exits 1 and writes the payload to stderr with stdout empty, so for
-  *that* case both runners reject it: `benchmark_run.py` `Dispatcher.run` and
-  `opencode_dispatch.py` `dispatch_one` each fail closed on
-  `returncode != 0`. The `plaintext-fallback` branch in `parse_event_stream`
-  is deliberate tolerance for CLI/format drift, and no rc=0-with-error-on-
-  stdout case has been observed.
-  Scope that to the observed case only: `dispatch_one` is not universally
-  fail-closed. Its guard is `returncode != 0 or (errors and not content)`, so
-  a run that exits 0 carrying structured `error` events *plus* assistant text
-  is accepted, and the success record (out_path / finish_reason / tokens /
-  parser_schema) omits `parsed["errors"]` entirely. Such a partially-errored
-  generation would be recorded as a clean success, auditable only in the
-  verbatim `.events.jsonl`. `_is_truncated_stub` catches the short/markerless
-  subset; a long partial response with an error event would pass. Unobserved
-  in practice, so recorded rather than speculatively patched: the fix is to
-  surface `parsed["errors"]` on the success record and decide explicitly
-  whether a nonempty set may accompany a PASS (agent).
-- Nothing is `brew pin`ned, and `opencode` comes from a third-party tap
-  (`anomalyco/homebrew-tap`), so the next `brew upgrade` can silently move it
-  ahead of the BOM again and recreate the 2026-07-24 mismatch. Recommended:
-  `brew pin opencode`, so adopting a new version stays a deliberate act
-  matching the BOM's own "pin here first" rule (user; global toolchain
-  change, so not applied automatically).
 
 ### jobq spec strengthening — DONE 2026-07-14 except F2 (commit 61e6588)
 
@@ -250,7 +211,7 @@ suite):
   submission-bound trust assumption, plus new evidence, not a vote.
 
 Also fixed in the same push (c363545): a latent broken-clone bug the
-strengthening surfaced. The global `.colosseum/` gitignore had hidden every
+strengthening surfaced. The global `.fv/` gitignore had hidden every
 fixture manifest (r22 obligations/ledger/floors, four r28 floors.json) from
 git, so local CI passed while fresh clones failed r22/r28. Negated the
 ignore for `tests/fixtures/`, tracked the seven manifests, and added a
@@ -260,17 +221,11 @@ again.
 
 ### GitHub Actions CI — green since 2026-07-14 (commits 4de698d, 82477ae)
 
-The `colosseum-ci` workflow had failed on every push since it was added on
+The `fv-ci` workflow had failed on every push since it was added on
 2026-07-12: four suites hard-failed on the toolchain-less runner instead of
 degrading to the INCOMPLETE the workflow was designed to tolerate. Local
 `ci.py` never saw it because this machine has the tools. Fixes:
 
-- `opencode_dispatch.py`: the opencode-binary check lived inside the
-  preflight scan, so `--preflight-only` runs (which never dispatch) and the
-  `--voices`/`--slices` validation paths wrongly required the binary. Split
-  into an `ensure_dispatch_ready()` gate that runs only once a real
-  dispatch is committed. R3 (real dispatch, binary absent -> INCOMPLETE) is
-  preserved; the preflight scan is file-safety only.
 - `m3b`: stub invoked via `sys.executable` instead of a bare `python3` that
   `uv run` on a bare runner may not expose; a missing summary degrades to
   SKIP instead of a traceback.
@@ -285,7 +240,7 @@ check was replaced by `scripts/check_fixture_tracking.py` (self-tested),
 which also flags ignore-HIDDEN fixtures — the blind spot both clone bugs
 shared, since `git ls-files --others --exclude-standard` never lists
 ignored files. Real build/run artifacts (a `target/` next to a Cargo.toml,
-`.colosseum/verify/`) stay tolerated. Verified off a fresh clone and on
+`.fv/verify/`) stay tolerated. Verified off a fresh clone and on
 the live runner; both workflow jobs green.
 
 ## Suggested sequence

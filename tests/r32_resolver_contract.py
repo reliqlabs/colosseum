@@ -27,65 +27,30 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RESOLVER = REPO / "templates" / "omp-panel-resolver.ts"
+RESOLVER = REPO / "tools" / "panel-resolver.ts"
 FAILURES: list[str] = []
 
 HARNESS_TS = r"""
 const [, , resolverPath, projectRoot, profile] = process.argv;
 const mod = await import(resolverPath);
-
 const stub: any = {};
-for (const k of ["min", "max", "optional", "describe", "default", "nullable", "array"]) {
-	stub[k] = () => stub;
-}
-stub.parse = (x: any) => x;
-const z: any = new Proxy(stub, { get: (t, p) => (p in t ? t[p] : () => stub) });
-
+for (const key of ["min", "max", "optional", "describe", "default", "nullable", "array"]) stub[key] = () => stub;
+stub.parse = (value: any) => value;
+const zod: any = new Proxy(stub, { get: (target, key) => key in target ? target[key] : () => stub });
 const MODELS = [
-	{ id: "m1", provider: "pa" },
-	{ id: "m1", provider: "pb" },
-	{ id: "m2", provider: "pb" },
-	{ id: "m3", provider: "pa" },
+  { id: "m1", provider: "pa", identity: { class: "pa", family: "one" } },
+  { id: "m1", provider: "pb", identity: { class: "pb", family: "two" } },
+  { id: "m2", provider: "pb", identity: { class: "pb", family: "two" } },
+  { id: "m3", provider: "pa", identity: { class: "pa", family: "one" } },
 ];
-// Resolvable but NOT in list(): a bare-id availability set would accept it
-// because an unrelated provider ("pa") also serves id "m3".
-const HIDDEN = { id: "m3", provider: "pz" };
-
-let tool: any = null;
-const pi: any = {
-	zod: { z },
-	setLabel() {},
-	registerTool(t: any) {
-		tool = t;
-	},
-	on() {},
-};
-mod.default(pi);
-if (!tool) {
-	console.log(JSON.stringify({ ok: false, error: "registerTool was never called" }));
-	process.exit(0);
-}
-
-const ctx: any = {
-	cwd: projectRoot,
-	models: {
-		list: () => MODELS,
-		resolve: (spec: string) => {
-			if (spec === "pz/m3") return HIDDEN;
-			const qualified = MODELS.find((m) => `${m.provider}/${m.id}` === spec);
-			if (qualified) return qualified;
-			return MODELS.find((m) => m.id === spec);
-		},
-		// Family keyed by provider: distinct providers are distinct lineages.
-		family: (m: any) => `fam:${m.provider}`,
-	},
-};
-
+const api: any = { cwd: projectRoot, zod };
+const tool = await mod.default(api);
 try {
-	const res = await tool.execute("tc", { profile, project_root: projectRoot }, undefined, undefined, ctx);
-	console.log(JSON.stringify({ ok: true, roster: res.details, tool_name: tool.name }));
-} catch (err: any) {
-	console.log(JSON.stringify({ ok: false, error: String(err?.message ?? err) }));
+  const result = await tool.execute("tc", { profile, project_root: projectRoot }, undefined,
+    { modelRegistry: { getAvailable: () => MODELS } });
+  console.log(JSON.stringify({ ok: true, roster: result.details, tool_name: tool.name }));
+} catch (error: any) {
+  console.log(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
 }
 """
 
@@ -181,8 +146,8 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="r32-") as td:
         root = Path(td)
-        (root / ".colosseum").mkdir()
-        (root / ".colosseum" / "panel-profiles.json").write_text(
+        (root / ".fv").mkdir()
+        (root / ".fv" / "panel-profiles.json").write_text(
             json.dumps(PROFILES, indent=2) + "\n")
         harness = root / "harness.ts"
         harness.write_text(HARNESS_TS)
@@ -201,8 +166,8 @@ def main() -> int:
                 return {"ok": False, "error": f"unparseable: {line[-1][:300]}"}
 
         dup = run("dup")
-        check("resolver loads under Bun and registers colosseum_panel_resolve",
-              dup.get("ok") and dup.get("tool_name") == "colosseum_panel_resolve", dup)
+        check("resolver loads under Bun and registers fv_panel_resolve",
+              dup.get("ok") and dup.get("tool_name") == "fv_panel_resolve", dup)
         if dup.get("ok"):
             seats = dup["roster"]["seats"]
             # The regression: bare `model.id` would make both seats "m1".
@@ -215,12 +180,8 @@ def main() -> int:
                   dup["roster"]["synthesizer"])
             check("thinking_level is carried per seat, unmodified",
                   [s["thinking_level"] for s in seats] == ["max", "low"], seats)
-            check("family distinctness is reported as a runtime comparison",
-                  dup["roster"]["family_distinctness_checked"] is True
-                  and "ctx.models.family" in dup["roster"]["family_distinctness_source"],
-                  dup["roster"].get("family_distinctness_source"))
-            check("opaque family token is never persisted in the roster",
-                  "fam:" not in json.dumps(dup["roster"]), dup["roster"])
+            check("resolver persists model-registry family identities for engine verification",
+                  [s["resolved_family"] for s in seats] == ["pa", "pb"], seats)
 
         hidden = run("hidden")
         check("a resolvable model whose provider is absent is skipped "

@@ -7,8 +7,8 @@
 M5 — boundary skill + ledger versioning regression.
 
 Asserts:
-  1. the colosseum-boundary skill frontmatter passes validate_frontmatter;
-  2. check_ledger_version classifies v1 / bare / unknown / malformed with
+  1. the fv-boundary skill frontmatter passes validate_frontmatter;
+  2. check_ledger_version classifies v2 / bare / unknown / malformed with
      the mandated exit codes;
   3. a versioned envelope gates identically to the equivalent bare list
      through check_evidence_records (the load_records unwrap is verdict-
@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FM = ROOT / "scripts" / "validate_frontmatter.py"
 LV = ROOT / "scripts" / "check_ledger_version.py"
 GATE = ROOT / "scripts" / "check_evidence_records.py"
-SKILL = ROOT / "skills" / "colosseum-boundary" / "SKILL.md"
+SKILL = ROOT / "skills" / "fv-boundary" / "SKILL.md"
 TEMPLATE = ROOT / "templates" / "system-intent.template.md"
 FIX = ROOT / "tests" / "fixtures" / "m5"
 
@@ -73,15 +73,15 @@ def main() -> int:
     # 1. boundary skill frontmatter is valid (validator sweeps all skills).
     #    Run through the uv shebang so pyyaml is available.
     code, out, err = run_exec(FM, [])
-    check("validate_frontmatter green (incl. colosseum-boundary)",
+    check("validate_frontmatter green (incl. fv-boundary)",
           code == 0, f"exit={code}: {err.strip()[:200]}")
     check("boundary skill was seen by the validator",
-          "colosseum-boundary" not in err, err.strip()[:200])
+          "fv-boundary" not in err, err.strip()[:200])
 
     # 2. check_ledger_version exit-code contract.
     code, _, err = run(LV, ["--ledger", str(FIX / "records-envelope.json")])
-    check("v1 envelope -> exit 0", code == 0, f"exit={code}")
-    check("v1 envelope reports OK", verdict_of(err) == "OK", verdict_of(err))
+    check("v2 envelope -> exit 0", code == 0, f"exit={code}")
+    check("v2 envelope reports OK", verdict_of(err) == "OK", verdict_of(err))
 
     code, _, err = run(LV, ["--ledger", str(FIX / "records-bare.json")])
     check("bare list -> exit 0 (unversioned)", code == 0, f"exit={code}")
@@ -98,7 +98,7 @@ def main() -> int:
 
     # 3. versioned envelope gates identically to the bare list. Same records,
     #    same required set -> same verdict + exit through check_evidence_records.
-    req = ["--require", "B1,S1"]
+    req = ["--allow-unbound", "--require", "B1,S1"]
     c_env, _, e_env = run(GATE, ["--records", str(FIX / "records-envelope.json"), *req])
     c_bare, _, e_bare = run(GATE, ["--records", str(FIX / "records-bare.json"), *req])
     check("envelope verdict == bare verdict",

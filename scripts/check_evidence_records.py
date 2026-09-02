@@ -3,284 +3,377 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""
-check_evidence_records — the SEMANTIC evidence gate (Gate B of the
-two-gate ledger split, C1; contracts G1/G2).
-
-Gate A (`check_ledger_references.py`) checks that the ledger's references
-hook into live code. This gate checks the claims themselves: every claim
-the assurance profile requires is backed by a typed G1 record carrying
-the full binding set, and the run-level verdict follows the G2 truth
-table exactly. Prose never passes this gate; only records do.
-
-RECORD SCHEMA (JSON; one file with a list, or a directory of *.json)
-
-    {
-      "claim_id": "B1",              # stable intent clause ID (B/S/T)
-      "required": true,              # per the active assurance profile
-      "evidence_class": "bounded-checked",
-          # code-enforced | proof-discharged | bounded-checked |
-          # test-witnessed | conformance-tested | externally-assumed |
-          # unverified
-      "result": "PASS",              # PASS | FAIL | INCOMPLETE
-      "scope": "safety under bound 10, Apalache 0.56.1",
-      "bindings": {
-        "source_snapshot":        "<commit>+<dirty-tree content hash>",
-        "intent_hash":            "<sha256>",
-        "obligation_manifest_hash": "<sha256>",
-        "profile":                "bounded",
-        "required_targets":       ["B1", "B2", "W1"],
-        "environment_policy":     "z2-worktree",
-        "toolchain_digests":      {"quint": "0.32.0"},
-        "command":                "quint verify --invariant=... main.qnt",
-        "configuration":          {"max_steps": 10},
-        "seeds":                  "0x1",        # null allowed, key required
-        "raw_output_hash":        "<sha256>",
-        "parser_schema_version":  "opencode-events-v1",
-        "run_id":                 "intent-v1-2026-07-11T000000Z"
-      },
-      "waiver": null   # key REQUIRED; a waiver object or null, never absent
-    }
-
-A record missing ANY field above — including any bindings subfield and
-the waiver key — is rejected (R27). `evidence_class` and `result` are
-orthogonal: a `bounded-checked` record may FAIL, an `unverified` record
-may not PASS silently.
-
-VERDICT (G2 truth table; exit code)
-    FAILED       (1)  any required claim has a valid record with result FAIL
-    INCOMPLETE   (3)  any required claim is missing a record, or its record
-                      is invalid/stale/INCOMPLETE, or rests on
-                      externally-assumed/unverified evidence without a
-                      waiver, or the required-claims list is empty
-    VERIFIED[..] (0)  every required claim PASSes under a named profile;
-                      the scope string names the profile and every waived
-                      or externally-assumed claim — never bare VERIFIED
-    ERROR        (2)  unreadable records / usage errors
-
-USAGE
-    check_evidence_records.py --records <file.json|dir> \\
-        --require B1,B2,W1 [--expect-snapshot <prefix>] [--json]
-
-    --require names the claim IDs the active profile requires (or pass
-    --manifest <obligations.json> to derive them from an E3 obligation
-    manifest's invariant/witness IDs). --expect-snapshot rejects records
-    bound to a different source snapshot as stale.
-"""
+"""Gate B: validate hash-bound execution evidence and aggregate G2 verdicts."""
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
 EVIDENCE_CLASSES = {
-    "code-enforced", "proof-discharged", "bounded-checked", "test-witnessed",
-    "conformance-tested", "externally-assumed", "unverified",
+    "code-enforced",
+    "proof-discharged",
+    "bounded-checked",
+    "test-witnessed",
+    "conformance-tested",
+    "externally-assumed",
+    "unverified",
+}
+EVIDENCE_CLASS_PASS_MARKERS: dict[str, str] = {
+    "code-enforced": r"--- fv-evidence: exit=0 ---",
+    "proof-discharged": r"(?:VERIFICATION:- SUCCESSFUL|Build completed successfully|--- fv-evidence: exit=0 ---)",
+    "bounded-checked": r"(?:\[ok\]|VERIFICATION:- SUCCESSFUL|No violation found)",
+    "test-witnessed": r"(?:test result: ok\.|\[ok\]|\[violation\]|Invariant violated|violation found)",
+    "conformance-tested": r"(?:CONFORMANCE(?:_TESTED)?: PASS|test result: ok\.|--- fv-evidence: exit=0 ---)",
+    "externally-assumed": r"--- fv-evidence: exit=0 ---",
+    "unverified": r"--- fv-evidence: exit=0 ---",
+}
+OBLIGATION_EVIDENCE_COMPATIBILITY: dict[str, frozenset[str]] = {
+    "invariant": frozenset(
+        {
+            "code-enforced",
+            "proof-discharged",
+            "bounded-checked",
+            "conformance-tested",
+            "externally-assumed",
+            "unverified",
+        }
+    ),
+    "witness": frozenset(
+        {"test-witnessed", "conformance-tested", "externally-assumed", "unverified"}
+    ),
 }
 RESULTS = {"PASS", "FAIL", "INCOMPLETE"}
-TOP_FIELDS = ("claim_id", "required", "evidence_class", "result", "scope",
-              "bindings", "waiver")
+TOP_FIELDS = ("claim_id", "required", "evidence_class", "result", "scope", "bindings", "waiver")
 BINDING_FIELDS = (
-    "source_snapshot", "intent_hash", "obligation_manifest_hash", "profile",
-    "required_targets", "environment_policy", "toolchain_digests", "command",
-    "configuration", "seeds", "raw_output_hash", "parser_schema_version",
+    "source_snapshot",
+    "intent_hash",
+    "obligation_manifest_hash",
+    "profile",
+    "required_targets",
+    "environment_policy",
+    "toolchain_digests",
+    "command",
+    "configuration",
+    "seeds",
+    "raw_output_hash",
+    "parser_schema_version",
     "run_id",
 )
-# Keys whose value may be null (the key itself is still mandatory).
 NULLABLE = {"seeds", "waiver"}
 
 
-def validate_record(rec: dict, expect_snapshot: str | None,
-                    expect_intent: str | None = None,
-                    expect_manifest: str | None = None,
-                    snapshot_exact: bool = False) -> list[str]:
-    """Returns the list of defects; empty means the record is valid."""
-    defects = []
+def _inside(root: Path, candidate: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _raw_artifact_defects(record: dict, repo_root: Path) -> list[str]:
+    bindings = record["bindings"]
+    relative = bindings.get("raw_output_path")
+    if not isinstance(relative, str) or not relative.strip():
+        return ["unresolvable raw artifact: missing binding raw_output_path"]
+    raw_path = (repo_root / relative).resolve()
+    if Path(relative).is_absolute() or not _inside(repo_root.resolve(), raw_path):
+        return ["unresolvable raw artifact: path escapes repository root"]
+    if not raw_path.is_file():
+        return [f"unresolvable raw artifact: {relative}"]
+    raw = raw_path.read_bytes()
+    actual = hashlib.sha256(raw).hexdigest()
+    expected = bindings.get("raw_output_hash")
+    if expected != actual:
+        return [f"raw output hash mismatch: stored={expected!r} recomputed={actual}"]
+    text = raw.decode(errors="replace")
+    canonical = "--- fv-evidence: exit=0 ---"
+    trailers = [line for line in text.splitlines()
+                if re.fullmatch(r"--- fv-evidence: exit=\d+ ---", line)]
+    if trailers != [canonical] or not text.splitlines() or text.splitlines()[-1] != canonical:
+        return ["PASS artifact must end with one unique canonical exit=0 trailer"]
+    configuration = bindings.get("configuration")
+    override = configuration.get("pass_marker") if isinstance(configuration, dict) else None
+    if isinstance(override, str) and override:
+        missing = override not in text
+    else:
+        try:
+            missing = re.search(EVIDENCE_CLASS_PASS_MARKERS[record["evidence_class"]], text) is None
+        except re.error as error:
+            return [f"invalid evidence-class marker regex: {error}"]
+    return [f"PASS marker absent for evidence class {record['evidence_class']}"] if missing else []
+
+
+def validate_record(
+    record: dict,
+    expect_snapshot: str | None,
+    expect_intent: str | None = None,
+    expect_manifest: str | None = None,
+    snapshot_exact: bool = False,
+    repo_root: Path | None = None,
+    obligation_kind: str | None = None,
+) -> list[str]:
+    defects: list[str] = []
+    if not isinstance(record, dict):
+        return ["record is not an object"]
     for field in TOP_FIELDS:
-        if field not in rec:
+        if field not in record:
             defects.append(f"missing field {field!r}")
     if defects:
         return defects
-    if rec["evidence_class"] not in EVIDENCE_CLASSES:
-        defects.append(f"unknown evidence_class {rec['evidence_class']!r}")
-    if rec["result"] not in RESULTS:
-        defects.append(f"unknown result {rec['result']!r}")
-    if not isinstance(rec["scope"], str) or not rec["scope"].strip():
+    if not isinstance(record["claim_id"], str) or not record["claim_id"]:
+        defects.append("claim_id is empty")
+    if not isinstance(record["required"], bool):
+        defects.append("required is not boolean")
+    if record["evidence_class"] not in EVIDENCE_CLASSES:
+        defects.append(f"unknown evidence_class {record['evidence_class']!r}")
+    if record["result"] not in RESULTS:
+        defects.append(f"unknown result {record['result']!r}")
+    if not isinstance(record["scope"], str) or not record["scope"].strip():
         defects.append("scope is empty")
-    bindings = rec["bindings"]
+    bindings = record["bindings"]
     if not isinstance(bindings, dict):
         defects.append("bindings is not an object")
         return defects
     for field in BINDING_FIELDS:
         if field not in bindings:
             defects.append(f"missing binding field {field!r}")
-        elif bindings[field] in ("", [], {}) or \
-                (bindings[field] is None and field not in NULLABLE):
+        elif bindings[field] in ("", [], {}) or (bindings[field] is None and field not in NULLABLE):
             defects.append(f"empty binding field {field!r}")
+    if bindings.get("profile") == "producer-trusted-execution":
+        toolchain = bindings.get("toolchain_digests")
+        valid_toolchain = (
+            isinstance(toolchain, dict)
+            and isinstance(toolchain.get("executable"), str)
+            and bool(toolchain["executable"])
+            and isinstance(toolchain.get("sha256"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", toolchain["sha256"]) is not None
+            and isinstance(toolchain.get("version"), str)
+            and isinstance(toolchain.get("version_exit_code"), int)
+        )
+        if not valid_toolchain:
+            defects.append("producer evidence lacks resolved executable identity")
+    if defects:
+        return defects
     if expect_snapshot:
-        snap = bindings.get("source_snapshot")
-        matched = isinstance(snap, str) and (
-            snap == expect_snapshot if snapshot_exact else snap.startswith(expect_snapshot))
+        snapshot = bindings.get("source_snapshot")
+        matched = isinstance(snapshot, str) and (
+            snapshot == expect_snapshot if snapshot_exact else snapshot.startswith(expect_snapshot)
+        )
         if not matched:
-            how = "exactly " if snapshot_exact else ""
+            qualifier = "exactly " if snapshot_exact else ""
             defects.append(
-                f"stale record: bound to snapshot {snap!r}, expected {how}{expect_snapshot!r}")
+                f"stale record: bound to snapshot {snapshot!r}, expected {qualifier}{expect_snapshot!r}"
+            )
     if expect_intent and bindings.get("intent_hash") != expect_intent:
         defects.append(
-            f"stale record: bound to intent {bindings.get('intent_hash')!r}, "
-            f"expected {expect_intent!r}")
+            f"stale record: bound to intent {bindings.get('intent_hash')!r}, expected {expect_intent!r}"
+        )
     if expect_manifest and bindings.get("obligation_manifest_hash") != expect_manifest:
         defects.append(
-            f"stale record: bound to obligation manifest "
-            f"{bindings.get('obligation_manifest_hash')!r}, expected {expect_manifest!r}")
+            "stale record: bound to obligation manifest "
+            f"{bindings.get('obligation_manifest_hash')!r}, expected {expect_manifest!r}"
+        )
+    if obligation_kind is not None:
+        compatible = OBLIGATION_EVIDENCE_COMPATIBILITY.get(obligation_kind)
+        if compatible is None or record["evidence_class"] not in compatible:
+            defects.append(
+                f"incompatible evidence class {record['evidence_class']!r} for obligation kind {obligation_kind!r}"
+            )
+    if record["result"] == "PASS" and record["evidence_class"] in EVIDENCE_CLASSES and repo_root is not None:
+        defects.extend(_raw_artifact_defects(record, repo_root))
     return defects
 
 
 def unwrap(data: object) -> list[dict]:
-    """Flatten one JSON payload to a list of record objects. A bare list or
-    a bare single record is unversioned (v0). An object carrying a `records`
-    key is the M5 versioned ledger envelope
-    (`{"ledger_schema_version": ..., "records": [...]}`); unwrap it. The
-    version field itself is not validated here (that is
-    check_ledger_version.py's job); this reader only accepts either shape so
-    a versioned ledger and its equivalent bare list gate identically."""
     if isinstance(data, dict) and "records" in data:
         data = data["records"]
-    if isinstance(data, list):
-        return data
-    return [data]
+    return data if isinstance(data, list) else [data]
 
 
 def load_records(path: Path) -> list[dict]:
     if path.is_dir():
-        records = []
-        for p in sorted(path.glob("*.json")):
-            records.extend(unwrap(json.loads(p.read_text())))
+        records: list[dict] = []
+        for record_path in sorted(path.glob("*.json")):
+            records.extend(unwrap(json.loads(record_path.read_text())))
         return records
     return unwrap(json.loads(path.read_text()))
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--records", required=True, type=Path)
-    ap.add_argument("--require", default=None,
-                    help="comma-separated claim IDs the profile requires")
-    ap.add_argument("--manifest", type=Path, default=None,
-                    help="derive required claim IDs from an obligation manifest")
-    ap.add_argument("--expect-snapshot", default=None,
-                    help="reject records bound to a different source snapshot")
-    ap.add_argument("--expect-intent", default=None,
-                    help="reject records whose bindings.intent_hash differs (task/AC drift)")
-    ap.add_argument("--expect-manifest", default=None,
-                    help="reject records whose bindings.obligation_manifest_hash differs")
-    ap.add_argument("--snapshot-exact", action="store_true",
-                    help="require source_snapshot == --expect-snapshot exactly "
-                         "(milestone gate over a clean tree; rejects HEAD+dirty)")
-    ap.add_argument("--json", action="store_true")
-    args = ap.parse_args()
+def infer_repo_root(records_path: Path) -> Path:
+    resolved = records_path.resolve()
+    for parent in (resolved if resolved.is_dir() else resolved.parent, *resolved.parents):
+        if (parent / ".fv").is_dir():
+            return parent
+    return Path.cwd().resolve()
 
+
+def load_manifest(path: Path) -> tuple[list[str], dict[str, str]]:
+    manifest = json.loads(path.read_text())
+    required: list[str] = []
+    kinds: dict[str, str] = {}
+    for collection, kind in (("invariants", "invariant"), ("witnesses", "witness")):
+        for item in manifest.get(collection, []):
+            claim_id = item.get("id")
+            if isinstance(claim_id, str) and claim_id:
+                required.append(claim_id)
+                kinds[claim_id] = kind
+    return required, kinds
+
+def current_source_snapshot(repo_root: Path) -> str:
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True, text=True, check=False
+    )
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=repo_root, capture_output=True, text=True, check=False,
+    )
+    if revision.returncode != 0 or not revision.stdout.strip() or status.returncode != 0:
+        raise ValueError("cannot derive current Git source snapshot")
+    source_changes = [line for line in status.stdout.splitlines()
+                      if line[3:] != ".fv" and not line[3:].startswith(".fv/")]
+    if source_changes:
+        raise ValueError("current source tree is dirty; refusing freshness verification")
+    return revision.stdout.strip()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--records", required=True, type=Path)
+    parser.add_argument("--require", default=None)
+    parser.add_argument("--manifest", type=Path, default=None)
+    parser.add_argument("--root", type=Path, default=None)
+    parser.add_argument("--expect-snapshot", default=None)
+    parser.add_argument("--expect-intent", default=None)
+    parser.add_argument("--expect-manifest", default=None)
+    parser.add_argument("--snapshot-exact", action="store_true")
+    parser.add_argument("--allow-unbound", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
     try:
         records = load_records(args.records)
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"ERROR: cannot read records: {e}", file=sys.stderr)
-        print("\nVERDICT: ERROR", file=sys.stderr)
-        return 2
-
-    required: list[str] = []
-    if args.require:
-        required = [c.strip() for c in args.require.split(",") if c.strip()]
-    elif args.manifest:
-        try:
-            manifest = json.loads(args.manifest.read_text())
-        except (OSError, json.JSONDecodeError) as e:
-            print(f"ERROR: cannot read manifest: {e}", file=sys.stderr)
-            print("\nVERDICT: ERROR", file=sys.stderr)
+        manifest_required: list[str] = []
+        obligation_kinds: dict[str, str] = {}
+        if args.manifest:
+            manifest_required, obligation_kinds = load_manifest(args.manifest)
+            if args.expect_manifest is None:
+                args.expect_manifest = hashlib.sha256(args.manifest.read_bytes()).hexdigest()
+        if args.require is not None:
+            required = [claim.strip() for claim in args.require.split(",") if claim.strip()]
+            if not required:
+                print("ERROR: --require names no claims")
+                print("\nVERDICT: ERROR")
+                return 2
+        elif args.manifest:
+            required = manifest_required
+        else:
+            print("ERROR: pass --require or --manifest")
+            print("\nVERDICT: ERROR")
             return 2
-        required = [x["id"] for x in manifest.get("invariants", [])] + \
-                   [x["id"] for x in manifest.get("witnesses", [])]
-    else:
-        print("ERROR: pass --require or --manifest — a gate with no required "
-              "claims gates nothing", file=sys.stderr)
-        print("\nVERDICT: ERROR", file=sys.stderr)
+        unknown_required = sorted(set(required) - set(obligation_kinds)) if args.manifest else []
+        if unknown_required:
+            print(f"ERROR: required claims absent from manifest: {unknown_required}")
+            print("\nVERDICT: ERROR")
+            return 2
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"ERROR: cannot read evidence inputs: {error}")
+        print("\nVERDICT: ERROR")
         return 2
 
+    required = sorted(dict.fromkeys(required))
+    repo_root = args.root.resolve() if args.root else infer_repo_root(args.records)
+    if not args.allow_unbound:
+        try:
+            if args.expect_snapshot is None:
+                args.expect_snapshot = current_source_snapshot(repo_root)
+                args.snapshot_exact = True
+            if args.expect_intent is None:
+                args.expect_intent = hashlib.sha256(
+                    (repo_root / ".fv" / "intent.md").read_bytes()
+                ).hexdigest()
+        except (OSError, ValueError) as error:
+            print(f"ERROR: cannot bind evidence to current source and intent: {error}")
+            print("\nVERDICT: ERROR")
+            return 2
     by_claim: dict[str, dict] = {}
-    dup_claims: set[str] = set()
-    per_claim: list[dict] = []
-    for rec in records:
-        cid = rec.get("claim_id")
-        if isinstance(cid, str):
-            if cid in by_claim:
-                dup_claims.add(cid)  # duplicate must not let a later PASS mask a FAIL
-            by_claim[cid] = rec
+    duplicates: set[str] = set()
+    for record in records:
+        claim_id = record.get("claim_id") if isinstance(record, dict) else None
+        if isinstance(claim_id, str):
+            if claim_id in by_claim:
+                duplicates.add(claim_id)
+            by_claim[claim_id] = record
 
     failed: list[str] = []
     incomplete: list[str] = []
-    assumed_or_waived: list[str] = []
-
+    waived: list[str] = []
+    per_claim: list[dict] = []
     if not required:
-        incomplete.append("(required-claims list is empty — invalid run)")
-
-    for cid in required:
-        if cid in dup_claims:
-            incomplete.append(f"{cid}: duplicate records for claim_id (ambiguous)")
-            per_claim.append({"claim_id": cid, "status": "duplicate-record"})
+        incomplete.append("(required-claims list is empty - invalid run)")
+    for claim_id in required:
+        if claim_id in duplicates:
+            incomplete.append(f"{claim_id}: duplicate records for claim_id (ambiguous)")
+            per_claim.append({"claim_id": claim_id, "status": "duplicate-record"})
             continue
-        rec = by_claim.get(cid)
-        if rec is None:
-            incomplete.append(f"{cid}: no record")
-            per_claim.append({"claim_id": cid, "status": "missing-record"})
+        record = by_claim.get(claim_id)
+        if record is None:
+            incomplete.append(f"{claim_id}: no record")
+            per_claim.append({"claim_id": claim_id, "status": "missing-record"})
             continue
-        defects = validate_record(rec, args.expect_snapshot, args.expect_intent,
-                                  args.expect_manifest, args.snapshot_exact)
+        defects = validate_record(
+            record,
+            args.expect_snapshot,
+            args.expect_intent,
+            args.expect_manifest,
+            args.snapshot_exact,
+            repo_root,
+            obligation_kinds.get(claim_id),
+        )
         if defects:
-            incomplete.append(f"{cid}: invalid record ({'; '.join(defects)})")
-            per_claim.append({"claim_id": cid, "status": "invalid",
-                              "defects": defects})
+            incomplete.append(f"{claim_id}: invalid record ({'; '.join(defects)})")
+            per_claim.append({"claim_id": claim_id, "status": "invalid", "defects": defects})
             continue
-        klass, result = rec["evidence_class"], rec["result"]
+        evidence_class = record["evidence_class"]
+        result = record["result"]
         if result == "FAIL":
-            failed.append(f"{cid}: {klass} FAIL — {rec['scope']}")
-            per_claim.append({"claim_id": cid, "status": "FAIL",
-                              "evidence_class": klass})
-            continue
-        if result == "INCOMPLETE":
-            incomplete.append(f"{cid}: record result INCOMPLETE")
-            per_claim.append({"claim_id": cid, "status": "INCOMPLETE",
-                              "evidence_class": klass})
-            continue
-        # result == PASS
-        if klass in ("externally-assumed", "unverified"):
-            if rec["waiver"]:
-                assumed_or_waived.append(cid)
-                per_claim.append({"claim_id": cid, "status": "PASS-waived",
-                                  "evidence_class": klass})
-            else:
-                incomplete.append(
-                    f"{cid}: {klass} evidence cannot PASS without a waiver")
-                per_claim.append({"claim_id": cid, "status": "unwaived-assumption",
-                                  "evidence_class": klass})
-            continue
-        if rec["waiver"]:
-            assumed_or_waived.append(cid)
-        per_claim.append({"claim_id": cid, "status": "PASS",
-                          "evidence_class": klass, "scope": rec["scope"]})
+            failed.append(f"{claim_id}: {evidence_class} FAIL - {record['scope']}")
+            per_claim.append({"claim_id": claim_id, "status": "FAIL", "evidence_class": evidence_class})
+        elif result == "INCOMPLETE":
+            incomplete.append(f"{claim_id}: record result INCOMPLETE")
+            per_claim.append({"claim_id": claim_id, "status": "INCOMPLETE", "evidence_class": evidence_class})
+        elif evidence_class in ("externally-assumed", "unverified") and not record["waiver"]:
+            incomplete.append(f"{claim_id}: {evidence_class} evidence cannot PASS without a waiver")
+            per_claim.append({"claim_id": claim_id, "status": "unwaived-assumption", "evidence_class": evidence_class})
+        else:
+            if record["waiver"]:
+                waived.append(claim_id)
+            per_claim.append(
+                {
+                    "claim_id": claim_id,
+                    "status": "PASS-waived" if record["waiver"] else "PASS",
+                    "evidence_class": evidence_class,
+                    "scope": record["scope"],
+                }
+            )
 
     if failed:
         verdict, code = "FAILED", 1
     elif incomplete:
         verdict, code = "INCOMPLETE", 3
     else:
-        profiles = {by_claim[c]["bindings"]["profile"] for c in required}
-        scope = f"profile={'/'.join(sorted(profiles))}"
-        if assumed_or_waived:
-            scope += f"; waived-or-assumed={','.join(sorted(assumed_or_waived))}"
-        verdict, code = f"VERIFIED[{scope}]", 0
-
+        profiles = sorted({by_claim[claim]["bindings"]["profile"] for claim in required})
+        verdict = f"VERIFIED[profile={'/'.join(profiles)}]"
+        if waived:
+            verdict += f" (waived: {','.join(sorted(waived))})"
+        code = 0
     report = {
         "gate": "semantic-evidence",
         "records": str(args.records),
+        "repo_root": str(repo_root),
         "required_claims": required,
         "per_claim": per_claim,
         "failed": failed,
@@ -290,14 +383,14 @@ def main() -> int:
     if args.json:
         print(json.dumps(report, indent=2))
     else:
+        print("required claims: " + ",".join(required))
         for entry in per_claim:
-            print(f"  [{entry['status']:>18}] {entry['claim_id']} "
-                  f"({entry.get('evidence_class', '-')})")
-        for msg in failed + incomplete:
-            print(f"  ! {msg}")
+            print(f"  [{entry['status']:>18}] {entry['claim_id']} ({entry.get('evidence_class', '-')})")
+        for message in failed + incomplete:
+            print(f"  ! {message}")
     print(f"\nVERDICT: {verdict}", file=sys.stderr)
     return code
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

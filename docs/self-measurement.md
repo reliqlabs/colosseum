@@ -1,6 +1,6 @@
 # Self-measurement (M2)
 
-How Colosseum measures its own adversarial process. These are metrics the
+How FV measures its own adversarial process. These are metrics the
 system computes about itself from run artifacts. They are not evidence that
 the process helps: a system measuring itself cannot establish external
 benefit. External benefit is the job of the blinded benchmark (M3) and
@@ -19,11 +19,11 @@ or a zero for missing data.
   carries `severity`, `sources` (the voices or dimensions that raised it),
   and, for confirmed/refuted, a `verdict.confirmed` boolean set at
   adjudication.
-- **Run manifest** (`.colosseum/attacks/<run_id>/run.json`, written by
-  `colosseum_run.py`): carries `run_id`, `phase` (the round: `attack`,
+- **Run manifest** (`.fv/attacks/<run_id>/run.json`, written by
+  `fv_run.py`): carries `run_id`, `phase` (the round: `attack`,
   `critique`, ...), and the `voices` panel.
-- **Event data** (`opencode run --format json` capture): per-voice token
-  counts, when the dispatch preserved them.
+- **Event data** (OMP structured agent status and handle metadata): per-voice
+  token counts when the dispatch preserved them.
 
 ## Metric 1 — Adversarial yield
 

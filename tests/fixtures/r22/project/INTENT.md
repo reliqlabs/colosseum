@@ -6,7 +6,7 @@ added, K3 added; clause IDs stable, nothing renumbered). Status: reference
 project for the R22 end-to-end fixture. This
 document is the behavioral contract; the Quint spec (`specs/jobq.qnt`)
 encodes it, the implementation (`src/queue.rs`) must satisfy it, and the
-obligation manifest (`.colosseum/obligations.json`) freezes which clauses
+obligation manifest (`.fv/obligations.json`) freezes which clauses
 are required evidence targets.
 
 ## Purpose

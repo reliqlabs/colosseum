@@ -71,7 +71,7 @@ def main() -> int:
               verify.returncode != 0 and "counterexample" in out,
               f"exit={verify.returncode}")
 
-    body = (REPO / "agents" / "quint-spec-generator-body.md").read_text()
+    body = (REPO / "agents" / "fv-quint-spec-generator.md").read_text()
     check("generator: safety gate is quint verify, labeled bounded-checked",
           "quint verify --invariant=$SAFETY_INVARIANT" in body
           and "bounded-checked to depth 30" in body)
@@ -83,13 +83,8 @@ def main() -> int:
     check("generator: checks recorded per G3 (version, seeds, backend, depth)",
           "## Checks run" in body and "seeds/samples" in body)
 
-    for wrapper in ("agents/opencode/quint-spec-generator.md",
-                    "agents/colosseum-quint-spec-generator.md"):
-        wtext = (REPO / wrapper).read_text()
-        check(f"{wrapper}: rebuilt with verify gate",
-              "quint verify --invariant=$SAFETY_INVARIANT" in wtext)
 
-    life = (REPO / "skills" / "colosseum-lifecycle-adversary" / "SKILL.md").read_text()
+    life = (REPO / "skills" / "fv-lifecycle-adversary" / "SKILL.md").read_text()
     check("lifecycle: Quint example has no Some/None",
           "Some(" not in life and "= None" not in life)
     check("lifecycle: absence claims escalate to quint verify",
@@ -100,7 +95,7 @@ def main() -> int:
     check("lifecycle: bounded-checked records depth/backend/version",
           "bounded-checked (verify, depth=10, apalache" in life)
 
-    adv = (REPO / "skills" / "colosseum-adversarial" / "SKILL.md").read_text()
+    adv = (REPO / "skills" / "fv-adversarial" / "SKILL.md").read_text()
     check("adversarial Step 5: verify escalation before absence claims",
           "Certify absence" in adv and "quint verify --invariant <inv_name>" in adv)
     check("adversarial Step 5: temporal properties via --temporal",

@@ -54,7 +54,7 @@ def main() -> int:
     # --- ci.py knows its checks and validates --only ---
     ci = load(CI, "ci")
     names = {c[0] for c in ci.CHECKS}
-    for expected in ("frontmatter", "agent-lint", "roster-drift", "doc-links",
+    for expected in ("frontmatter", "roster-drift", "doc-links",
                      "dispatch-config", "fixture-tracking", "regression"):
         check(f"ci.py registers check '{expected}'", expected in names)
     check("ci.py: exactly one regression check maps INCOMPLETE",
@@ -65,6 +65,9 @@ def main() -> int:
     r = run(["uv", "run", "--script", str(CI), "--only", "dispatch-config"])
     check("ci.py: --only runs a single toolchain-free check green",
           r.returncode == 0 and "CI PASSED" in r.stdout, r.stdout[-200:])
+    help_run = run(["python3", str(CI), "--help"])
+    check("ci.py exposes tolerate-incomplete escape and no legacy strict flag",
+          "--tolerate-incomplete" in help_run.stdout and "--strict" not in help_run.stdout)
 
     # --- check_doc_links catches broken file link + broken anchor ---
     with tempfile.TemporaryDirectory(prefix="cilinks-") as td:
@@ -101,17 +104,18 @@ def main() -> int:
     dc = load(DISPATCH, "check_dispatch_config")
     example = json.loads((REPO / "scripts" / "dispatch.config.example.json").read_text())
     check("dispatch-config: example validates", dc.validate(example) == [])
-    missing = {k: v for k, v in example.items() if k != "voices"}
-    check("dispatch-config: missing 'voices' rejected",
-          any("voices" in e for e in dc.validate(missing)))
-    dup = json.loads(json.dumps(example))
-    dup["slices"] = dup["slices"] + [dict(dup["slices"][0])]
-    check("dispatch-config: duplicate slice name rejected",
-          any("duplicate slice name" in e for e in dc.validate(dup)))
+    missing = json.loads(json.dumps(example))
+    del missing["omp_native"]["target_spec"]
+    check("dispatch-config: missing target_spec rejected",
+          any("target_spec" in error for error in dc.validate(missing)))
+    duplicate = json.loads(json.dumps(example))
+    duplicate["omp_native"]["voices"].append(dict(duplicate["omp_native"]["voices"][0]))
+    check("dispatch-config: duplicate voice id rejected",
+          any("duplicate voice id" in error for error in dc.validate(duplicate)))
     badslug = json.loads(json.dumps(example))
-    badslug["voices"][0]["id"] = "../evil"
+    badslug["omp_native"]["voices"][0]["id"] = "../evil"
     check("dispatch-config: traversal-shaped voice id rejected",
-          any("not a valid slug" in e for e in dc.validate(badslug)))
+          any("not a valid slug" in error for error in dc.validate(badslug)))
 
     print()
     if FAILURES:

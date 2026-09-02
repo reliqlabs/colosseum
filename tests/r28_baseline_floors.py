@@ -7,7 +7,7 @@
 R28 — engineering baseline floors (C8).
 
 The `floors` layer is a required layer under every profile (tested, and
-therefore bounded/proved). It reads <crate>/.colosseum/floors.json (documented
+therefore bounded/proved). It reads <crate>/.fv/floors.json (documented
 defaults when absent) and runs three mechanical sub-checks: a cargo feature
 matrix (with --workspace on workspaces), a per-public-module property-test bar,
 and a per-surface fuzz-time floor. This suite drives the pure floor helpers
@@ -72,7 +72,7 @@ def run(crate: Path, profile: str, *extra: str) -> tuple[int, str]:
 
 def floors_status(crate: Path) -> tuple[str, dict]:
     """Read the layer status and sub-check statuses from the persisted report."""
-    reports = sorted((crate / ".colosseum" / "verify").glob("headless-*.json"))
+    reports = sorted((crate / ".fv" / "verify").glob("headless-*.json"))
     report = json.loads(reports[-1].read_text())
     floors = report["layers"].get("floors", {})
     subs = {k: v["status"]
@@ -89,19 +89,27 @@ def test_pure(mod) -> None:
           d["property_tests"]["min_per_module"] == 1
           and d["fuzz"]["min_seconds"] == 30
           and d["features"]["matrix"] == []
-          and d["schema"] == "colosseum-floors/v1", str(d))
+          and d["schema"] == "fv-floors/v2", str(d))
 
     # load_floors: present file layers over defaults, keeps default sub-keys.
     with tempfile.TemporaryDirectory(prefix="r28-lf-") as td:
         crate = Path(td)
-        (crate / ".colosseum").mkdir()
-        (crate / ".colosseum" / "floors.json").write_text(
+        (crate / ".fv").mkdir()
+        (crate / ".fv" / "floors.json").write_text(
             json.dumps({"property_tests": {"min_per_module": 3}}))
         d = mod.load_floors(crate)
         check("load_floors: file section overrides default, keeps sibling keys",
               d["property_tests"]["min_per_module"] == 3
               and d["property_tests"]["require_property_tests"] is False,
               str(d["property_tests"]))
+        (crate / ".fv" / "floors.json").write_text(
+            json.dumps({"schema": "fv-floors/v999"}))
+        rejected = False
+        try:
+            mod.load_floors(crate)
+        except ValueError:
+            rejected = True
+        check("load_floors: explicit non-v2 schema rejected", rejected)
 
     # is_workspace.
     with tempfile.TemporaryDirectory(prefix="r28-ws-") as td:
@@ -202,7 +210,7 @@ def test_runner() -> None:
         defaults = tmp / "defaults"
         shutil.copytree(MINICRATE, defaults)
         check("defaults: minicrate carries no floors.json",
-              not (defaults / ".colosseum" / "floors.json").exists())
+              not (defaults / ".fv" / "floors.json").exists())
         code, out = run(defaults, "tested")
         st, subs = floors_status(defaults)
         check("defaults: absent floors.json -> VERIFIED[tested], exit 0",

@@ -1,6 +1,6 @@
 # quint-mcp
 
-MCP server wrapping [Quint](https://github.com/informalsystems/quint) — Informal Systems' specification language for protocols and state machines — as a Claude-callable tool. Quint sits on the **spec axis** of the Colosseum pyramid: it captures protocol structure before any Rust is written, and exposes invariants and temporal properties that Apalache can model-check.
+MCP server wrapping [Quint](https://github.com/informalsystems/quint) — Informal Systems' specification language for protocols and state machines — as a Claude-callable tool. Quint sits on the **spec axis** of the FV pyramid: it captures protocol structure before any Rust is written, and exposes invariants and temporal properties that Apalache can model-check.
 
 ## Pipeline
 
@@ -87,7 +87,7 @@ If verify hangs the first time, run it manually once outside Claude Code to let 
 {
   "mcpServers": {
     "quint": {
-      "command": "/Users/you/path/to/colosseum/mcp/quint-mcp/quint_mcp.py"
+      "command": "/Users/you/path/to/fv/mcp/quint-mcp/quint_mcp.py"
     }
   }
 }
@@ -122,7 +122,7 @@ Expected: `ok: true` with a version string.
 
 ## Typical usage pattern
 
-In a Colosseum verification session, Quint usage comes **upstream of code**:
+In a FV verification session, Quint usage comes **upstream of code**:
 
 1. Claude calls `check_quint_health()`
 2. Claude reads the intent document; if the system has protocol/temporal properties, drafts a `.qnt` spec
@@ -130,7 +130,7 @@ In a Colosseum verification session, Quint usage comes **upstream of code**:
 4. Claude calls `typecheck_quint(spec_path)` — fail fast on syntax
 5. Claude calls `run_quint(spec_path, invariant=...)` — cheap reality check
 6. Claude calls `verify_quint(spec_path, invariants=[...])` — symbolic model check
-7. On `violation`: route to `colosseum-failure-classifier` with the counterexample file. Likely `spec_wrong`, `code_wrong` (if Rust exists yet), or `state_space_blowup` if Apalache exhausted.
+7. On `violation`: route to `fv-failure-classifier` with the counterexample file. Likely `spec_wrong`, `code_wrong` (if Rust exists yet), or `state_space_blowup` if Apalache exhausted.
 8. On `unknown`: typically `state_space_blowup` — simplify the spec, not the bound
 
 Quint's role in the pyramid: it catches protocol bugs at the architecture stage, before any Rust is written. Bugs found here cost a spec edit; the same bugs found at the Verus or Kani layer cost a code + spec edit; found in production, they cost an incident.

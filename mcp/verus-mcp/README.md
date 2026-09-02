@@ -1,6 +1,6 @@
 # verus-mcp
 
-MCP server wrapping [Verus](https://verus-lang.github.io/verus/) — SMT-backed verification for Rust — as a Claude-callable tool. Part of the Colosseum v1 verification-pyramid backbone.
+MCP server wrapping [Verus](https://verus-lang.github.io/verus/) — SMT-backed verification for Rust — as a Claude-callable tool. Part of the FV v1 verification-pyramid backbone.
 
 Verus sits above Kani on the pyramid: SMT-based (Z3), more expressive than bounded model checking, faster than full theorem proving. Annotations (`requires`, `ensures`, `invariant`, `spec`, `decreases`) are discharged automatically when they fit Z3's reach.
 
@@ -57,7 +57,7 @@ Add to `.mcp.json`:
 {
   "mcpServers": {
     "verus": {
-      "command": "/Users/you/path/to/colosseum/mcp/verus-mcp/verus_mcp.py"
+      "command": "/Users/you/path/to/fv/mcp/verus-mcp/verus_mcp.py"
     }
   }
 }
@@ -69,7 +69,7 @@ If `verus` is not on PATH, point at the absolute binary:
 {
   "mcpServers": {
     "verus": {
-      "command": "/Users/you/path/to/colosseum/mcp/verus-mcp/verus_mcp.py",
+      "command": "/Users/you/path/to/fv/mcp/verus-mcp/verus_mcp.py",
       "env": {
         "VERUS_BIN": "/abs/path/to/verus"
       }
@@ -95,11 +95,11 @@ Expected: `{ok: true, version_output: "verus 0.x.y", ...}`.
 
 ## Typical usage pattern
 
-In a Colosseum verification session against a Rust crate:
+In a FV verification session against a Rust crate:
 
 1. Claude calls `list_verus_annotations(crate_path)` to inventory the verification surface
 2. For each annotated entry point, Claude calls `verify_verus_file` or `verify_verus_crate`
-3. On `failed` verdicts, Claude inspects `summary.error_locations` and routes the failure to `colosseum-failure-classifier`
+3. On `failed` verdicts, Claude inspects `summary.error_locations` and routes the failure to `fv-failure-classifier`
 4. On `successful`, Claude advances to the next layer (Aeneas/Lean for properties Verus could not discharge) or commits
 
 Verus's role in the pyramid: SMT-tractable properties get answered in seconds-to-minutes with no manual proof construction. Properties that require induction, complex quantifier reasoning, or full theorem proving fall through to Aeneas/Lean.

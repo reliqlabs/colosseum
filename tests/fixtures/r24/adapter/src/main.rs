@@ -3,7 +3,7 @@
 //! scripts/itf_replay.py). std-only by design so replay adapters need no
 //! dependencies.
 //!
-//! Seeded divergence: with COLOSSEUM_R24_BUG=1 the dbl implementation
+//! Seeded divergence: with FV_R24_BUG=1 the dbl implementation
 //! saturates at 64, a bound the spec does not have. Replay must catch the
 //! first step where a doubling crosses it.
 
@@ -66,7 +66,7 @@ fn parse_bindings(rest: &str) -> Result<(i64, i64), String> {
 }
 
 fn main() {
-    let bug = std::env::var("COLOSSEUM_R24_BUG").as_deref() == Ok("1");
+    let bug = std::env::var("FV_R24_BUG").as_deref() == Ok("1");
     let stdin = io::stdin();
     let mut out = io::stdout();
     let mut machine: Option<Machine> = None;

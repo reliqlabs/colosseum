@@ -1,5 +1,5 @@
 {
-  "_comment": "Colosseum deliberation-panel rosters. Installed to <project>/.colosseum/panel-profiles.json by colosseum_init --harness omp. Each seat is a RANKED candidate list resolved to the first AVAILABLE model by the colosseum-panel-resolver extension, which checks availability + enforces distinct model families via OMP ctx.models.family. Panel execution REQUIRES that extension and fails closed if it is absent; the stdlib panel_roster loader is diagnostics/tests only. Roster (2026-07-27, operator-set): four families — gpt-5.6-sol (OpenAI), claude-fable-5 (Anthropic), GLM-5.2 (Zhipu), Kimi-K3 (Moonshot) — at min_families=4. GLM and Kimi prefer the `synthetic` provider and rank `fireworks` second. TWO LAYERS OF FAILOVER, do not confuse them. (1) This candidate list is resolved ONCE at roster freeze and only checks catalog availability, so it expresses provider preference, not quota awareness. (2) At dispatch, OMP's own retry layer performs automatic model failover per the `retry.fallbackChains` setting, which already pairs these routes (synthetic/hf:zai-org/GLM-5.2 -> fireworks/glm-5.2:high, synthetic/hf:moonshotai/Kimi-K3 -> fireworks/kimi-k3:high) with retry.modelFallback=true, retry.usageAwareFallback=true and retry.usageReservePolicy=auto. A synthetic quota or rate-limit error therefore does NOT simply fail the voice: OMP retries it on the fireworks pair. PROVENANCE GAP: the frozen roster records the model the resolver chose, so when OMP's retry layer serves a request from a fallback the persisted evidence still names the primary. OMP exposes `resolvedModelIsFallback`; the panel and fanout do not yet record it, so treat a seat's recorded model as the REQUESTED route, not proof of which provider answered. CAVEAT: modelFamilyToken does not recognize synthetic's `hf:vendor/Model` ids uniformly — `hf:moonshotai/Kimi-K3` yields `kimi`, but `hf:zai-org/GLM-5.2` yields no token and falls back to the provider name `synthetic`. The current four tokens are still pairwise distinct so the resolver accepts them, but the Zhipu seat's runtime diversity token is provider-derived, not lineage-derived: a second Zhipu model on another provider would NOT collide with it. Effort rule: step down one rung from `max`, or take the TOP rung when the ladder has no `max` to step down from. That yields xhigh for fable and sol (max at top), high for Kimi-K3 (max at top), and xhigh for synthetic's GLM-5.2, whose ladder ends at xhigh and so has no max to step down from. NOTE the seat level applies to the FIRST candidate: fireworks/glm-5.2 does have a max rung, so its own step-down is `high`, and the retry chain entry `fireworks/glm-5.2:high` carries that level when OMP fails over. A resolver-level fallback to fireworks (synthetic absent from the catalog entirely, not merely out of quota) would request xhigh, which that ladder lacks; OMP warns and uses its default. Recorded calibration evidence was collected at max, so these are the current operating point, not the calibrated one. declared_family is a stable persisted label; the opaque OMP family token is never persisted. OMP routes are uncalibrated (calibration: pending).",
+  "_comment": "FV OMP panel rosters. The package resolver checks availability and real model-family distinctness; each seat call has a wall-clock deadline.",
   "version": 1,
   "profiles": {
     "large-project": {
@@ -27,7 +27,7 @@
         {
           "seat_id": "zhipu",
           "declared_family": "Zhipu",
-          "thinking_level": "xhigh",
+          "thinking_level": "high",
           "calibration": "pending",
           "candidates": [
             "synthetic/hf:zai-org/GLM-5.2",
@@ -53,7 +53,8 @@
         "candidates": [
           "openai-codex/gpt-5.6-sol"
         ]
-      }
+      },
+      "seat_timeout_seconds": 1800
     },
     "milestone-review": {
       "mode": "milestone-review",
@@ -80,7 +81,7 @@
         {
           "seat_id": "zhipu",
           "declared_family": "Zhipu",
-          "thinking_level": "xhigh",
+          "thinking_level": "high",
           "calibration": "pending",
           "candidates": [
             "synthetic/hf:zai-org/GLM-5.2",
@@ -106,7 +107,9 @@
         "candidates": [
           "openai-codex/gpt-5.6-sol"
         ]
-      }
+      },
+      "seat_timeout_seconds": 1800
     }
-  }
+  },
+  "registry_profile": "canonical-4@sha256:0f73580ef4e3fdf2"
 }

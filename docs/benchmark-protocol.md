@@ -33,13 +33,13 @@ Ordered from cheapest to richest:
    loop (cross-critique, defense, re-cross-critique) under G4 adjudication.
 
 Arms 3 through 5 are the ones that cost real tokens; arm cost is recorded from
-`opencode run --format json` token data and reported as cost per confirmed
-defect (see `docs/self-measurement.md` for the cost definitions this shares).
+OMP structured agent status and handle metadata and reported as cost per
+confirmed defect (see `docs/self-measurement.md` for the shared definitions).
 
 ## Seeded-defect corpus
 
 Ground truth is a corpus of known planted defects
-(`colosseum-seeded-corpus/v1`). Each defect has a `detection_key` of
+(`fv-seeded-corpus/v2`). Each defect has a `detection_key` of
 `file:line:category`. A voice's finding counts as detecting a defect iff:
 
 - the finding's file basename equals the defect's file basename, and

@@ -1,4 +1,4 @@
-"""Shared subprocess helper for the CLI-backed Colosseum MCP servers.
+"""Shared subprocess helper for the CLI-backed FV MCP servers.
 
 The kani/verus/quint/aeneas wrappers all shell out to external tools that
 spawn their own children (CBMC, Apalache, cargo, charon). This module gives

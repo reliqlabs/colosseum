@@ -85,13 +85,17 @@ def project_snapshot(project: Path) -> str:
 def make_records(project: Path, quint_version: str, verify_out: str,
                  witness_out: str, witness2_out: str,
                  spec_rel: str) -> list[dict]:
-    """G1 records constructed from the runs this suite actually performed.
-    verify_out is the concatenated output of BOTH capacity instances (2 and
-    4); the command binding lists both invocations."""
     snapshot = project_snapshot(project)
     intent_hash = sha256_file(project / "INTENT.md")
-    manifest_hash = sha256_file(project / ".colosseum" / "obligations.json")
-    digests = {"quint": quint_version}
+    manifest_hash = sha256_file(project / ".fv" / "obligations.json")
+    raw_dir = project / ".fv" / "evidence" / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    outputs = {"verify": verify_out, "W1": witness_out, "W2": witness2_out}
+    raw_paths = {}
+    for name, output in outputs.items():
+        raw_path = raw_dir / f"r22-{name}.log"
+        raw_path.write_text(output.rstrip("\n") + "\n--- fv-evidence: exit=0 ---\n")
+        raw_paths[name] = raw_path
     common = {
         "source_snapshot": snapshot,
         "intent_hash": intent_hash,
@@ -99,7 +103,7 @@ def make_records(project: Path, quint_version: str, verify_out: str,
         "profile": "bounded",
         "required_targets": ["B1", "B2", "B3", "B4", "B5", "W1", "W2"],
         "environment_policy": "r22-fixture-local",
-        "toolchain_digests": digests,
+        "toolchain_digests": {"quint": quint_version},
         "parser_schema_version": f"quint-cli-{quint_version}",
     }
     verify_command = (" ".join(VERIFY_CMD + [spec_rel]) + "; "
@@ -117,14 +121,15 @@ def make_records(project: Path, quint_version: str, verify_out: str,
                 "command": verify_command,
                 "configuration": {"max_steps": 12, "capacities": [2, 4]},
                 "seeds": None,
-                "raw_output_hash": hashlib.sha256(verify_out.encode()).hexdigest(),
+                "raw_output_hash": sha256_file(raw_paths["verify"]),
+                "raw_output_path": str(raw_paths["verify"].relative_to(project)),
                 "run_id": f"r22-verify-{cid}",
             },
             "waiver": None,
         })
-    for cid, cmd, out, prop in (
-        ("W1", WITNESS_CMD, witness_out, "done>0"),
-        ("W2", WITNESS_W2_CMD, witness2_out, "failed>0"),
+    for cid, cmd, prop in (
+        ("W1", WITNESS_CMD, "done>0"),
+        ("W2", WITNESS_W2_CMD, "failed>0"),
     ):
         records.append({
             "claim_id": cid,
@@ -137,7 +142,8 @@ def make_records(project: Path, quint_version: str, verify_out: str,
                 "command": " ".join(cmd + [spec_rel]),
                 "configuration": {"max_steps": 8, "max_samples": 200},
                 "seeds": "0x1",
-                "raw_output_hash": hashlib.sha256(out.encode()).hexdigest(),
+                "raw_output_hash": sha256_file(raw_paths[cid]),
+                "raw_output_path": str(raw_paths[cid].relative_to(project)),
                 "run_id": f"r22-witness-{cid}",
             },
             "waiver": None,
@@ -149,7 +155,9 @@ def gate_b(records: list[dict], manifest: Path, tmp: Path, tag: str) -> subproce
     rec_dir = tmp / f"records-{tag}"
     rec_dir.mkdir()
     (rec_dir / "records.json").write_text(json.dumps(records, indent=2))
-    return run([str(GATE_B), "--records", str(rec_dir), "--manifest", str(manifest)])
+    project = manifest.parent.parent
+    return run([str(GATE_B), "--records", str(rec_dir), "--manifest", str(manifest),
+                "--root", str(project), "--allow-unbound"])
 
 
 def main() -> int:
@@ -162,8 +170,8 @@ def main() -> int:
         tmp = Path(td)
         good = copy_tree(tmp / "good")
         project = good / "project"
-        ledger = project / ".colosseum" / "ledger.md"
-        manifest = project / ".colosseum" / "obligations.json"
+        ledger = project / ".fv" / "ledger.md"
+        manifest = project / ".fv" / "obligations.json"
 
         # ── Part 1, cargo side: the known-good project passes ────────────
         p = run([str(PYRAMID), "--crate", str(project), "--profile", "tested"])
@@ -184,7 +192,7 @@ def main() -> int:
         qrs = drift / "project" / "src" / "queue.rs"
         qrs.write_text("// drift: inserted line shifts all citations below\n"
                        + qrs.read_text())
-        p = run([str(GATE_A), str(drift / "project" / ".colosseum" / "ledger.md")])
+        p = run([str(GATE_A), str(drift / "project" / ".fv" / "ledger.md")])
         check("drift: Gate A fails", p.returncode != 0)
         check("drift: names the content-hash mismatch",
               "content hash mismatch" in (p.stdout + p.stderr))
@@ -293,7 +301,7 @@ def main() -> int:
         check("weak: quint verify finds the violation", p.returncode != 0,
               out[-300:])
         p = run([str(GATE_A),
-                 str(weak / "project" / ".colosseum" / "ledger.md")])
+                 str(weak / "project" / ".fv" / "ledger.md")])
         check("weak: other gate (Gate A) still green (guard line not cited, "
               "no lines shifted)", p.returncode == 0)
 
@@ -314,7 +322,7 @@ def main() -> int:
         check("div: divergence named with trace and step",
               "divergence at" in out and "step" in out)
         p = run([str(GATE_A),
-                 str(div / "project" / ".colosseum" / "ledger.md")])
+                 str(div / "project" / ".fv" / "ledger.md")])
         check("div: other gate (Gate A) still green (same-position "
               "replacement, cited lines unchanged)", p.returncode == 0)
 

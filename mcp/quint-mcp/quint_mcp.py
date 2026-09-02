@@ -9,7 +9,7 @@
 quint-mcp: Wrap Quint (Informal Systems' protocol specification language) as
 an MCP tool.
 
-Quint sits on the spec-axis of the Colosseum pyramid: it captures protocol
+Quint sits on the spec-axis of the FV pyramid: it captures protocol
 and state-machine properties at the architecture stage, before Rust is
 written. This MCP wraps the four most useful Quint operations:
 

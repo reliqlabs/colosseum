@@ -1,47 +1,32 @@
 # Regression suite
 
-Executable fixtures from Part IV of the remediation plan of record, plus
-infra checks (r0) and P2 measurement suites (m1-m5) that are not Part IV
-fixtures. Each suite
-is a standalone `uv run --script` file: exit 0 pass, 1 fail, 2 when a required
-toolchain is absent. `./tests/run_all.py` runs everything and aggregates per
-G2 (any fail → FAILED exit 1; any suite that could not run → INCOMPLETE exit 3).
+`python3 tests/run_all.py` discovers every listed suite. Exit 0 passes, exit 2 is environment-incomplete, and the runner maps any incomplete suite to exit 3.
 
-| Suite | Fixture | Asserts | Item |
-|---|---|---|---|
-| `r0_registry_docs.py` | infra (not Part IV) | registry parses + calibration invariant (canonical-panel ⇒ non-pending calibration); profile content_hash recomputes; `gen_roster_docs --check` green (SKILLs/README/INSTALL/dispatch-config generated from registry); `colosseum_init` scaffolds + idempotence + `--force`; `colosseum_doctor --json` runs offline, BOM-consistent versions | C4 |
-| `r1_r21_r27_ledger_gates.py` | R1, R21, R27 | no vacuous ledger pass; content-hash binding catches moved/stubbed citations; axiom anchoring; per-link kani; G1 records with full binding set; G2 verdict mapping, scoped VERIFIED only | C1 |
-| `r2_r5_concurrency_containment.py` | R2, R5 | citation containment (`../`, absolute, symlink, space paths); 24-writer manifest stress x3, zero losses; freshness/emptiness/reset guards | E5 |
-| `r3_r4_r15_dispatch.py` | R3, R4, R15 | missing opencode → INCOMPLETE; unmatched/duplicate/traversal selections rejected; versioned event parser (truncated, malformed, error, plaintext variants) | E4 |
-| `r6_manifest_failclosed.py` | R6 | zero-voice manifests invalid; all-errored wait nonzero; synthesize refuses partial evidence without override; retry history retained | E4 |
-| `r7_lean_proof_gate.py` | R7 | lake build false-green demonstrated; sorry-admitted → exactly INCOMPLETE via axiom audit; no text-scan fallback | E2 |
-| `r8_quint_semantics.py` | R8 | rare-path defect missed by seeded `quint run`, found by `quint verify`; evidence classes labeled at all three doc sites | E1 |
-| `r9_r19_obligations.py` | R9, R19 | weakened required invariant → proposal diff (verify alone stays green); vacuous invariant, disabled transition, unreachable witness caught | E3 |
-| `r10_injection_handling.py` | R10 | injection payloads contained in UNTRUSTED-REPORT delimiters; marker spoofing neutralized; skill carries data-not-instructions rule | Z3 |
-| `r11_deny_first_profiles.py` | R11 | deny-first permission shape on both agent wrappers; secrets masked; phantom flag gone. Live probe invocable via `--live` (off by default): installs the agent into an ephemeral detached worktree and dispatches one real gateway-voice probe attempting bash/write/webfetch/read-.env/edit-manifest; asserts all denied (no probe.txt, manifest byte-unchanged, .env canary never surfaces, no dangerous tool completes). Provider-unreachable is SKIP-FAIL exit 2, never a pass | Z1 |
-| `r12_preflight_scan.py` | R12 | seeded secret + escaping symlink block dispatch; worktree sheds untracked secrets; in-place mode still blocks | Z2 |
-| `r13_frontmatter_validator.py` | R13 | validator green over all skills/agents/wrappers, plus known-bad self-tests | E6 |
-| `r14_cli_contracts.py` | R14 | opencode/quint flag contracts and BOM version pins; flag drift fails here, not in field runs | E6 |
-| `r16_r17_r18_mcp.py` | R16, R17, R18 | quint verdict parsers (Apalache-gated `unknown`, verdict/violation consistency); kani discovery of `cfg_attr`/`proof_for_contract` forms + verus library-crate command; shared `runproc` reaps the process group on timeout, retains partial output, and is used by all four CLI-backed servers; per-server smoke against fixtures | C5 |
-| `r20_verdict_truth_table.py` | R20 | G2 aggregation truth table, all rows; headless pyramid runner end-to-end on a fixture crate | E4 |
-| `r22_reference_project.py` | R22 | known-good `jobq` reference project passes every gate end-to-end: pyramid `VERIFIED[tested]`, Gate A hash-bound ledger, `quint verify` B1-B4 + seeded W1 witness, ITF conformance replay through the real library (`conformance-tested[...]`, REFINEMENT_VERIFIED nowhere), Gate B over G1 records generated live from those runs; known-bad mutations each fail at exactly their intended gate while another gate stays green (ledger drift, missing binding field, FAIL result, floors regression, spec weakening, conformance divergence) | C10/M3 |
-| `r23_adjudication_guard.py` | R23 | G4 closure rules present; vote counts never close; contested findings retained; blinded second checks | Z4 |
-| `r24_r26_conformance.py` | R24, R26 | seeded spec/code divergence caught by ITF-trace replay at the exact step; conformance-tested label carries trace scope through Gate B aggregation; REFINEMENT_VERIFIED emitted nowhere; script VERIFIEDs always scoped | C2 |
-| `r25_critique_loop.py` | R25 | critique loop (cross-critique/defense/re-cross-critique) under G4; blinded re-review framing; delta attack mode invocable; mandatory holistic pass; dual spec+intent citations; run-manifest phase field | C3 |
-| `r28_baseline_floors.py` | R28 | floors is a required layer under `tested`; below-floors crate (zero-test public module + missing fuzz surface) → FAILED; compliant → VERIFIED[tested]; feature-matrix combo that fails cargo check → FAILED; absent floors.json → defaults pass; explicitly unavailable fuzz run → fuzz-time floor unmeasurable → INCOMPLETE | C8 |
-| `r29_omp_integration.py` | R29 | generated OMP agents lint and validate; initializer installs all skills, agents, executable Gate A/B and dispatch scripts, additive MCP config, and registry-derived OMP-native routes; normal reruns preserve local changes while filling missing servers; `--force` restores Colosseum entries without deleting unrelated MCP servers; doctor accepts the canonical project and detects agent or route drift | OMP integration |
-| `r30_omp_native_dispatch.py` | R30 | OMP-native canonical route resolution and content hash; explicit voice order; unknown voice and route drift fail closed; live-tree preflight blocks secrets before model calls and binds a stable target hash; per-voice agent-model dispatch has failure-isolated PARTIAL/INCOMPLETE aggregation; verbatim prompts, raw reports, errors, handles, and metadata persist without overwrite | OMP-native dispatch |
-| `r31_omp_panel.py` | R31 | OMP-native deliberation panel: three barriered waves (drafts → blinded cross-review → synthesis); randomized anon labels + deferred identity keep reviewers blind; family + coverage quorum with failure-isolated PARTIAL/INCOMPLETE; schema output required (fail-closed); milestone verdict engine-adjudicated from Gate B evidence (validated at the frozen clean HEAD + canonical intent_hash, never model prose) with a real Gate B end-to-end; Gate B `--expect-intent`/`--snapshot-exact`/duplicate rejection; brief + git target-tree drift and dirty/PARTIAL runs block PASS; preflight / session-root / isolation refusals | OMP panel |
-| `r32_resolver_contract.py` | R32 | Panel-resolver extension dispatch-identity contract, run against the real `omp-panel-resolver.ts` under Bun with a faked `ExtensionAPI` + `ctx.models` (no model calls): `resolved_model` is OMP's canonical `provider/id` selector (what `omp_panel.py` dispatches), `resolved_provider` is the real `model.provider`, availability is keyed by `provider/id` so a resolvable model whose provider is absent is skipped rather than accepted on a bare-id collision, the opaque family token is never persisted, and family-collision / no-candidate cases fail closed. Bun absent -> INCOMPLETE | OMP panel |
-| `r_ci_selfcheck.py` | infra (not Part IV) | `ci.py` registers every named check and rejects unknown `--only`; `check_doc_links` catches broken file-links/anchors and ignores fenced code; `check_dispatch_config` rejects missing-field/duplicate/traversal configs | C10 |
-| `m1_coverage.py` | infra (P2 measurement) | coverage dashboard reduces G1 records to per-claim status (PASS/FAIL/INCOMPLETE/missing-record/invalid/unwaived-assumption); counts and per-evidence_class breakdown correct; missing required claims surface as gaps; run verdict matches G2 truth table (mixed set → FAILED, all-PASS subset → scoped VERIFIED[...]); `--check` self-conformance catches bare VERIFIED against the token-discipline regex directly; versioned envelope input equals bare-list result | M1 |
-| `m2_yield.py` | infra (P2 measurement) | per-voice adversarial yield by severity + confirmed/refuted at adjudication; cost per confirmed finding from `--format json` token data, reported unmeasured (not zero) when tokens absent; cheapest-capable-layer routing metric computed only over a layer-labeled corpus, INCOMPLETE (exit 3) when asked to route from an unlabeled findings dump | M2 |
-| `m3_recall.py` | infra (P2 measurement) | seeded-defect recall per voice over a ground-truth corpus; match rule (basename + exact category + line within tolerance), right-place wrong-category excluded; shared blind spot (defects no voice caught) and panel union recall; findings-form `confirmed[]`/`sources[]` input path; unmatched detections counted without a precision number; empty corpus and snapshot mismatch → INCOMPLETE | M3 |
-| `m3b_benchmark_runner.py` | infra (P2 measurement) | pre-registered ablation-arm runner (`scripts/benchmark_run.py`) over a stub dispatcher: the five protocol arms (ordinary/single/repeated/multi-family/adversarial) issue the right dispatch counts (1/1/3/3/6); dry-run prints the plan and dispatches nothing; the adversarial critique round shows each voice the other voices' round-1 findings authorship-blinded and records round 2 separately; detections parse and `recall_score` yields per-arm recall (ordinary 0.25, single 0.5, panel union 0.75) with D4 the shared blind spot; an errored voice lands in the error log and outside recall denominators; a missing dispatcher and an all-errored arm both exit 3 INCOMPLETE, never a fake pass | M3 |
-| `m5_boundary_ledger.py` | infra (P2 measurement) | boundary skill frontmatter valid; `check_ledger_version` exit-code contract (v1 → 0, bare/unversioned → 0 with warning, unknown/malformed → 2); a versioned envelope gates to the identical G2 verdict as the equivalent bare list through `check_evidence_records` (load_records unwrap is verdict-neutral); system-intent template carries the A*/G*/composition structure | M5 |
-
-The behavioral halves of R10 and R23 (live injection steering, contested-synthesis
-adjudication) are harness runs over the mechanisms tested here, exercised manually.
-R11's live half is invocable directly via `r11_deny_first_profiles.py --live`
-(off by default so `run_all` is unchanged); its deny-first enforcement was
-confirmed live from a preflight-clean tree.
+- `m1_coverage.py`
+- `m2_yield.py`
+- `m3_recall.py`
+- `m3b_benchmark_runner.py`
+- `m5_boundary_ledger.py`
+- `r0_registry_docs.py`
+- `r12_preflight_scan.py`
+- `r13_frontmatter_validator.py`
+- `r14_cli_contracts.py`
+- `r16_r17_r18_mcp.py`
+- `r1_r21_r27_ledger_gates.py`
+- `r20_verdict_truth_table.py`
+- `r22_reference_project.py`
+- `r23_adjudication_guard.py`
+- `r24_r26_conformance.py`
+- `r25_critique_loop.py`
+- `r28_baseline_floors.py`
+- `r29_omp_integration.py`
+- `r2_r5_concurrency_containment.py`
+- `r30_omp_native_dispatch.py`
+- `r31_omp_panel.py`
+- `r32_resolver_contract.py`
+- `r33_omp_calibration_session.py`
+- `r6_manifest_failclosed.py`
+- `r7_lean_proof_gate.py`
+- `r8_quint_semantics.py`
+- `r9_r19_obligations.py`
+- `r_ci_selfcheck.py`

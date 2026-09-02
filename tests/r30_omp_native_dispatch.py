@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-HELPER = REPO / "skills" / "colosseum-adversarial" / "omp_fanout.py"
+HELPER = REPO / "skills" / "fv-adversarial" / "omp_fanout.py"
 CONFIG = REPO / "scripts" / "dispatch.config.example.json"
 FAILURES: list[str] = []
 
@@ -262,7 +262,7 @@ def main() -> int:
               raises(lambda: mod.load_fallback_suppression(
                   selected["voices"], certificate_overlay, invalid_precheck),
                   "leaves a tested route eligible"))
-        run_dir = root / ".colosseum" / "attacks" / "partial"
+        run_dir = root / ".fv" / "attacks" / "partial"
         summary = mod.run_omp_fanout(
             agent_fn=fake_agent,
             parallel_fn=serial_parallel,
@@ -344,13 +344,13 @@ def main() -> int:
                 "glm-5.2": "critique A",
                 "claude-agent": "critique B",
             },
-            run_dir=root / ".colosseum" / "attacks" / "all-fail",
+            run_dir=root / ".fv" / "attacks" / "all-fail",
             metadata={"phase": "critique"},
         )
         check("all-failed native wave is INCOMPLETE",
               failed["verdict"] == "INCOMPLETE" and failed["voices_ok"] == 0)
         check("per-voice critique prompts persist verbatim",
-              (root / ".colosseum" / "attacks" / "all-fail"
+              (root / ".fv" / "attacks" / "all-fail"
                / "prompts" / "glm-5.2.md").read_text()
               == "critique A")
 
@@ -365,7 +365,7 @@ def main() -> int:
             project_root=root,
             target_spec=target,
             prompt="attack",
-            run_dir=root / ".colosseum" / "attacks" / "target-drift",
+            run_dir=root / ".fv" / "attacks" / "target-drift",
         )
         check("target drift makes an otherwise successful wave INCOMPLETE",
               unstable["voices_ok"] == 1
@@ -374,7 +374,7 @@ def main() -> int:
         def exploding_parallel(_thunks):
             raise RuntimeError("wave crashed")
 
-        crash_dir = root / ".colosseum" / "attacks" / "wave-crash"
+        crash_dir = root / ".fv" / "attacks" / "wave-crash"
         check("orchestration crash re-raises",
               raises(lambda: mod.run_omp_fanout(
                   agent_fn=fake_agent,
@@ -393,7 +393,7 @@ def main() -> int:
         def dropping_parallel(thunks):
             return [thunk() for thunk in thunks][:-1]
 
-        drop_dir = root / ".colosseum" / "attacks" / "wave-mismatch"
+        drop_dir = root / ".fv" / "attacks" / "wave-mismatch"
         check("wave result-count mismatch re-raises",
               raises(lambda: mod.run_omp_fanout(
                   agent_fn=fake_agent,
@@ -421,7 +421,7 @@ def main() -> int:
               raises(lambda: mod.run_omp_fanout(
                   agent_fn=fake_agent, parallel_fn=serial_parallel,
                   voices=selected["voices"], project_root=root, target_spec=target,
-                  prompt="x", run_dir=root / ".colosseum" / "attacks" / "no-ack",
+                  prompt="x", run_dir=root / ".fv" / "attacks" / "no-ack",
                   allow_unverified_isolation=False), "isolation is unverified")
               and len(calls) == acks)
         with tempfile.TemporaryDirectory(prefix="r30-otherroot-") as other:
@@ -435,7 +435,7 @@ def main() -> int:
                       agent_fn=fake_agent, parallel_fn=serial_parallel,
                       voices=selected["voices"], project_root=root,
                       target_spec=target, prompt="x",
-                      run_dir=root / ".colosseum" / "attacks" / "mismatch"),
+                      run_dir=root / ".fv" / "attacks" / "mismatch"),
                       "not project_root")
                   and len(calls) == m0)
         os.environ["PI_SESSION_FILE"] = str(sess)
@@ -445,13 +445,13 @@ def main() -> int:
               raises(lambda: mod.run_omp_fanout(
                   agent_fn=fake_agent, parallel_fn=serial_parallel,
                   voices=selected["voices"], project_root=root, target_spec=target,
-                  prompt="x", run_dir=root / ".colosseum" / "attacks" / "no-sess"),
+                  prompt="x", run_dir=root / ".fv" / "attacks" / "no-sess"),
                   "cannot confirm the OMP session root")
               and len(calls) == m1)
         if saved is not None:
             os.environ["PI_SESSION_FILE"] = saved
         (root / ".env").write_text("SECRET=value\n")
-        blocked_dir = root / ".colosseum" / "attacks" / "blocked"
+        blocked_dir = root / ".fv" / "attacks" / "blocked"
         calls_before = len(calls)
         blocked = raises(lambda: mod.run_omp_fanout(
             agent_fn=fake_agent,

@@ -6,7 +6,7 @@ It tells an independent party exactly what to run and what to send back, so
 their run is comparable and citable against this repo's own claims.
 
 Read [README.md](../README.md), [QUICKSTART.md](../QUICKSTART.md), and
-[INSTALL.md](../INSTALL.md) first if you have not set up a Colosseum project
+[INSTALL.md](../INSTALL.md) first if you have not set up a FV project
 before. This document assumes you can already install and run the repo; it
 adds the specific sequence that counts as a replication and the bundle that
 makes it checkable.
@@ -15,7 +15,7 @@ makes it checkable.
 
 Independent execution of the workflow on your own machine, by someone with
 no commit history in this repo, producing your own evidence trail: your own
-`colosseum_doctor` output, your own `ci.py` run, your own `r22` run, your
+`fv_doctor` output, your own `ci.py` run, your own `r22` run, your
 own hashes.
 
 Two things this is explicitly not:
@@ -33,24 +33,22 @@ Two things this is explicitly not:
 
 ## 2. Environment
 
-1. Follow [INSTALL.md](../INSTALL.md). At minimum you need §1.1 (Rust),
-   §1.2 (Python 3.11+ and `uv`), §1.3 (JVM 17+, needed by Apalache, which
-   `quint verify` invokes), §2 (clone), and §3.1 (Quint). Add §7 (OpenCode
-   CLI + providers) only if you intend to run the optional extended half in
-   step 3(c).
-2. From the repo root, run the preflight diagnostic and capture its output:
+1. Follow [INSTALL.md](../INSTALL.md), especially **Requirements**, **Install
+   OMP**, **Clone FV**, and **Initialize a project**. Set `FV_ROOT` to
+   this checkout. Bun, Python 3.11+, and `uv` are required. Install Cargo and
+   Quint before the mandatory reference-project run.
+2. Initialize a disposable replication project, then run the package doctor
+   against that project and capture its output:
 
    ```bash
-   ./scripts/colosseum_doctor.py --json > doctor.json
+   export REPLICATION_PROJECT=/tmp/fv-replication
+   python3 "$FV_ROOT/scripts/fv_init.py" "$REPLICATION_PROJECT"
+   uv run --script "$FV_ROOT/scripts/fv_doctor.py" \
+     --project "$REPLICATION_PROJECT" --json > doctor.json
    cat doctor.json
    ```
 
-   `colosseum_doctor.py` compares your installed tool versions against
-   [`bom.json`](../bom.json), checks the voice registry, and (with
-   `--project`) diffs a project's dispatch scripts against the repo's
-   canonical copies. You do not need `--project` for this replication — you
-   are running against the repo itself, not a downstream project. Include
-   `doctor.json` verbatim in your return bundle (section 4).
+   Include `doctor.json` verbatim in your return bundle (section 4).
 3. Minimum toolchain for a meaningful replication: `cargo` and `quint` on
    `PATH`. `quint verify` auto-downloads Apalache to `~/.quint/apalache`
    (~250 MB) on first invocation; pre-warm it once outside automation
@@ -87,13 +85,11 @@ exact commit (`git rev-parse HEAD`) and whether the tree was dirty
 echo "ci.py exit=$?" >> ci-output.txt
 ```
 
-Runs frontmatter validation, agent-lint, roster-drift, doc-links,
-dispatch-config, and the full regression suite (`tests/run_all.py`, ~24
-suites — this already includes `r22_reference_project.py` as one of the
-`tests/r*.py` suites it globs). Exit 0 pass, 1 a check failed, 2 usage
-error. Use `--strict` if you want an INCOMPLETE regression suite (a
-toolchain-absent suite) to also fail the run; report whichever mode you
-used.
+Runs frontmatter validation, agent policy, roster drift, documentation links,
+dispatch configuration, fixture tracking, and the full regression suite. The
+default is exhaustive and treats INCOMPLETE as nonzero. Use
+`--tolerate-incomplete` only when reporting a known unavailable toolchain, and
+record that mode in the return bundle.
 
 **(b) The end-to-end reference project, standalone:**
 
@@ -121,14 +117,11 @@ inside `tests/fixtures/`:
 mkdir -p /tmp/r22-panel && cp -R tests/fixtures/r22/project /tmp/r22-panel/
 ```
 
-Then follow [`skills/colosseum-adversarial/SKILL.md`](../skills/colosseum-adversarial/SKILL.md)
-and [`scripts/opencode_dispatch.py`](../scripts/opencode_dispatch.py) against
-`/tmp/r22-panel/project/INTENT.md` as `TARGET_SPEC`, using whatever voices
-you have credentials for. Your voice roster will differ from the canonical
-panel pinned in `registry/voices.json` — that is fine and expected. Record
-it, do not hide it: name each voice's exact provider/model id, and do not
-describe your roster as "the canonical panel" unless it is byte-identical
-to the pin recorded in `registry/voices.json` at your checkout commit.
+Then start OMP in `/tmp/r22-panel/project`, load the FV extension, and
+invoke `/skill:fv-adversarial` against `INTENT.md`. The skill resolves
+available ModelRegistry routes and records the exact served roster. Do not call
+the roster canonical unless its generated profile pin matches
+`registry/voices.json` at the checkout commit.
 
 ## 4. The return bundle
 
@@ -141,7 +134,7 @@ Collect these into one directory before hashing:
   `bom.json` at that commit vs. what `doctor.json` reported you actually
   had installed (`doctor.json`'s own toolchain-vs-BOM comparison already
   carries this; `versions.txt` is a one-line human summary pointing at it)
-- panel outputs from step 3c, if you ran it, under `.colosseum/attacks/`
+- panel outputs from step 3c, if you ran it, under `.fv/attacks/`
   as written by the dispatch tooling — verbatim, unedited
 - a short prose report of divergences: anything that passed here and would
   not on the authoring machine, anything that failed here and passed there,
@@ -162,7 +155,7 @@ Collect these into one directory before hashing:
 Open a PR against this repo adding a `replications/<ISO-date>-<party>/`
 directory containing the bundle from section 4, plus a manifest file at
 `replications/<ISO-date>-<party>/manifest.json` following the
-`colosseum-dogfood-evidence/v1` conventions in
+`fv-dogfood-evidence/v2` conventions in
 [dogfood-evidence.md](./dogfood-evidence.md): a `status` field of
 `observation` or `manifested`, honest `null`s wherever a value was not
 captured rather than a plausible-looking guess, and the same field
@@ -172,7 +165,7 @@ project. Minimum manifest shape:
 
 ```json
 {
-  "schema": "colosseum-replication-manifest/v1",
+  "schema": "fv-replication-manifest/v2",
   "status": "observation",
   "party": "<name or handle>",
   "generated_at": "<ISO-8601 UTC>",

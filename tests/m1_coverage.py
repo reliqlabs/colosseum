@@ -124,7 +124,7 @@ def main() -> int:
     check("all-PASS subset (B1,W1): exit 0", code == 0)
     check("all-PASS subset: verdict is scoped VERIFIED[...]",
           d2.get("verdict", "").startswith("VERIFIED[")
-          and d2.get("verdict") == "VERIFIED[profile=bounded; waived-or-assumed=W1]")
+          and d2.get("verdict") == "VERIFIED[profile=bounded] (waived: W1)")
     check("all-PASS subset: verdict is never bare VERIFIED",
           not BARE_VERIFIED.search(d2.get("verdict", "")))
 
@@ -177,9 +177,9 @@ def main() -> int:
           bool(BARE_VERIFIED.search("some prose says VERIFIED here")))
     check("token discipline: scoped 'VERIFIED[profile=bounded]' is NOT flagged",
           not BARE_VERIFIED.search("VERDICT: VERIFIED[profile=bounded]"))
-    check("token discipline: scoped with waived-or-assumed suffix is NOT flagged",
+    check("token discipline: scoped with visible waiver suffix is NOT flagged",
           not BARE_VERIFIED.search(
-              "VERIFIED[profile=bounded; waived-or-assumed=W1]"))
+              "VERIFIED[profile=bounded] (waived: W1)"))
     # cross-check against every line the dashboard actually emits for the
     # all-PASS fixture, across text, stderr, and --json renderings: the
     # word VERIFIED must appear at least once (it's the real verdict) and
@@ -219,9 +219,12 @@ def main() -> int:
     gate = REPO / "scripts" / "check_evidence_records.py"
 
     def gate_verdict(*extra: str) -> str:
+        gate_extra = [*extra]
+        if "--manifest" in gate_extra:
+            gate_extra += ["--expect-manifest", "2" * 64]
         proc = subprocess.run(
             ["uv", "run", "--script", str(gate), "--records", str(records),
-             *extra, "--json"],
+             "--allow-unbound", *gate_extra, "--json"],
             capture_output=True, text=True, timeout=60)
         try:
             return json.loads(proc.stdout)["verdict"]

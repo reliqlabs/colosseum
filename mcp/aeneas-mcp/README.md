@@ -1,6 +1,6 @@
 # aeneas-mcp
 
-MCP server wrapping [Aeneas](https://github.com/AeneasVerif/aeneas) — the Rust → Lean 4 extraction toolchain — as a Claude-callable tool. The bridge between Colosseum's Rust code layer and its theorem-proving layer (Lean + Goedel).
+MCP server wrapping [Aeneas](https://github.com/AeneasVerif/aeneas) — the Rust → Lean 4 extraction toolchain — as a Claude-callable tool. The bridge between FV's Rust code layer and its theorem-proving layer (Lean + Goedel).
 
 ## Pipeline
 
@@ -69,7 +69,7 @@ aeneas -version
 {
   "mcpServers": {
     "aeneas": {
-      "command": "/Users/you/path/to/colosseum/mcp/aeneas-mcp/aeneas_mcp.py"
+      "command": "/Users/you/path/to/fv/mcp/aeneas-mcp/aeneas_mcp.py"
     }
   }
 }
@@ -110,11 +110,11 @@ Expected: both `charon.present: true` and `aeneas.present: true`, with `ok: true
 
 ## Typical usage pattern
 
-In a Colosseum verification session targeting the theorem-proving layer:
+In a FV verification session targeting the theorem-proving layer:
 
 1. Claude calls `check_aeneas_health()` to confirm the toolchain is available
 2. Claude calls `extract_rust_to_lean(crate_path, output_dir)` and inspects the stage-by-stage result
-3. If extraction fails: route to `colosseum-failure-classifier` — likely `tool_mismatch` (Rust pattern not supported) or `infrastructure`
+3. If extraction fails: route to `fv-failure-classifier` — likely `tool_mismatch` (Rust pattern not supported) or `infrastructure`
 4. If extraction succeeds: Claude calls `list_extracted_definitions(output_dir)` to inventory the Lean surface
 5. For each extracted theorem with a `sorry`, Claude orchestrates the proof: reads goal via `lean-lsp-mcp`, proposes tactics via `goedel-mcp`, verifies via `lean-lsp-mcp`
 

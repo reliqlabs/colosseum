@@ -27,13 +27,10 @@ ARMS (docs/benchmark-protocol.md, cheapest to richest)
                   outputs are recorded and scored separately from round 1.
 
 DISPATCH (the single model-call surface)
-    Every model call goes through Dispatcher.run(). It shells out to a
-    command template, default
-        opencode run --model {model} --agent spec-adversary {prompt}
-    with cwd = the --targets dir. {model} and {prompt} are substituted into
-    the argv tokens (no shell, so the prompt is one argv element and is not
-    re-split). --dispatch-cmd overrides the template; that is how the test
-    swaps in a stub. No other code path invokes a model.
+    Every model call goes through Dispatcher.run() using the required
+    `--dispatch-cmd` template. OMP-native runners supply a command containing
+    `{model}` and `{prompt}`; tests substitute a stub executable. No other
+    code path invokes a model.
 
 BLINDING
     The corpus file is NEVER read by this runner and never enters a prompt
@@ -104,7 +101,6 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 RECALL_SCORE = SCRIPTS_DIR / "recall_score.py"
 
 ARMS = ["ordinary", "single", "repeated", "multi-family", "adversarial"]
-DEFAULT_DISPATCH = "opencode run --model {model} --agent spec-adversary {prompt}"
 
 FENCE = re.compile(r"```json\s*(\[.*?\])\s*```", re.DOTALL)
 REQUIRED = {"file", "line", "category", "severity", "title"}
@@ -209,9 +205,8 @@ class Dispatcher:
 
     def run(self, model: str, prompt: str) -> dict:
         argv = self.argv(model, prompt)
-        # opencode resolves its project from $PWD, not getcwd; subprocess
-        # cwd= alone leaves the parent's stale PWD and the dispatch
-        # server-errors. Keep them consistent.
+        # Keep PWD aligned with subprocess cwd for dispatchers that resolve
+        # project state through the environment.
         env = {**os.environ, "PWD": str(self.cwd)}
         t0 = time.monotonic()
         try:
@@ -524,8 +519,8 @@ def main() -> int:
                     help="panel voices (csv); arm 1-3 use the first voice")
     ap.add_argument("--repeats", type=int, default=3,
                     help="passes for the repeated-same-model arm (default 3)")
-    ap.add_argument("--dispatch-cmd", default=DEFAULT_DISPATCH,
-                    help="command template with {model} and {prompt} placeholders")
+    ap.add_argument("--dispatch-cmd", required=True,
+                    help="OMP-native command template with {model} and {prompt} placeholders")
     ap.add_argument("--per-call-timeout", type=int, default=1800)
     ap.add_argument("--dry-run", action="store_true",
                     help="print the dispatch plan and exit without dispatching")
@@ -604,7 +599,7 @@ def main() -> int:
                  for k, r in e.get("errored", {}).items()]
 
     summary = {
-        "schema": "colosseum-benchmark/v1",
+        "schema": "fv-benchmark/v2",
         "corpus": str(args.corpus),
         "targets": str(targets),
         "dispatch_cmd": args.dispatch_cmd,

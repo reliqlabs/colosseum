@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SKILL = REPO / "skills" / "colosseum-adversarial" / "SKILL.md"
+SKILL = REPO / "skills" / "fv-adversarial" / "SKILL.md"
 FAILURES: list[str] = []
 
 

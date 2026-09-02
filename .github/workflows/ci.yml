@@ -1,4 +1,4 @@
-name: colosseum-ci
+name: fv-ci
 
 # What this workflow honestly gates:
 #
@@ -6,16 +6,10 @@ name: colosseum-ci
 # apalache/JVM, kani, verus, lean, cargo-fuzz). So we DO NOT pretend to run
 # the toolchain-dependent suites here. Two jobs:
 #
-#   gates      — toolchain-independent checks, REQUIRED. These fully gate a
-#                PR: frontmatter/agent-lint/roster-drift/doc-links/
-#                dispatch-config, plus the pure-Python regression suites
-#                (run_all reports exit 1 on a real regression even when the
-#                toolchain suites are absent, and exit 3 = INCOMPLETE when
-#                they merely could not run).
-#   regression — the full Part IV suite. exit 1 (a real failure in a
-#                runnable suite) fails the job; exit 3 (INCOMPLETE, a
-#                toolchain was absent) is tolerated and annotated. Run the
-#                toolchain-dependent halves locally or in a toolchain image.
+#   gates      - toolchain-independent required checks, including Bun-based OMP
+#                resolver and evidence-tool contracts.
+#   regression - full suite. Exit 3 is tolerated only after the required core
+#                runtime suites have passed separately.
 #
 # uv and Python are pinned per bom.json (uv 0.11.6, python >=3.11).
 
@@ -33,22 +27,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Bun (pinned)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
       - name: Install uv (pinned)
         uses: astral-sh/setup-uv@v5
         with:
           version: "0.11.6"
       - name: Set up Python
         run: uv python install 3.12
-      - name: Frontmatter / lint / roster / links / dispatch-config
+      - name: Frontmatter / roster / links / dispatch / fixtures
         run: >-
           uv run --script scripts/ci.py
-          --only frontmatter,agent-lint,roster-drift,doc-links,dispatch-config
+          --only frontmatter,roster-drift,doc-links,dispatch-config,fixture-tracking
+      - name: OMP extension runtime contracts
+        run: |
+          uv run --script tests/r32_resolver_contract.py
+          uv run --script tests/r34_evidence_run.py
 
   regression:
     name: Regression suite (toolchain-dependent tolerated)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Bun (pinned)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
       - name: Install uv (pinned)
         uses: astral-sh/setup-uv@v5
         with:
@@ -61,11 +67,14 @@ jobs:
           uv run --script tests/run_all.py
           rc=$?
           set -e
-          if [ "$rc" = "1" ]; then
-            echo "::error::regression suite reported a real failure"
-            exit 1
-          elif [ "$rc" = "3" ]; then
-            echo "::warning::regression INCOMPLETE — verification toolchains absent on this runner; run the toolchain-dependent suites locally or in a toolchain image"
-            exit 0
-          fi
-          exit 0
+          case "$rc" in
+            0) exit 0 ;;
+            3)
+              echo "::warning::regression INCOMPLETE: proof toolchains absent on hosted runner"
+              exit 0
+              ;;
+            *)
+              echo "::error::regression suite exited $rc"
+              exit "$rc"
+              ;;
+          esac

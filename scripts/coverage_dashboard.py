@@ -207,9 +207,10 @@ def compute_verdict(rows: list[dict], by_claim: dict[str, dict],
     profiles = sorted({by_claim[r["claim_id"]]["bindings"]["profile"] for r in rows})
     scope = f"profile={'/'.join(profiles)}"
     waived = sorted(r["claim_id"] for r in rows if r["waived"])
+    verdict = f"VERIFIED[{scope}]"
     if waived:
-        scope += f"; waived-or-assumed={','.join(waived)}"
-    return f"VERIFIED[{scope}]", 0
+        verdict += f" (waived: {','.join(waived)})"
+    return verdict, 0
 
 
 def build_dashboard(records_path: Path, required: list[str],

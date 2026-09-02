@@ -33,8 +33,8 @@ def run(argv: list[str], *, env: dict[str, str]) -> subprocess.CompletedProcess:
 
 def init(project: Path, *, env: dict[str, str]) -> subprocess.CompletedProcess:
     return run([
-        "uv", "run", "--script", str(SCRIPTS / "colosseum_init.py"),
-        str(project), "--harness", "omp",
+        "uv", "run", "--script", str(SCRIPTS / "fv_init.py"),
+        str(project),
     ], env=env)
 
 
@@ -61,8 +61,8 @@ if argv[-3:] == ['config', 'get', 'retry.fallbackChains']:
     raise SystemExit(0)
 Path(os.environ['TEST_CAPTURE']).write_text(json.dumps({
     'argv': argv,
-    'overlay': os.environ.get('COLOSSEUM_OMP_FALLBACK_OVERLAY'),
-    'precheck': os.environ.get('COLOSSEUM_OMP_FALLBACK_PRECHECK'),
+    'overlay': os.environ.get('FV_OMP_FALLBACK_OVERLAY'),
+    'precheck': os.environ.get('FV_OMP_FALLBACK_PRECHECK'),
     'config_files': os.environ.get('PI_CONFIG_FILES'),
 }))
 raise SystemExit(int(os.environ.get('FAKE_LAUNCH_EXIT', '0')))

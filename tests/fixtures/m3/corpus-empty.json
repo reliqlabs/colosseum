@@ -1,5 +1,5 @@
 {
-  "schema": "colosseum-seeded-corpus/v1",
+  "schema": "fv-seeded-corpus/v2",
   "target": "empty-fixture",
   "target_snapshot": "abc1234+worktree-clean",
   "line_tolerance": 5,
